@@ -3,9 +3,9 @@ server:
 
 spring:
   datasource:
-    url: ${DATABASE_URL:jdbc:mysql://localhost:3306/dopamina_crew_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}
-    username: ${DATABASE_USER:dopamina_user}
-    password: ${DATABASE_PASSWORD:dopamina_secure_password123}
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:dopamina_crew_db}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: ${DB_USER:dopamina_user}
+    password: ${DB_PASSWORD:dopamina_secure_password123}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
