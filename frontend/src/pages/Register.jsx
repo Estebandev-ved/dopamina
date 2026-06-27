@@ -82,12 +82,16 @@ export default function Register() {
 
   const googleLogin = useGoogleLogin({
     flow: 'implicit',
-    onSuccess: async (credentialResponse) => {
+    onSuccess: async (tokenResponse) => {
       setLoading(true);
       setSubmitError('');
       try {
-        const payload = decodeJwtPayload(credentialResponse.credential);
-        if (!payload) throw new Error('No se pudo verificar la identidad de Google.');
+        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        });
+        const payload = await userInfoRes.json();
+        if (!payload || !payload.email) throw new Error('No se pudo obtener la información de Google.');
+        
         await api.loginWithGoogle(payload.email, payload.name, payload.sub);
         navigate('/');
       } catch (err) {
