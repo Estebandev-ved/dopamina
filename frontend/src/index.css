@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Variables de paleta ──────────────────────────────────────────────────── */
+:root {
+  --color-bg:         #0A0A0F;  /* Negro casi puro */
+  --color-neon:       #B14EFF;  /* Violeta neón */
+  --color-neon-light: #C97FFF;  /* Violeta claro */
+  --color-neon-glow:  #D9AAFF;  /* Glow suave */
+  --color-neon-shadow-sm: rgba(177, 78, 255, 0.3);
+  --color-neon-shadow-md: rgba(177, 78, 255, 0.55);
+  --color-neon-shadow-lg: rgba(177, 78, 255, 0.8);
+  --color-gray:       #9A9A9A;  /* Gris claro */
+  --color-bone:       #F2F0F5;  /* Blanco hueso */
+}
+
+@layer base {
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-bone);
+    font-family: 'Outfit', 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Selección de texto con color de marca */
+  ::selection {
+    background-color: rgba(177, 78, 255, 0.35);
+    color: #F2F0F5;
+  }
+}
+
+/* ── Scrollbars ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #22222D;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-neon);
+  box-shadow: 0 0 10px var(--color-neon);
+}
+
+/* ── Grid industrial de fondo ─────────────────────────────────────────────── */
+.industrial-grid {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(242, 240, 245, 0.018) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(242, 240, 245, 0.018) 1px, transparent 1px);
+}
+
+.industrial-grid-dense {
+  background-size: 20px 20px;
+  background-image: 
+    linear-gradient(to right, rgba(177, 78, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(177, 78, 255, 0.04) 1px, transparent 1px);
+}
+
+/* ── Glow borders ─────────────────────────────────────────────────────────── */
+.glow-border {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.glow-border::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(90deg, var(--color-neon), var(--color-neon-light));
+  border-radius: inherit;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.glow-border:hover::after {
+  opacity: 1;
+}
+
+/* ── Efectos de texto neón ────────────────────────────────────────────────── */
+.text-neon {
+  color: var(--color-neon);
+  text-shadow: 0 0 10px rgba(177, 78, 255, 0.6), 0 0 20px rgba(177, 78, 255, 0.4);
+}
+
+.text-neon-glow {
+  color: var(--color-neon-light);
+  text-shadow: 0 0 15px rgba(201, 127, 255, 0.8), 0 0 30px rgba(201, 127, 255, 0.5);
+}
+
+/* ── Ticker infinito de sponsors ──────────────────────────────────────────── */
+@keyframes scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-ticker-scroll {
+  display: flex;
+  width: max-content;
+  animation: scroll 30s linear infinite;
+}
+
+/* ── Barras ecualizador DJ player ─────────────────────────────────────────── */
+@keyframes soundWave {
+  0%, 100% { height: 4px; }
+  50%       { height: 28px; }
+}
+
+.eq-bar {
+  width: 3px;
+  background-color: var(--color-neon);
+  border-radius: 2px;
+}
+
+.eq-bar-1 { animation: soundWave 0.8s ease-in-out infinite; }
+.eq-bar-2 { animation: soundWave 1.2s ease-in-out infinite; animation-delay: 0.2s; }
+.eq-bar-3 { animation: soundWave 0.9s ease-in-out infinite; animation-delay: 0.4s; }
+.eq-bar-4 { animation: soundWave 1.1s ease-in-out infinite; animation-delay: 0.1s; }
+.eq-bar-5 { animation: soundWave 0.7s ease-in-out infinite; animation-delay: 0.3s; }
+.eq-bar-6 { animation: soundWave 1.3s ease-in-out infinite; animation-delay: 0.5s; }

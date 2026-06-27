@@ -1,0 +1,39 @@
+# System / OS
+.DS_Store
+Thumbs.db
+
+# Secrets & Local Configurations
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Dependency directories
+node_modules/
+jspm_packages/
+web_modules/
+
+# Maven build outputs
+target/
+*.class
+*.db
+*.log
+
+# IDE settings
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# React build outputs
+dist/
+build/
+out/
+
+# Maven wrapper/binaries
+.maven/
+
