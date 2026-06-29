@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import logoImg from '../assets/logo.png';
 import jsQR from 'jsqr';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
@@ -1330,7 +1331,7 @@ export default function AdminDashboard() {
         {/* Logo */}
         <div style={{ padding: '20px 20px', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ width: '32px', height: '32px', borderRadius: '6px', border: `1px solid ${theme.accent}`, background: '#000', display: 'flex', alignItems: 'center', justifycontent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-            <img src="/src/assets/logo.png" alt="Logo" style={{ width: '22px', height: '22px', objectFit: 'contain' }} />
+            <img src={logoImg} alt="Logo" style={{ width: '22px', height: '22px', objectFit: 'contain' }} />
           </div>
           <div>
             <div style={{ fontWeight: 900, fontSize: '1rem', color: theme.text, letterSpacing: '1px' }}>DOPAMINA</div>

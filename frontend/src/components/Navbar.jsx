@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { LogOut, User, Shield, Menu, X, ChevronDown, Ticket, Award } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 
 /**
  * Navbar component for Dopamina Crew portal.
@@ -164,7 +165,7 @@ export default function Navbar() {
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-3 group">
               <div className="w-8 h-8 rounded border border-neon-purple flex items-center justify-center bg-black overflow-hidden transition-all duration-300 group-hover:shadow-neon-sm group-hover:border-neon-violet">
-                <img src="/src/assets/logo.png" alt="Dopamina Logo" className="w-6 h-6 object-contain" />
+                <img src={logoImg} alt="Dopamina Logo" className="w-6 h-6 object-contain" />
               </div>
               <span className="text-xl font-black tracking-widest text-white group-hover:text-neon-glow transition-colors duration-300">
                 DOPAMINA

@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
+import logoImg from '../assets/logo.png';
 
 /**
  * Splash Screen showing on initial load.
@@ -49,7 +50,7 @@ export default function Splash({ onComplete }) {
               transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
               className="w-16 h-16 rounded-lg border border-neon-purple flex items-center justify-center bg-black overflow-hidden"
             >
-              <img src="/src/assets/logo.png" alt="Dopamina Logo" className="w-11 h-11 object-contain" />
+              <img src={logoImg} alt="Dopamina Logo" className="w-11 h-11 object-contain" />
             </motion.div>
             <div className="absolute -inset-1 border border-neon-purple/30 rounded-lg blur-sm pointer-events-none" />
           </div>
