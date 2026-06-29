@@ -4,6 +4,7 @@ import com.dopaminacrew.backend.dto.EventoRequest;
 import com.dopaminacrew.backend.dto.EventoResponse;
 import com.dopaminacrew.backend.model.Evento;
 import com.dopaminacrew.backend.repository.EventoRepository;
+import com.dopaminacrew.backend.repository.CompraRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
@@ -24,6 +25,9 @@ public class EventoServiceImpl {
 
     @Autowired
     private EventoRepository eventoRepository;
+
+    @Autowired
+    private CompraRepository compraRepository;
 
     // ── Public ────────────────────────────────────────────────────────────────
 
@@ -88,6 +92,15 @@ public class EventoServiceImpl {
         e.setLugar(req.getLugar());
         e.setCiudad(req.getCiudad() != null ? req.getCiudad() : "Medellín");
         e.setPrecio(req.getPrecio() != null ? req.getPrecio() : BigDecimal.ZERO);
+        // Preventa: solo se activa si hay precio y cantidad (> 0); si no, se limpia.
+        if (req.getPrecioPreventa() != null && req.getCantidadPreventa() != null
+                && req.getCantidadPreventa() > 0) {
+            e.setPrecioPreventa(req.getPrecioPreventa());
+            e.setCantidadPreventa(req.getCantidadPreventa());
+        } else {
+            e.setPrecioPreventa(null);
+            e.setCantidadPreventa(null);
+        }
         e.setCapacidad(req.getCapacidad() != null ? req.getCapacidad() : 100);
         e.setImagenUrl(req.getImagenUrl());
         e.setLineup(req.getLineup());
@@ -96,6 +109,8 @@ public class EventoServiceImpl {
     }
 
     private EventoResponse toResponse(Evento e) {
+        // Entradas ocupadas (pagadas + reservas vigentes): cifra usada para el cupo de preventa.
+        int vendidas = compraRepository.contarEntradasOcupadas(e.getId());
         return new EventoResponse(
                 e.getId(),
                 e.getNombre(),
@@ -105,6 +120,9 @@ public class EventoServiceImpl {
                 e.getLugar(),
                 e.getCiudad(),
                 e.getPrecio() != null ? e.getPrecio().doubleValue() : 0.0,
+                e.getPrecioPreventa() != null ? e.getPrecioPreventa().doubleValue() : null,
+                e.getCantidadPreventa(),
+                vendidas,
                 e.getCapacidad(),
                 e.getImagenUrl(),
                 e.getLineup(),

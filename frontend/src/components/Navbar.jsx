@@ -133,13 +133,14 @@ export default function Navbar() {
               <span className="font-bold">INICIA EN:</span>
               <div className="flex gap-1.5">
                 {[
-                  { v: countdown.days, l: 'DÍAS' },
-                  { v: countdown.hours, l: 'HRS' },
-                  { v: countdown.minutes, l: 'MIN' },
-                  { v: countdown.seconds, l: 'SEG' }
+                  { v: countdown.days, l: 'd' },
+                  { v: countdown.hours, l: 'h' },
+                  { v: countdown.minutes, l: 'm' },
+                  { v: countdown.seconds, l: 's' }
                 ].map(({ v, l }) => (
-                  <span key={l} className="bg-industrial-950 border border-neon-purple/20 text-white font-bold rounded px-2 py-0.5 min-w-[32px] text-center shadow-neon-sm font-mono text-[10px]" style={{ borderColor: 'rgba(var(--color-neon), 0.25)', textShadow: '0 0 8px var(--color-neon)' }}>
-                    {String(v).padStart(2, '0')} <span className="text-[8px] text-gray-500 font-normal">{l}</span>
+                  <span key={l} className="bg-industrial-950 border border-neon-purple/30 text-white font-black rounded px-2 py-0.5 min-w-[36px] text-center shadow-neon-sm font-mono text-[11px] flex items-center justify-center gap-0.5" style={{ borderColor: 'rgba(var(--color-neon), 0.25)', textShadow: '0 0 6px var(--color-neon)' }}>
+                    <span>{String(v).padStart(2, '0')}</span>
+                    <span className="text-gray-500 text-[8px] font-normal uppercase">{l}</span>
                   </span>
                 ))}
               </div>
@@ -162,8 +163,8 @@ export default function Navbar() {
           {/* Logo Brand */}
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-3 group">
-              <div className="w-8 h-8 rounded border border-neon-purple flex items-center justify-center bg-black text-neon-purple font-black text-lg transition-all duration-300 group-hover:shadow-neon-sm group-hover:border-neon-violet">
-                D
+              <div className="w-8 h-8 rounded border border-neon-purple flex items-center justify-center bg-black overflow-hidden transition-all duration-300 group-hover:shadow-neon-sm group-hover:border-neon-violet">
+                <img src="/src/assets/logo.png" alt="Dopamina Logo" className="w-6 h-6 object-contain" />
               </div>
               <span className="text-xl font-black tracking-widest text-white group-hover:text-neon-glow transition-colors duration-300">
                 DOPAMINA

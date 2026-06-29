@@ -45,6 +45,14 @@ public class Evento {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal precio;
 
+    // ── Preventa (precio promocional para las primeras N entradas) ──────────────
+    // Si ambos son null, el evento no tiene preventa y se cobra siempre 'precio'.
+    @Column(name = "precio_preventa", precision = 10, scale = 2)
+    private BigDecimal precioPreventa;
+
+    @Column(name = "cantidad_preventa")
+    private Integer cantidadPreventa;
+
     @Column(nullable = false)
     private Integer capacidad;
 

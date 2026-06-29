@@ -14,6 +14,7 @@ import Dashboard from './pages/Dashboard';
 import Perfil from './pages/Perfil';
 import Eventos from './pages/Eventos';
 import Artistas from './pages/Artistas';
+import PagoResultado from './pages/PagoResultado';
 import AdminDashboard from './pages/AdminDashboard';
 import { api } from './services/api';
 
@@ -23,6 +24,10 @@ import { api } from './services/api';
 const ProtectedRoute = ({ children }) => {
   const user = api.getUser();
   if (!user) return <Navigate to="/login" replace />;
+  if (api.isTokenExpired()) {
+    api.clearAuth();
+    return <Navigate to="/login" replace />;
+  }
   return children;
 };
 
@@ -33,6 +38,10 @@ const ProtectedRoute = ({ children }) => {
 const AdminRoute = ({ children }) => {
   const user = api.getUser();
   if (!user) return <Navigate to="/login" replace />;
+  if (api.isTokenExpired()) {
+    api.clearAuth();
+    return <Navigate to="/login" replace />;
+  }
   if (user.rol !== 'ROLE_ADMIN') return <Navigate to="/" replace />;
   return children;
 };
@@ -111,6 +120,7 @@ export default function App() {
                   <Route path="/perfil" element={<ProtectedRoute><Perfil /></ProtectedRoute>} />
                   <Route path="/eventos" element={<Eventos />} />
                   <Route path="/artistas" element={<Artistas />} />
+                  <Route path="/pago-resultado" element={<PagoResultado />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </AnimatePresence>

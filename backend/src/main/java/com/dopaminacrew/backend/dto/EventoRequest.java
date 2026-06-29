@@ -34,6 +34,14 @@ public class EventoRequest {
     @DecimalMin(value = "0.0", message = "El precio no puede ser negativo")
     private BigDecimal precio;
 
+    // Preventa (opcional). Si se definen ambos, las primeras 'cantidadPreventa'
+    // entradas se venden al 'precioPreventa' y el resto al 'precio' regular.
+    @DecimalMin(value = "0.0", message = "El precio de preventa no puede ser negativo")
+    private BigDecimal precioPreventa;
+
+    @Min(value = 0, message = "La cantidad de preventa no puede ser negativa")
+    private Integer cantidadPreventa;
+
     @Min(value = 1, message = "La capacidad debe ser al menos 1")
     private Integer capacidad;
 

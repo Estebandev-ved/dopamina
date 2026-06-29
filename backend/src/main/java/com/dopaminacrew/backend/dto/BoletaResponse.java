@@ -22,4 +22,5 @@ public class BoletaResponse {
     private String estado;
     private LocalDateTime createdAt;
     private String usuarioNombre;
+    private Integer numeroSorteo;
 }

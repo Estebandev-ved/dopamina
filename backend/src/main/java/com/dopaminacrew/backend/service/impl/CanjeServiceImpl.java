@@ -7,6 +7,7 @@ import com.dopaminacrew.backend.repository.CanjeRepository;
 import com.dopaminacrew.backend.repository.CompraRepository;
 import com.dopaminacrew.backend.repository.UserRepository;
 import com.dopaminacrew.backend.service.CanjeService;
+import com.dopaminacrew.backend.service.EmailService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,13 +26,16 @@ import java.util.List;
 public class CanjeServiceImpl implements CanjeService {
 
     @Autowired
-    private CanjeRepository canjeRepository;
+    private UserRepository userRepository;
 
     @Autowired
     private CompraRepository compraRepository;
 
     @Autowired
-    private UserRepository userRepository;
+    private CanjeRepository canjeRepository;
+
+    @Autowired
+    private EmailService emailService;
 
     private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -41,15 +45,16 @@ public class CanjeServiceImpl implements CanjeService {
         // Fetch all purchases to compute earned points (50 points per ticket)
         List<Compra> compras = compraRepository.findByUsuarioIdOrderByCreatedAtDesc(usuarioId);
         int totalTickets = compras.stream()
-                .filter(c -> "PAGADO".equalsIgnoreCase(c.getEstado()))
-                .mapToInt(Compra::getCantidad)
+                .filter(c -> "PAGADO".equalsIgnoreCase(c.getEstado()) && c.getCantidad() != null)
+                .mapToInt(c -> c.getCantidad())
                 .sum();
         int earnedPoints = totalTickets * 50;
 
         // Fetch all redemptions to compute spent points
         List<Canje> canjes = canjeRepository.findByUsuarioIdOrderByCreatedAtDesc(usuarioId);
         int spentPoints = canjes.stream()
-                .mapToInt(Canje::getCostoPuntos)
+                .filter(c -> c.getCostoPuntos() != null)
+                .mapToInt(c -> c.getCostoPuntos())
                 .sum();
 
         return Math.max(0, earnedPoints - spentPoints);
@@ -76,7 +81,9 @@ public class CanjeServiceImpl implements CanjeService {
         canje.setCostoPuntos(costoPuntos);
         canje.setEstado("PENDIENTE");
 
-        return canjeRepository.save(canje);
+        Canje saved = canjeRepository.save(canje);
+        emailService.sendRewardConfirmation(user, premioTitulo, uniqueCode);
+        return saved;
     }
 
     @Override

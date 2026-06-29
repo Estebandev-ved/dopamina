@@ -17,8 +17,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.beans.factory.annotation.Value;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 /**
  * Security Configuration for Spring Boot 3.x.
@@ -34,6 +36,10 @@ public class SecurityConfig {
 
     @Autowired
     private CustomUserDetailsService userDetailsService;
+
+    // Orígenes permitidos para CORS, configurables por entorno (app.cors.allowed-origins)
+    @Value("${app.cors.allowed-origins}")
+    private List<String> allowedOrigins;
 
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter() {
@@ -59,6 +65,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()       // Authentication endpoints are public
                 .requestMatchers("/api/public/**").permitAll()      // Public resources
+                .requestMatchers("/api/webhook/**").permitAll()     // Webhook endpoints are public (signature verified internally)
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")  // Admin dashboard: ROLE_ADMIN only (defense-in-depth)
                 .anyRequest().authenticated()                        // Everything else requires a valid JWT
             )
@@ -78,9 +85,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Allow React dev environment and deployed Vercel apps
-        configuration.setAllowedOriginPatterns(Collections.singletonList("*"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        // Solo se permiten los orígenes definidos en app.cors.allowed-origins (no comodín "*").
+        // Se usan patrones para soportar previews de Vercel si se incluyen explícitamente.
+        configuration.setAllowedOriginPatterns(allowedOrigins);
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cache-Control"));
         configuration.setExposedHeaders(Collections.singletonList("Authorization"));
         configuration.setAllowCredentials(true);

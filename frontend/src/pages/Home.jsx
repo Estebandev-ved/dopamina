@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import PageTransition from '../components/PageTransition';
-import { Ticket, Radio, Flame, Sparkles, CheckCircle2, AlertTriangle, ArrowRight, ShieldCheck, Send } from 'lucide-react';
+import { Ticket, Radio, Flame, Sparkles, CheckCircle2, AlertTriangle, ArrowRight, ShieldCheck, Send, Gift, EyeOff, MessageCircle, Music } from 'lucide-react';
 import heroBg from '../assets/hero-bg.png';
 
 /**
@@ -27,6 +27,15 @@ export default function Home() {
   const [purchaseStatus, setPurchaseStatus] = useState(null);
   const [purchaseMessage, setPurchaseMessage] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
+  const [suggestionText, setSuggestionText] = useState('');
+  const [suggestionNombre, setSuggestionNombre] = useState('');
+  const [suggestionEmail, setSuggestionEmail] = useState('');
+  const [suggestionSubmitted, setSuggestionSubmitted] = useState(false);
+  const [submittingSuggestion, setSubmittingSuggestion] = useState(false);
+
+  // Countdown state
+  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const PARTY_DATE = new Date(2026, 6, 25, 22, 0, 0); // July 25, 2026 10:00 PM
 
   const [featuredEvent, setFeaturedEvent] = useState(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
@@ -49,6 +58,44 @@ export default function Home() {
       setContactForm({ nombre: '', email: '', mensaje: '' });
       setTimeout(() => setContactSuccess(false), 5000);
     }, 1200);
+  };
+
+  // Countdown effect
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      const diff = PARTY_DATE - now;
+      if (diff <= 0) {
+        setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        return;
+      }
+      setCountdown({
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((diff / (1000 * 60)) % 60),
+        seconds: Math.floor((diff / 1000) % 60),
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Suggestion box handler
+  const handleSuggestionSubmit = async (e) => {
+    e.preventDefault();
+    if (!suggestionText.trim()) return;
+    setSubmittingSuggestion(true);
+    try {
+      await api.enviarSugerencia(suggestionText.trim(), suggestionNombre.trim(), suggestionEmail.trim());
+      setSuggestionSubmitted(true);
+      setSuggestionText('');
+      setSuggestionNombre('');
+      setSuggestionEmail('');
+      setTimeout(() => setSuggestionSubmitted(false), 5000);
+    } catch (err) {
+      console.error('Error al enviar sugerencia:', err);
+    } finally {
+      setSubmittingSuggestion(false);
+    }
   };
 
   // Audio playback handler
@@ -88,28 +135,28 @@ export default function Home() {
       title: "Bloque 1: Reggaetón Clásico",
       genre: "Old School & Marquesina",
       hours: "22:00 - 00:30",
-      description: "Volviendo a las raíces del perreo de marquesina (2000 - 2012). Bajos analógicos sucios, líricas que marcaron una generación y el golpe rítmico inconfundible del dembow crudo.",
+      description: "Apenas empieza la fiesta y ya estamos listos para romperla. Volviendo a las raíces del perreo de marquesina (2000 - 2012) mientras hacemos nuestros primeros sorteos de la noche. Bajos analógicos sucios, líricas que marcaron una generación y el golpe rítmico inconfundible del dembow crudo.",
       color: "from-purple-500/25 to-transparent",
-      icon: <Radio className="w-8 h-8 text-neon-glow" />,
-      tagline: "El origen de la fiesta."
+      icon: <Gift className="w-8 h-8 text-neon-glow" />,
+      tagline: "Comienza la fiesta. Sorteos y regalos."
     },
     {
-      title: "Bloque 2: Dancehall & Perreo Pesado",
-      genre: "Riddims & Sub-Bajos Densos",
-      hours: "00:30 - 03:00",
-      description: "El punto de quiebre de la noche. Fusión de beats jamaiquinos con bajos subsaturados que golpean el pecho. El sudor de la pista en su punto más álgido.",
+      title: "Bloque 2: Shows y Sorpresas",
+      genre: "Experiencia en Vivo",
+      hours: "⏱️ Hora Incógnita",
+      description: "La noche guarda secretos que no te podemos contar... aún. Shows en vivo, presentaciones especiales y momentos únicos que solo los que estén presentes podrán vivir. El misterio es parte de la experiencia.",
       color: "from-pink-500/25 to-transparent",
-      icon: <Flame className="w-8 h-8 text-neon-glow" />,
-      tagline: "Presión acústica absoluta."
+      icon: <EyeOff className="w-8 h-8 text-neon-glow" />,
+      tagline: "El misterio es parte de la noche."
     },
     {
-      title: "Bloque 3: Mero Techno",
-      genre: "Industrial Raw & Acid Beats",
-      hours: "03:00 - Cierre",
-      description: "El clímax en la oscuridad. Directo desde las bodegas de Berlín: percusión industrial metálica, líneas de bajo sintéticas ácidas y ritmos hipnóticos a 140 BPM. Cero luces, puro sonido.",
+      title: "Bloque 3: Dancehall & Perreo Pesado",
+      genre: "Riddims & Sub-Bajos Densos",
+      hours: "Hasta que el cuerpo aguante",
+      description: "El punto de quiebre de la noche. Fusión de beats jamaiquinos con bajos subsaturados que golpean el pecho. Dancehall, perreo pesado y el sudor de la pista en su punto más álgido. Esto apenas se pone bueno.",
       color: "from-neon-purple/25 to-transparent",
-      icon: <Sparkles className="w-8 h-8 text-neon-glow" />,
-      tagline: "Oscuridad y liberación mental."
+      icon: <Flame className="w-8 h-8 text-neon-glow" />,
+      tagline: "Perreo intenso hasta el amanecer."
     }
   ];
 
@@ -217,7 +264,6 @@ export default function Home() {
             </p>
           </div>
 
-
           {/* SPONSORS TICKER */}
           <div className="w-full overflow-hidden bg-industrial-950/60 border-y border-industrial-800/80 py-4 sm:py-6 my-10 sm:my-16 relative">
             <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-16 bg-gradient-to-r from-black to-transparent z-10 pointer-events-none" />
@@ -226,7 +272,7 @@ export default function Home() {
             <div className="animate-ticker-scroll flex items-center space-x-8 sm:space-x-12 select-none">
               {[1, 2].map((loop) => (
                 <React.Fragment key={loop}>
-                  <span className="text-xs sm:text-sm font-black text-industrial-400 hover:text-neon-glow font-mono uppercase tracking-[0.2em] sm:tracking-[0.25em] transition-colors duration-300 whitespace-nowrap">BERLIN RAW BEATS</span>
+                  <span className="text-xs sm:text-sm font-black text-industrial-400 hover:text-neon-glow font-mono uppercase tracking-[0.2em] sm:tracking-[0.25em] transition-colors duration-300 whitespace-nowrap">MOCOA RAW BEATS</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-industrial-700 flex-shrink-0" />
                   <span className="text-xs sm:text-sm font-black text-industrial-400 hover:text-neon-glow font-mono uppercase tracking-[0.2em] sm:tracking-[0.25em] transition-colors duration-300 whitespace-nowrap">TRESOR RECORDS</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-industrial-700 flex-shrink-0" />
@@ -338,6 +384,85 @@ export default function Home() {
               <audio ref={audioRef} loop src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" />
             </div>
 
+          </div>
+
+          {/* SUGGESTION BOX - QUEREMOS ESCUCHARTE */}
+          <div className="border-t border-industrial-800 pt-10 sm:pt-16 mt-10 sm:mt-16 max-w-4xl mx-auto">
+            <h3 className="text-xl sm:text-2xl font-black tracking-widest text-white mb-2 text-center uppercase">
+              Queremos Escucharte
+            </h3>
+            <p className="text-xs text-gray-500 mb-8 sm:mb-10 text-center font-mono">
+              TÚ DECIDES QUÉ SUENA • OPINA Y PARTICIPA
+            </p>
+
+            <div className="bg-industrial-900/60 border border-industrial-800 rounded-lg p-6 sm:p-10 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-32 h-32 bg-neon-purple/5 blur-2xl pointer-events-none" />
+
+              <div className="flex flex-col items-center text-center relative z-10">
+                <div className="w-14 h-14 rounded-full bg-black border border-neon-purple/30 flex items-center justify-center mb-5 shadow-neon-sm">
+                  <Music className="w-7 h-7 text-neon-glow" />
+                </div>
+
+                <h4 className="text-base sm:text-lg font-black text-white uppercase tracking-wider mb-1">
+                  ¿Qué canciones quieres escuchar?
+                </h4>
+                <p className="text-xs text-gray-400 mb-6 max-w-md leading-relaxed">
+                  Esta fiesta la hacemos entre todos. Cuéntanos qué géneros, artistas o canciones te gustaría escuchar en la noche. Cada sugerencia la tenemos en cuenta para armar el set perfecto.
+                </p>
+
+                <form onSubmit={handleSuggestionSubmit} className="w-full max-w-lg space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      className="w-full bg-black border border-industrial-800 text-sm px-4 py-3 text-white rounded focus:outline-none focus:border-neon-purple font-mono placeholder:text-gray-600"
+                      placeholder="Tu nombre (opcional)"
+                      value={suggestionNombre}
+                      onChange={e => setSuggestionNombre(e.target.value)}
+                    />
+                    <input
+                      type="email"
+                      className="w-full bg-black border border-industrial-800 text-sm px-4 py-3 text-white rounded focus:outline-none focus:border-neon-purple font-mono placeholder:text-gray-600"
+                      placeholder="Tu email (opcional)"
+                      value={suggestionEmail}
+                      onChange={e => setSuggestionEmail(e.target.value)}
+                    />
+                  </div>
+                  <textarea
+                    required
+                    rows="3"
+                    className="w-full bg-black border border-industrial-800 text-sm px-4 py-3 text-white rounded focus:outline-none focus:border-neon-purple font-mono resize-none placeholder:text-gray-600"
+                    placeholder="Ej: Quiero escuchar más dancehall, pongan a Bad Bunny, necesito perreo de marquesina..."
+                    value={suggestionText}
+                    onChange={e => setSuggestionText(e.target.value)}
+                  />
+
+                  {suggestionSubmitted && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-3 bg-emerald-950/20 border border-emerald-500/30 text-emerald-400 text-xs rounded font-mono"
+                    >
+                      ✓ ¡Gracias por tu sugerencia! La tendremos en cuenta para armar la mejor noche.
+                    </motion.div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={submittingSuggestion}
+                    className="w-full bg-industrial-800 hover:bg-neon-purple text-white text-xs font-black tracking-widest py-3.5 rounded uppercase transition-all duration-300 disabled:opacity-40 disabled:hover:bg-industrial-800 flex items-center justify-center space-x-2 touch-manipulation min-h-[48px]"
+                  >
+                    {submittingSuggestion ? (
+                      <span className="w-4 h-4 rounded-full border border-white border-t-transparent animate-spin" />
+                    ) : (
+                      <>
+                        <MessageCircle className="w-4 h-4" />
+                        <span>Enviar Sugerencia</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            </div>
           </div>
 
           {/* SECCIÓN DE SEGURIDAD, CONFIANZA Y EDAD */}

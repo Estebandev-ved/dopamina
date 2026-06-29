@@ -9,7 +9,9 @@ import com.dopaminacrew.backend.repository.CompraRepository;
 import com.dopaminacrew.backend.repository.EventoRepository;
 import com.dopaminacrew.backend.repository.UserRepository;
 import com.dopaminacrew.backend.repository.BoletaRepository;
+import com.dopaminacrew.backend.repository.CuponRepository;
 import com.dopaminacrew.backend.service.CompraService;
+import com.dopaminacrew.backend.service.EmailService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +25,6 @@ import java.util.UUID;
 public class CompraServiceImpl implements CompraService {
 
     private static final double DEFAULT_TICKET_PRICE = 25000.0;
-    private static final String DISCOUNT_COUPON = "DOPAMINA10";
 
     @Autowired
     private CompraRepository compraRepository;
@@ -37,6 +38,12 @@ public class CompraServiceImpl implements CompraService {
     @Autowired
     private BoletaRepository boletaRepository;
 
+    @Autowired
+    private CuponRepository cuponRepository;
+
+    @Autowired
+    private EmailService emailService;
+
     @Override
     @Transactional
     public Compra processCheckout(CheckoutRequest request, Long userId) {
@@ -44,41 +51,75 @@ public class CompraServiceImpl implements CompraService {
                 .orElseThrow(() -> new RuntimeException("Error: Usuario no encontrado."));
 
         int cantidad = request.getCantidad();
-        
+
         // Retrieve event if provided to determine pricing
         Evento evento = null;
         double price = DEFAULT_TICKET_PRICE;
-        
+        double subtotal;
+
         if (request.getEventoId() != null) {
             evento = eventoRepository.findById(request.getEventoId())
                     .orElseThrow(() -> new RuntimeException("Error: Evento no encontrado."));
-            
-            // Calculate pricing phases based on total tickets sold for this event
-            Integer sold = compraRepository.sumCantidadByEventoId(evento.getId());
-            if (sold == null) sold = 0;
-            
-            // Limit event capacity to 1000 tickets
+
+            // Use the event's configured price as the base price
+            if (evento.getPrecio() != null) {
+                price = evento.getPrecio().doubleValue();
+            }
+
+            // Limit event capacity to 1000 tickets.
+            // 'sold' = entradas pagadas + pendientes con reserva vigente (ver repositorio).
+            int sold = compraRepository.contarEntradasOcupadas(evento.getId());
+
             if (sold + cantidad > 1000) {
                 int cuposRestantes = 1000 - sold;
-                throw new RuntimeException("Error: Aforo completo del evento alcanzado. Solo quedan " 
+                throw new RuntimeException("Error: Aforo completo del evento alcanzado. Solo quedan "
                         + (cuposRestantes > 0 ? cuposRestantes : 0) + " entradas disponibles.");
             }
-            
-            // Apply tiers: first 100 tickets at 25,000 COP, rest up to 1000 at 35,000 COP
-            if (sold >= 100) {
-                price = 35000.0; // Phase 2
+
+            // ── Precio dinámico de preventa ─────────────────────────────────────
+            // Las primeras 'cantidadPreventa' entradas se cobran a 'precioPreventa';
+            // a partir de ahí, a 'precio' regular. Una compra que cruce el límite
+            // se factura mezclada (parte preventa + parte regular) para que el total
+            // que llega a la pasarela sea siempre exacto.
+            if (evento.getPrecioPreventa() != null && evento.getCantidadPreventa() != null
+                    && evento.getCantidadPreventa() > 0) {
+                double precioPreventa = evento.getPrecioPreventa().doubleValue();
+                int cupoPreventa = evento.getCantidadPreventa();
+                int preventaRestante = Math.max(0, cupoPreventa - sold);
+                int enPreventa = Math.min(cantidad, preventaRestante);
+                int enRegular = cantidad - enPreventa;
+                subtotal = (enPreventa * precioPreventa) + (enRegular * price);
             } else {
-                price = 25000.0; // Phase 1
+                subtotal = cantidad * price;
             }
+        } else {
+            subtotal = cantidad * price;
         }
 
-        double subtotal = cantidad * price;
         double descuento = 0.0;
-        String couponUsed = request.getCodigoCupon() != null ? request.getCodigoCupon().trim() : "";
+        boolean promoParcheAplicada = false;
+        String couponUsed = request.getCodigoCupon() != null ? request.getCodigoCupon().trim().toUpperCase() : "";
 
-        // Apply 10% discount if purchasing 4+ tickets OR using the correct coupon
-        if (cantidad >= 4 || couponUsed.equalsIgnoreCase(DISCOUNT_COUPON)) {
+        if (!couponUsed.isEmpty()) {
+            com.dopaminacrew.backend.model.Cupon cupon = cuponRepository.findByCodigoIgnoreCase(couponUsed)
+                    .orElseThrow(() -> new RuntimeException("El cupón '" + couponUsed + "' no existe."));
+            
+            if (!cupon.getActivo()) {
+                throw new RuntimeException("El cupón '" + couponUsed + "' no está activo o ya venció.");
+            }
+
+            // Validar un único uso por usuario
+            long usosPrevios = compraRepository.countByUsuarioIdAndCodigoCupon(user.getId(), cupon.getCodigo());
+            if (usosPrevios > 0) {
+                throw new RuntimeException("Ya has usado el cupón '" + cupon.getCodigo() + "' en una compra anterior.");
+            }
+            
+            descuento = subtotal * (cupon.getDescuentoPorcentaje() / 100.0);
+        } else if (cantidad >= 4 && !compraRepository.usuarioYaUsoPromoParche(user.getId())) {
+            // Descuento automático del 10% por cantidad (promo parche), sin cupón.
+            // Es de un solo uso por usuario: una vez consumida queda deshabilitada.
             descuento = subtotal * 0.10;
+            promoParcheAplicada = true;
         }
 
         double total = subtotal - descuento;
@@ -91,30 +132,61 @@ public class CompraServiceImpl implements CompraService {
         compra.setDescuento(descuento);
         compra.setTotal(total);
         compra.setCodigoCupon(couponUsed.isEmpty() ? null : couponUsed.toUpperCase());
-        compra.setEstado("PAGADO"); // Simulated successful payment
+        compra.setPromoParcheAplicada(promoParcheAplicada);
+        compra.setEstado("PENDIENTE"); // Pending payment via Efipay
 
         // Generate a unique purchase reference QR code
         String purchaseRef = "DOPAMINA-ORDER-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase() + "-" + System.currentTimeMillis();
         compra.setCodigoQr(purchaseRef);
 
         Compra savedCompra = compraRepository.save(compra);
+        return savedCompra;
+    }
 
-        // Generate individual tickets (Boleta) with unique QR codes for each entry
-        for (int i = 0; i < cantidad; i++) {
+    @Override
+    @Transactional
+    public void confirmCompra(Long compraId) {
+        Compra compra = compraRepository.findById(compraId)
+                .orElseThrow(() -> new RuntimeException("Error: Compra no encontrada."));
+
+        if (!"PENDIENTE".equals(compra.getEstado())) {
+            long boletasCount = boletaRepository.countByCompraId(compraId);
+            if (boletasCount > 0 || !"PAGADO".equals(compra.getEstado())) {
+                return;
+            }
+        }
+
+        compra.setEstado("PAGADO");
+        compraRepository.save(compra);
+
+        long existingCount = boletaRepository.countByCompraId(compraId);
+        int nextSorteo = 1;
+        if (compra.getEvento() != null) {
+            Integer maxSorteo = boletaRepository.findMaxNumeroSorteoByEventoId(compra.getEvento().getId());
+            nextSorteo = (maxSorteo != null ? maxSorteo : 0) + 1;
+        }
+
+        for (int i = (int) existingCount; i < compra.getCantidad(); i++) {
             Boleta boleta = new Boleta();
-            boleta.setCompra(savedCompra);
-            // unique QR code for each ticket
+            boleta.setCompra(compra);
+            boleta.setUsuario(compra.getUsuario());
             String ticketRef = "DOPAMINA-QR-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase() + "-" + System.currentTimeMillis() + "-" + (i + 1);
             boleta.setCodigoQr(ticketRef);
             boleta.setEstado("ACTIVA");
+            boleta.setNumeroSorteo(nextSorteo++);
             boletaRepository.save(boleta);
         }
 
-        return savedCompra;
+        emailService.sendPurchaseConfirmation(compra);
     }
 
     @Override
     public List<Compra> getMisBoletas(Long userId) {
         return compraRepository.findByUsuarioIdOrderByCreatedAtDesc(userId);
+    }
+
+    @Override
+    public boolean isPromoParcheDisponible(Long userId) {
+        return !compraRepository.usuarioYaUsoPromoParche(userId);
     }
 }

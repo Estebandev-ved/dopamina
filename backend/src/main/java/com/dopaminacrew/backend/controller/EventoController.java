@@ -20,7 +20,6 @@ import java.util.List;
  * - Input validated with @Valid to prevent malformed data.
  */
 @RestController
-@CrossOrigin(origins = "http://localhost:5173")
 public class EventoController {
 
     @Autowired

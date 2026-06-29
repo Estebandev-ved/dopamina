@@ -45,8 +45,8 @@ export default function Perfil() {
   };
 
   useEffect(() => {
-    if (!api.getUser()) {
-      navigate('/login');
+    if (!api.isAuthenticated()) {
+      navigate('/login', { state: { from: '/perfil' } });
       return;
     }
     loadProfileData();

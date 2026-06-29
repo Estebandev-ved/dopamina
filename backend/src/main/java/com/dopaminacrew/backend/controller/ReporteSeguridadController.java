@@ -4,6 +4,7 @@ import com.dopaminacrew.backend.dto.MessageResponse;
 import com.dopaminacrew.backend.dto.ReporteSeguridadRequest;
 import com.dopaminacrew.backend.dto.ReporteSeguridadResponse;
 import com.dopaminacrew.backend.dto.TransferenciaLogResponse;
+import com.dopaminacrew.backend.service.EmailService;
 import com.dopaminacrew.backend.model.ReporteSeguridad;
 import com.dopaminacrew.backend.model.TransferenciaLog;
 import com.dopaminacrew.backend.model.User;
@@ -46,6 +47,9 @@ public class ReporteSeguridadController {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private EmailService emailService;
+
     @PostMapping("/public/reportes-seguridad")
     public ResponseEntity<?> crearReporte(@Valid @RequestBody ReporteSeguridadRequest request,
                                           @AuthenticationPrincipal UserPrincipal currentUser,
@@ -71,6 +75,9 @@ public class ReporteSeguridadController {
         }
 
         reporteSeguridadRepository.save(reporte);
+
+        emailService.sendSecurityAlert(reporte);
+
         return ResponseEntity.ok(new MessageResponse("Alerta de seguridad enviada con éxito. El equipo de Dopamina ha sido notificado."));
     }
 

@@ -18,44 +18,118 @@ export default function Checkout() {
   const selectedEvento = location.state?.evento;
   const currentUser = api.getUser();
 
-  // Guard: If no event, redirect to catalog/home
+  // Guard: If not logged in or token expired, redirect to login with return state
   useEffect(() => {
-    if (!currentUser) {
-      navigate('/login');
+    if (!currentUser || api.isTokenExpired()) {
+      if (api.isTokenExpired()) api.clearAuth();
+      navigate('/login', { state: { from: '/checkout', eventoState: { evento: selectedEvento, cantidad } } });
     } else if (!selectedEvento) {
       navigate('/');
     }
   }, [currentUser, selectedEvento, navigate]);
 
-  const TICKET_PRICE = selectedEvento ? selectedEvento.precio : 25000;
   const [cantidad, setCantidad] = useState(location.state?.cantidad || 1);
   const [couponCode, setCouponCode] = useState('');
+  const [couponDiscountPercent, setCouponDiscountPercent] = useState(0);
   const [couponApplied, setCouponApplied] = useState(false);
   const [couponError, setCouponError] = useState('');
+
+  // Promo de "10% por 4+ boletas": es de un solo uso por usuario.
+  const [promoParcheDisponible, setPromoParcheDisponible] = useState(true);
 
   // Statuses
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  if (!currentUser || !selectedEvento) {
+  // Auto apply active coupon from profile chest or state
+  useEffect(() => {
+    let targetCoupon = location.state?.autoCoupon;
+    
+    if (!targetCoupon) {
+      // Check if there is an explicit intent to apply the coupon (user clicked "Gastar cupón" in Dashboard)
+      targetCoupon = sessionStorage.getItem('dopamina_intent_auto_coupon');
+      if (targetCoupon) {
+        // Consume the intent immediately so it doesn't auto-apply to subsequent checkouts
+        sessionStorage.removeItem('dopamina_intent_auto_coupon');
+      }
+    }
+
+    if (targetCoupon) {
+      setCouponCode(targetCoupon);
+      api.publicValidarCupon(targetCoupon)
+        .then(res => {
+          if (res.valido) {
+            setCouponApplied(true);
+            setCouponDiscountPercent(res.descuentoPorcentaje);
+          }
+        })
+        .catch(err => console.log('Error al autoaplicar cupón sorpresa:', err));
+    }
+  }, [location.state]);
+
+  // Consultar si el usuario todavía tiene disponible la promo de 4+ boletas
+  useEffect(() => {
+    api.getPromoParcheDisponible()
+      .then(res => setPromoParcheDisponible(!!res.disponible))
+      .catch(() => setPromoParcheDisponible(false));
+  }, []);
+
+  if (!currentUser || api.isTokenExpired()) {
+    return null;
+  }
+  if (!selectedEvento) {
     return null;
   }
 
-  // Auto discount is triggered if quantity >= 4 OR the coupon 'DOPAMINA10' is applied
-  const isDiscountEligible = cantidad >= 4 || (couponApplied && couponCode.toUpperCase() === 'DOPAMINA10');
-  
-  const subtotal = cantidad * TICKET_PRICE;
-  const descuento = isDiscountEligible ? subtotal * 0.10 : 0.0;
+  // Subtotal con preventa: las primeras 'cantidadPreventa' entradas (descontando las
+  // ya vendidas) van a 'precioPreventa'; el resto al precio regular. Refleja exactamente
+  // lo que calcula el backend, así el total mostrado coincide con el cobro de la pasarela.
+  const calcSubtotal = () => {
+    if (!selectedEvento) return cantidad * 25000;
+    const precioRegular = selectedEvento.precio || 0;
+    const pp = selectedEvento.precioPreventa;
+    const cp = selectedEvento.cantidadPreventa;
+    const vendidas = selectedEvento.vendidas || 0;
+    if (pp != null && cp != null && cp > 0) {
+      const preventaRestante = Math.max(0, cp - vendidas);
+      const enPreventa = Math.min(cantidad, preventaRestante);
+      const enRegular = cantidad - enPreventa;
+      return enPreventa * pp + enRegular * precioRegular;
+    }
+    return cantidad * precioRegular;
+  };
+  const subtotal = calcSubtotal();
+  // Entradas de preventa aún disponibles (para mostrar aviso al usuario)
+  const preventaRestante = (selectedEvento && selectedEvento.precioPreventa != null && selectedEvento.cantidadPreventa)
+    ? Math.max(0, selectedEvento.cantidadPreventa - (selectedEvento.vendidas || 0))
+    : 0;
+  // Precio unitario a mostrar: preventa si aún quedan cupos, si no el regular.
+  const precioUnitario = preventaRestante > 0 ? selectedEvento.precioPreventa : (selectedEvento?.precio || 0);
+  // La promo de parche (10%) solo aplica si: no hay cupón, son 4+ boletas y el usuario no la ha usado.
+  const promoParcheActiva = !couponApplied && cantidad >= 4 && promoParcheDisponible;
+  const activeDiscountPercent = couponApplied ? couponDiscountPercent : (promoParcheActiva ? 10 : 0);
+  const descuento = subtotal * (activeDiscountPercent / 100.0);
   const total = subtotal - descuento;
 
-  const handleApplyCoupon = (e) => {
+  const handleApplyCoupon = async (e) => {
     e.preventDefault();
     setCouponError('');
-    if (couponCode.trim().toUpperCase() === 'DOPAMINA10') {
-      setCouponApplied(true);
-    } else {
+    if (!couponCode.trim()) return;
+
+    try {
+      const res = await api.publicValidarCupon(couponCode.trim());
+      if (res.valido) {
+        setCouponApplied(true);
+        setCouponDiscountPercent(res.descuentoPorcentaje);
+      } else {
+        setCouponApplied(false);
+        setCouponDiscountPercent(0);
+        setCouponError('Código de cupón inválido o inactivo.');
+      }
+    } catch (err) {
       setCouponApplied(false);
-      setCouponError('Código de cupón inválido.');
+      setCouponDiscountPercent(0);
+      setCouponError(err.message || 'Error al validar el cupón.');
     }
   };
 
@@ -69,14 +143,31 @@ export default function Checkout() {
   const handlePurchase = async () => {
     setLoading(true);
     setErrorMsg('');
+
+    sessionStorage.setItem('dopamina_checkout_state', JSON.stringify({
+      evento: selectedEvento,
+      cantidad,
+      couponCode: couponApplied ? couponCode : null,
+    }));
+
     try {
-      await api.checkout(
-        cantidad, 
-        couponApplied ? couponCode.toUpperCase() : (cantidad >= 4 ? 'DOPAMINA10' : null),
+      // Sin cupón explícito enviamos null: la promo de 4+ boletas la aplica el backend
+      // automáticamente (y es de un solo uso). NO mandamos 'DOPAMINA10' como cupón.
+      const result = await api.efipayGenerate(
+        cantidad,
+        couponApplied ? couponCode.toUpperCase() : null,
         selectedEvento ? selectedEvento.id : null
       );
-      // redirect to dashboard
-      navigate('/dashboard');
+
+      if (result.redirectUrl) {
+        sessionStorage.setItem('dopamina_compra_pending', JSON.stringify({
+          compraId: result.compraId,
+          paymentId: result.paymentId,
+        }));
+        window.location.href = result.redirectUrl;
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       setErrorMsg(err.message || 'Error al procesar el pago.');
     } finally {
@@ -121,7 +212,7 @@ export default function Checkout() {
                       {`${selectedEvento.fecha} • ${selectedEvento.lugar}, ${selectedEvento.ciudad}`}
                     </p>
                     <p className="text-xs font-bold text-neon-violet mt-1 font-mono">
-                      ${TICKET_PRICE.toLocaleString('es-CO')} COP / Entrada
+                      ${precioUnitario.toLocaleString('es-CO')} COP / Entrada
                     </p>
                   </div>
                   
@@ -151,7 +242,23 @@ export default function Checkout() {
                 <div className="mt-4 bg-neon-purple/5 border border-neon-purple/20 rounded p-3 text-xs text-gray-300 flex items-start space-x-2.5">
                   <BadgePercent className="w-4.5 h-4.5 text-neon-glow flex-shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold text-white">Promo Parche Activada:</span> Compra 4 o más entradas y obtén un <span className="text-neon-glow font-bold">10% de descuento automático</span>. ¡Incentiva a tu parche a unirse!
+                    {promoParcheDisponible ? (
+                      <>
+                        <span className="font-bold text-white">Promo Parche:</span> Compra 4 o más entradas y obtén un <span className="text-neon-glow font-bold">10% de descuento automático</span>. ¡Solo se puede usar una vez!
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-bold text-white">Promo Parche ya utilizada:</span> Ya aprovechaste tu 10% de descuento por 4+ boletas en una compra anterior. ¡Gracias por traer a tu parche!
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Sorteo notice */}
+                <div className="mt-3 bg-purple-950/10 border border-purple-500/20 rounded p-3 text-xs text-gray-300 flex items-start space-x-2.5">
+                  <span className="text-md flex-shrink-0 mt-0.5">🎰</span>
+                  <div>
+                    <span className="font-bold text-white">Sorteos de la Noche Incluidos:</span> Al completar tu compra, cada boleta virtual en tu perfil recibirá un número único de sorteo correlativo para participar en los sorteos en vivo que realizaremos durante las primeras horas de la fiesta.
                   </div>
                 </div>
               </div>
@@ -201,14 +308,19 @@ export default function Checkout() {
                 </h3>
 
                 <div className="space-y-3 text-xs font-mono">
+                  {preventaRestante > 0 && (
+                    <div className="text-emerald-400 text-[11px] font-bold normal-case bg-emerald-500/10 border border-emerald-500/20 rounded px-2 py-1.5">
+                      🎟️ Preventa activa: ${Number(selectedEvento.precioPreventa).toLocaleString('es-CO')} c/u — quedan {preventaRestante} entradas a este precio.
+                    </div>
+                  )}
                   <div className="flex justify-between text-gray-400">
                     <span>Subtotal:</span>
                     <span>${subtotal.toLocaleString('es-CO')} COP</span>
                   </div>
                   
-                  {isDiscountEligible && (
+                  {descuento > 0 && (
                     <div className="flex justify-between text-emerald-400">
-                      <span>Descuento (10%):</span>
+                      <span>Descuento ({activeDiscountPercent}%):</span>
                       <span>-${descuento.toLocaleString('es-CO')} COP</span>
                     </div>
                   )}
@@ -248,7 +360,7 @@ export default function Checkout() {
                   </div>
                   {couponApplied && (
                     <p className="text-[10px] text-emerald-400 font-semibold mt-1">
-                      ✓ Cupón DOPAMINA10 aplicado con éxito.
+                      ✓ Cupón {couponCode.toUpperCase()} ({couponDiscountPercent}%) aplicado con éxito.
                     </p>
                   )}
                   {couponError && (
@@ -274,7 +386,7 @@ export default function Checkout() {
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-neon-purple to-neon-violet opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                     <span className="relative z-10 flex items-center justify-center space-x-2">
-                      <span>{loading ? 'PROCESANDO PAGO...' : 'SIMULAR PAGO'}</span>
+                      <span>{loading ? 'REDIRIGIENDO A EFIPAY...' : 'PAGAR CON EFIPAY'}</span>
                       <ArrowRight className="w-4 h-4" />
                     </span>
                   </button>

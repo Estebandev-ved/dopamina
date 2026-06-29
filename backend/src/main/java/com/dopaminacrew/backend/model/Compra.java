@@ -44,11 +44,27 @@ public class Compra {
     private String codigoCupon;
 
     @Column(nullable = false, length = 50)
-    private String estado = "PAGADO"; // Default to PAGADO since payment is mocked as successful
+    private String estado = "PENDIENTE"; // PENDIENTE, PAGADO, RECHAZADO
+
+    // true si esta compra aplicó la promo de "10% por 4+ boletas".
+    // Sirve para que la promo sea de un solo uso por usuario.
+    @Column(name = "promo_parche_aplicada", nullable = false)
+    private Boolean promoParcheAplicada = false;
 
     @Column(name = "codigo_qr", nullable = false, unique = true, length = 255)
     private String codigoQr;
 
-    @Column(name = "created_at", insertable = false, updatable = false)
+    @Column(name = "efipay_payment_id", length = 100)
+    private String efipayPaymentId;
+
+    @Column(name = "efipay_status", length = 50)
+    private String efipayStatus;
+
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
 }

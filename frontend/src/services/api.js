@@ -24,6 +24,24 @@ class ApiService {
     return userStr ? JSON.parse(userStr) : null;
   }
 
+  isTokenExpired() {
+    const token = this.getToken();
+    if (!token) return true;
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(atob(base64));
+      if (!payload.exp) return false;
+      return Date.now() >= payload.exp * 1000;
+    } catch {
+      return true;
+    }
+  }
+
+  isAuthenticated() {
+    return !!this.getUser() && !this.isTokenExpired();
+  }
+
   clearAuth() {
     localStorage.removeItem('dopamina_jwt');
     localStorage.removeItem('dopamina_user');
@@ -57,6 +75,7 @@ class ApiService {
         if ((response.status === 401 || response.status === 403) && !endpoint.includes('/api/auth/')) {
           this.clearAuth();
           if (!window.location.pathname.includes('/login')) {
+            sessionStorage.setItem('dopamina_redirect_after_login', window.location.pathname + window.location.search);
             window.location.href = '/login';
           }
           throw new Error('Sesión expirada. Inicie sesión de nuevo.');
@@ -148,6 +167,11 @@ class ApiService {
 
   getMisBoletas() {
     return this.get('/api/compras/mis-boletas');
+  }
+
+  // ¿El usuario aún puede usar la promo de 10% por 4+ boletas?
+  getPromoParcheDisponible() {
+    return this.get('/api/compras/promo-parche');
   }
 
   // Admin Operations (ROLE_ADMIN only)
@@ -269,6 +293,15 @@ class ApiService {
     return this.get('/api/admin/transferencias');
   }
 
+  // ── Efipay Payment Gateway ──────────────────────────────────────────────────
+  efipayGenerate(cantidad, codigoCupon, eventoId) {
+    return this.post('/api/pagos/efipay/generate', { cantidad, codigoCupon, eventoId });
+  }
+
+  efipayPaymentStatus(compraId) {
+    return this.get(`/api/pagos/efipay/status/${compraId}`);
+  }
+
   // ── Artistas ───────────────────────────────────────────────────────────────
   getArtistas() {
     return this.get('/api/public/artistas');
@@ -304,6 +337,56 @@ class ApiService {
 
   adminUnbanUsuario(id) {
     return this.request(`/api/admin/seguridad/usuarios/${id}/unban`, { method: 'PUT' });
+  }
+
+  adminRegalarBoletas(data) {
+    return this.post('/api/admin/boletas/regalar', data);
+  }
+
+  adminGetSorteoGanador(eventoId, numeroSorteo) {
+    return this.get(`/api/admin/boletas/sorteo?eventoId=${eventoId}&numeroSorteo=${numeroSorteo}`);
+  }
+
+  adminGetSorteoParticipantes(eventoId) {
+    return this.get(`/api/admin/boletas/sorteo/participantes?eventoId=${eventoId}`);
+  }
+
+  // ── Sugerencias del Público ─────────────────────────────────────────────────
+  enviarSugerencia(contenido, nombre, email) {
+    return this.post('/api/public/sugerencias', { contenido, nombre, email });
+  }
+
+  adminGetSugerencias() {
+    return this.get('/api/admin/sugerencias');
+  }
+
+  adminActualizarEstadoSugerencia(id, estado) {
+    return this.request(`/api/admin/sugerencias/${id}/estado`, {
+      method: 'PUT',
+      body: JSON.stringify({ estado }),
+    });
+  }
+
+  // Cupones Public
+  publicValidarCupon(codigo) {
+    return this.get(`/api/public/cupones/validar?codigo=${codigo}`);
+  }
+
+  // Cupones Admin
+  adminGetCupones() {
+    return this.get('/api/admin/cupones');
+  }
+
+  adminCreateCupon(data) {
+    return this.post('/api/admin/cupones', data);
+  }
+
+  adminToggleCupon(id) {
+    return this.request(`/api/admin/cupones/${id}/toggle`, { method: 'PUT' });
+  }
+
+  adminDeleteCupon(id) {
+    return this.request(`/api/admin/cupones/${id}`, { method: 'DELETE' });
   }
 }
 

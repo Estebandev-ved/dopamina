@@ -2,10 +2,47 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import PageTransition from '../components/PageTransition';
-import { Ticket, Download, Printer, Calendar, ShieldCheck, X } from 'lucide-react';
+import { Ticket, Download, Printer, Calendar, ShieldCheck, Clock, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return '—';
+  try {
+    const cleanStr = dateStr.replace('T', ' ').split('.')[0];
+    const parts = cleanStr.split(' ');
+    const dateParts = parts[0].split('-');
+    const timeParts = parts[1].split(':');
+    
+    const year = dateParts[0];
+    const month = dateParts[1];
+    const day = dateParts[2];
+    
+    let hour = parseInt(timeParts[0], 10);
+    const minute = timeParts[1];
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12;
+    hour = hour ? hour : 12;
+    
+    return `${day}/${month}/${year} - ${hour}:${minute} ${ampm}`;
+  } catch (e) {
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '—';
+      return d.toLocaleString('es-CO', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (err) {
+      return '—';
+    }
+  }
+};
 
 /**
  * User Dashboard showing purchased tickets.
@@ -18,6 +55,78 @@ export default function Dashboard() {
   const currentUser = api.getUser();
   const [boletas, setBoletas] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Estados para el cofre regalo sorpresa
+  const [cofreAbierto, setCofreAbierto] = useState(false);
+  const [tiempoRestante, setTiempoRestante] = useState(0);
+  const [expirado, setExpirado] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+
+  // Inicializar cofre sorpresa
+  useEffect(() => {
+    const expTimeStr = localStorage.getItem('dopamina_cofre_expiracion');
+    if (expTimeStr) {
+      const expTime = parseInt(expTimeStr, 10);
+      const diff = Math.floor((expTime - Date.now()) / 1000);
+      if (diff <= 0) {
+        setTiempoRestante(0);
+        setExpirado(true);
+        setCofreAbierto(true);
+      } else {
+        setTiempoRestante(diff);
+        setCofreAbierto(true);
+      }
+    }
+  }, []);
+
+  // Timer para la cuenta regresiva del cofre
+  useEffect(() => {
+    let interval = null;
+    if (cofreAbierto && tiempoRestante > 0 && !expirado) {
+      interval = setInterval(() => {
+        const expTimeStr = localStorage.getItem('dopamina_cofre_expiracion');
+        if (expTimeStr) {
+          const expTime = parseInt(expTimeStr, 10);
+          const diff = Math.floor((expTime - Date.now()) / 1000);
+          if (diff <= 0) {
+            setTiempoRestante(0);
+            setExpirado(true);
+            clearInterval(interval);
+          } else {
+            setTiempoRestante(diff);
+          }
+        }
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [cofreAbierto, tiempoRestante, expirado]);
+
+  const handleAbrirCofre = () => {
+    const expTime = Date.now() + 3 * 60 * 60 * 1000; // 3 horas
+    localStorage.setItem('dopamina_cofre_expiracion', expTime.toString());
+    setTiempoRestante(3 * 60 * 60);
+    setCofreAbierto(true);
+  };
+
+  const handleCopiarCupon = () => {
+    navigator.clipboard.writeText('REGALO15');
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2000);
+  };
+
+  const handleGastarCupon = () => {
+    sessionStorage.setItem('dopamina_intent_auto_coupon', 'REGALO15');
+    navigate('/', { state: { autoCoupon: 'REGALO15' } });
+  };
+
+  const formatTime = (secs) => {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
 
   const [selectedBoleta, setSelectedBoleta] = useState(null);
   const [transferEmail, setTransferEmail] = useState('');
@@ -87,8 +196,10 @@ export default function Dashboard() {
       <div class="g">
         <div><label>Asistente</label><span class="val">${currentUser.nombre}</span></div>
         <div><label>Estado</label><span class="val">${boleta.estado}</span></div>
-        <div><label>Fecha</label><span class="val">${boleta.eventoFecha || '—'} ${boleta.eventoHora ? boleta.eventoHora.slice(0,5) : ''}</span></div>
+        <div><label>Fecha del Evento</label><span class="val">${boleta.eventoFecha || '—'} ${boleta.eventoHora ? boleta.eventoHora.slice(0,5) : ''}</span></div>
         <div><label>Lugar</label><span class="val">${boleta.eventoLugar ? boleta.eventoLugar + ', ' + boleta.eventoCiudad : '—'}</span></div>
+        <div><label>Fecha de Compra</label><span class="val">${formatDateTime(boleta.createdAt)}</span></div>
+        <div><label>N° Sorteo</label><span class="val" style="color:#B14EFF;font-weight:bold">${boleta.numeroSorteo !== null && boleta.numeroSorteo !== undefined ? String(boleta.numeroSorteo).padStart(3, '0') : '—'}</span></div>
       </div>
       <div class="qr"><canvas id="qrc"></canvas>
       <div class="code">${qrVal}</div></div>
@@ -137,8 +248,8 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    if (!api.getUser()) {
-      navigate('/login');
+    if (!api.isAuthenticated()) {
+      navigate('/login', { state: { from: '/dashboard' } });
       return;
     }
 
@@ -186,6 +297,113 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* COFRE REGALO SORPRESA */}
+          <div className="mb-10 relative overflow-hidden bg-gradient-to-r from-industrial-900 via-industrial-900 to-purple-950/20 border border-industrial-800 rounded-lg p-6 md:p-8 shadow-neon-sm">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-neon-purple/5 blur-2xl pointer-events-none" />
+            
+            {!cofreAbierto ? (
+              /* ESTADO CERRADO */
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex items-center space-x-5 text-center md:text-left flex-col md:flex-row">
+                  <div className="w-16 h-16 rounded-full bg-neon-purple/10 border border-neon-purple/30 flex items-center justify-center text-3xl animate-bounce mb-3 md:mb-0">
+                    🎁
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-white uppercase tracking-wider">
+                      Cofre Regalo Sorpresa
+                    </h3>
+                    <p className="text-xs text-gray-400 font-mono mt-1">
+                      Tenemos un regalo exclusivo para ti. Ábrelo ahora para revelar tu recompensa.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleAbrirCofre}
+                  className="w-full md:w-auto bg-gradient-to-r from-neon-purple to-neon-violet hover:from-neon-violet hover:to-neon-purple text-white text-xs font-black tracking-widest px-8 py-3.5 rounded shadow-neon-sm hover:shadow-neon-md transition-all duration-300 uppercase cursor-pointer"
+                >
+                  Abrir Cofre
+                </button>
+              </div>
+            ) : expirado ? (
+              /* ESTADO EXPIRADO */
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6 opacity-60">
+                <div className="flex items-center space-x-5 text-center md:text-left flex-col md:flex-row">
+                  <div className="w-16 h-16 rounded-full bg-industrial-850 border border-industrial-800 flex items-center justify-center text-3xl mb-3 md:mb-0">
+                    🔒
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-gray-400 uppercase tracking-wider">
+                      Regalo Expirado
+                    </h3>
+                    <p className="text-xs text-gray-500 font-mono mt-1">
+                      La cuenta regresiva de 3 horas ha finalizado y el cupón sorpresa del 15% de descuento ha vencido.
+                    </p>
+                  </div>
+                </div>
+                <div className="text-xs font-mono font-bold text-rose-500 uppercase border border-rose-500/25 px-4 py-2 rounded bg-rose-950/10">
+                  Cerrado / Expirado
+                </div>
+              </div>
+            ) : (
+              /* ESTADO ABIERTO / ACTIVO */
+              <div className="space-y-6">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="flex items-center space-x-5 text-center md:text-left flex-col md:flex-row">
+                    <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-3xl animate-pulse mb-3 md:mb-0">
+                      🔓
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-white uppercase tracking-wider flex items-center justify-center md:justify-start gap-2">
+                        <span>¡Cupón Revelado!</span>
+                        <span className="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-mono">15% OFF</span>
+                      </h3>
+                      <p className="text-xs text-gray-400 font-mono mt-1">
+                        Has desbloqueado un **15% de descuento** en tu compra de entradas. ¡Se autoaplicará en el checkout!
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Temporizador de Cuenta Regresiva */}
+                  <div className="flex flex-col items-center md:items-end font-mono">
+                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">El cupón expira en</span>
+                    <span className="text-2xl font-black text-orange-500 tracking-wider animate-pulse mt-0.5">
+                      {formatTime(tiempoRestante)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Cupón Card */}
+                <div className="flex flex-col sm:flex-row items-center justify-between bg-black/40 border border-dashed border-industrial-800 rounded-lg p-5 gap-4">
+                  <div className="space-y-1 text-center sm:text-left">
+                    <span className="text-[9px] text-gray-500 uppercase tracking-widest block font-mono">Código de Descuento</span>
+                    <span className="text-xl font-black text-neon-glow font-mono uppercase tracking-widest">
+                      REGALO15
+                    </span>
+                  </div>
+                  
+                  <div className="flex space-x-3 w-full sm:w-auto">
+                    <button
+                      onClick={handleCopiarCupon}
+                      className="flex-grow sm:flex-grow-0 border border-industrial-800 hover:border-neon-purple/50 bg-black text-gray-300 hover:text-white text-xs font-bold px-5 py-3 rounded transition-colors uppercase font-mono"
+                    >
+                      {copiado ? '✓ Copiado' : 'Copiar Código'}
+                    </button>
+                    <button
+                      onClick={handleGastarCupon}
+                      className="flex-grow sm:flex-grow-0 bg-neon-purple text-white text-xs font-black tracking-widest px-6 py-3 rounded shadow-neon-sm hover:shadow-neon-md transition-all duration-300 uppercase cursor-pointer"
+                    >
+                      Comprar Entradas
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-center text-gray-500 font-mono leading-relaxed">
+                  ⚠️ <strong>Nota:</strong> Una vez activado, el cupón es válido únicamente durante 3 horas. Finaliza tu compra de entradas antes de que el temporizador llegue a cero para no perder el beneficio.
+                </p>
+              </div>
+            )}
+          </div>
+
           {loading ? (
             <div className="text-center py-20">
               <div className="w-8 h-8 rounded-full border border-neon-purple border-t-transparent animate-spin mx-auto mb-4" />
@@ -228,7 +446,7 @@ export default function Dashboard() {
                   <div className="flex-grow p-6 sm:p-8 flex flex-col justify-between border-b md:border-b-0 md:border-r border-industrial-800">
                     <div className="space-y-4">
                       {/* Badge status */}
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2 flex-wrap gap-2">
                         <span className={`text-[10px] font-mono font-bold tracking-widest px-2 py-0.5 rounded uppercase border ${
                           boleta.estado === 'ACTIVA' 
                             ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-400' 
@@ -239,6 +457,11 @@ export default function Dashboard() {
                         <span className="text-[10px] font-mono text-gray-500">
                           ID: #{boleta.id}
                         </span>
+                        {boleta.numeroSorteo !== undefined && boleta.numeroSorteo !== null && (
+                          <span className="text-[10px] font-mono font-bold tracking-widest px-2 py-0.5 rounded uppercase border bg-purple-950/40 border-purple-500/40 text-purple-400 animate-pulse">
+                            N° Sorteo: {String(boleta.numeroSorteo).padStart(3, '0')}
+                          </span>
+                        )}
                       </div>
                       
                       {/* Event name */}
@@ -252,11 +475,11 @@ export default function Dashboard() {
                       </div>
 
                       {/* Info breakdown */}
-                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-industrial-850">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-industrial-850">
                         <div className="flex items-start space-x-2.5">
                           <Calendar className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
                           <div>
-                            <span className="text-[10px] text-gray-500 uppercase font-bold block">Fecha</span>
+                            <span className="text-[10px] text-gray-500 uppercase font-bold block">Fecha del Evento</span>
                             <span className="text-xs text-gray-300">
                               {boleta.eventoFecha 
                                 ? `${boleta.eventoFecha} - ${boleta.eventoHora ? boleta.eventoHora.slice(0,5) : ''}`
@@ -273,6 +496,16 @@ export default function Dashboard() {
                               {boleta.eventoLugar 
                                 ? `${boleta.eventoLugar}, ${boleta.eventoCiudad}`
                                 : "Bogotá Bodega Club"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start space-x-2.5">
+                          <Clock className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <span className="text-[10px] text-gray-500 uppercase font-bold block">Fecha de Compra</span>
+                            <span className="text-xs text-gray-300">
+                              {formatDateTime(boleta.createdAt)}
                             </span>
                           </div>
                         </div>
@@ -370,6 +603,10 @@ export default function Dashboard() {
                     <p className="text-gray-300">
                       <span className="text-gray-500 font-bold uppercase tracking-wider block">Ubicación:</span>
                       {selectedBoleta.eventoLugar || "Bogotá Bodega Club"}
+                    </p>
+                    <p className="text-gray-300">
+                      <span className="text-gray-500 font-bold uppercase tracking-wider block">Fecha de Compra:</span>
+                      {formatDateTime(selectedBoleta.createdAt)}
                     </p>
                   </div>
 

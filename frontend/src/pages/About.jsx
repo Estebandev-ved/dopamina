@@ -58,7 +58,7 @@ export default function About() {
               Nacimos en las sombras de la escena electrónica e industrial, cansados de los eventos elitistas y las pistas divididas por el dinero. Dopamina es un espacio de libertad, una zona temporalmente autónoma donde la música oscura y la cultura urbana reclaman su lugar legítimo.
             </p>
             <p className="text-gray-400 leading-relaxed">
-              Inspirados por la ética del Hazlo Tú Mismo (DIY) y el espíritu libre de las bodegas industriales de Berlín, creamos rituales de baile basados en el respeto absoluto, la horizontalidad y el poder de la comunidad. No venimos a ser espectadores; venimos a ser parte del pulso.
+              Inspirados por la ética del Hazlo Tú Mismo (DIY) y el espíritu libre de las bodegas industriales y la escena underground de Mocoa, creamos rituales de baile basados en el respeto absoluto, la horizontalidad y el poder de la comunidad. No venimos a ser espectadores; venimos a ser parte del pulso.
             </p>
           </div>
 

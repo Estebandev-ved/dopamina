@@ -1,0 +1,56 @@
+# ============================================================================
+#  PERFIL DE PRODUCCIÓN  (activar con SPRING_PROFILES_ACTIVE=prod)
+#  Reglas:
+#   - NINGÚN secreto tiene valor por defecto: si falta una variable de entorno,
+#     la aplicación NO arranca (fail-fast). Esto es intencional.
+#   - El esquema NO se modifica solo (ddl-auto: validate).
+#   - No se imprimen las consultas SQL.
+# ============================================================================
+spring:
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USER}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      # 'update': Hibernate crea/añade tablas y columnas que falten, pero no borra datos.
+      # NOTA: el proyecto depende de Hibernate para crear el esquema (schema.sql está
+      # incompleto: no crea 'eventos' ni otras tablas). Por eso NO se usa 'validate',
+      # que haría fallar el arranque. Lo ideal a futuro: completar schema.sql + 'validate'.
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.MySQLDialect
+
+app:
+  jwt:
+    # OBLIGATORIO. Sin valor por defecto: si JWT_SECRET no existe, la app falla al arrancar.
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  cors:
+    # Dominios reales de producción. Se puede sobreescribir con CORS_ALLOWED_ORIGINS.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:https://www.dopaminaeventos.shop,https://dopaminaeventos.shop}
+
+efipay:
+  api-url: ${EFIPAY_API_URL:https://sag.efipay.co/api/v1}
+  access-token: ${EFIPAY_ACCESS_TOKEN}
+  office-id: ${EFIPAY_OFFICE_ID}
+  webhook-token: ${EFIPAY_WEBHOOK_TOKEN}
+  commerce-id: ${EFIPAY_COMMERCE_ID}
+  checkout-template-id: ${EFIPAY_CHECKOUT_TEMPLATE_ID:}
+  redirect-base-url: ${EFIPAY_REDIRECT_BASE_URL}
+  backend-base-url: ${EFIPAY_BACKEND_BASE_URL}
+
+resend:
+  api-key: ${RESEND_API_KEY}
+  admin-email: ${RESEND_ADMIN_EMAIL}
+  # En producción debe ir en false para enviar correos a los clientes reales.
+  test-mode: ${RESEND_TEST_MODE:false}
+  test-email: ${RESEND_TEST_EMAIL:}
+  from:
+    general: ${RESEND_FROM_GENERAL:"Dopamina Crew" <noreply@dopaminacrew.com>}
+    facturas: ${RESEND_FROM_FACTURAS:"Tribu Facturación" <facturas@tribucol.shop>}
+    seguridad: ${RESEND_FROM_SEGURIDAD:"Tribu Seguridad" <seguridad@tribucol.shop>}

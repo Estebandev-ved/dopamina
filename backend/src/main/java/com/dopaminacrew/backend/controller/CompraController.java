@@ -70,6 +70,16 @@ public class CompraController {
         }
     }
 
+    @GetMapping("/promo-parche")
+    public ResponseEntity<?> getPromoParcheDisponible(@AuthenticationPrincipal UserPrincipal currentUser) {
+        if (currentUser == null) {
+            return ResponseEntity.status(401).body(new MessageResponse("No autorizado. Inicie sesión."));
+        }
+        Map<String, Boolean> response = new HashMap<>();
+        response.put("disponible", compraService.isPromoParcheDisponible(currentUser.getId()));
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/mis-boletas")
     @Transactional
     public ResponseEntity<?> getMisBoletas(@AuthenticationPrincipal UserPrincipal currentUser) {
@@ -85,12 +95,18 @@ public class CompraController {
             int expectedCount = compra.getCantidad() != null ? compra.getCantidad() : 0;
             long existingCount = boletaRepository.countByCompraId(compra.getId());
             if (existingCount < expectedCount) {
+                int nextSorteo = 1;
+                if (compra.getEvento() != null) {
+                    Integer maxSorteo = boletaRepository.findMaxNumeroSorteoByEventoId(compra.getEvento().getId());
+                    nextSorteo = (maxSorteo != null ? maxSorteo : 0) + 1;
+                }
                 for (int i = (int) existingCount; i < expectedCount; i++) {
                     Boleta boleta = new Boleta();
                     boleta.setCompra(compra);
                     String ticketRef = "DOPAMINA-QR-" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase() + "-" + System.currentTimeMillis() + "-" + (i + 1);
                     boleta.setCodigoQr(ticketRef);
                     boleta.setEstado("ACTIVA");
+                    boleta.setNumeroSorteo(nextSorteo++);
                     boletaRepository.save(boleta);
                 }
             }
@@ -197,6 +213,14 @@ public class CompraController {
             }
         }
 
+        java.time.LocalDateTime purchaseDate = boleta.getCreatedAt();
+        if (purchaseDate == null && compra != null) {
+            purchaseDate = compra.getCreatedAt();
+        }
+        if (purchaseDate == null) {
+            purchaseDate = java.time.LocalDateTime.now();
+        }
+
         return new BoletaResponse(
                 boleta.getId(),
                 evNombre,
@@ -206,8 +230,9 @@ public class CompraController {
                 evCiudad,
                 boleta.getCodigoQr(),
                 boleta.getEstado(),
-                boleta.getCreatedAt(),
-                usuarioNombre
+                purchaseDate,
+                usuarioNombre,
+                boleta.getNumeroSorteo()
         );
     }
 

@@ -11,6 +11,7 @@ import com.dopaminacrew.backend.repository.UserRepository;
 import com.dopaminacrew.backend.security.JwtTokenProvider;
 import com.dopaminacrew.backend.security.UserPrincipal;
 import com.dopaminacrew.backend.service.AuthService;
+import com.dopaminacrew.backend.service.EmailService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -51,6 +52,9 @@ public class AuthServiceImpl implements AuthService {
     @Autowired
     private LoginAuditRepository loginAuditRepository;
 
+    @Autowired
+    private EmailService emailService;
+
     @Override
     @Transactional
     public void register(RegisterRequest registerRequest) {
@@ -74,6 +78,8 @@ public class AuthServiceImpl implements AuthService {
         user.setBanned(false);
 
         userRepository.save(user);
+
+        emailService.sendWelcomeEmail(user);
     }
 
     private void checkLockout(String email, String ipAddress) {
@@ -200,7 +206,13 @@ public class AuthServiceImpl implements AuthService {
                     newUser.setRol(userRole);
                     newUser.setBanned(false);
                     
-                    return userRepository.save(newUser);
+                    User saved = userRepository.save(newUser);
+                    try {
+                        emailService.sendWelcomeEmail(saved);
+                    } catch (Exception e) {
+                        System.err.println("Error al enviar email de bienvenida de Google: " + e.getMessage());
+                    }
+                    return saved;
                 });
 
         if (user.getBanned() != null && user.getBanned()) {

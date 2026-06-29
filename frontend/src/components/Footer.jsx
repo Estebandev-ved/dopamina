@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { HeartHandshake, Instagram, Mail, MessageCircle } from 'lucide-react';
+import { HeartHandshake, Instagram } from 'lucide-react';
 
 /**
  * Footer component highlighting space safety protocol.
@@ -13,11 +13,17 @@ export default function Footer() {
           {/* Brand & Mission */}
           <div className="space-y-4">
             <span className="text-xl font-black tracking-widest text-white">DOPAMINA</span>
-            <p className="text-xs text-gray-500 font-mono italic">BERLIN UNDERGROUND INFLUENCE</p>
+            <p className="text-xs text-gray-500 font-mono italic">MOCOA UNDERGROUND INFLUENCE</p>
             <div className="flex space-x-4">
-              <a href="#" className="text-gray-400 hover:text-neon-glow transition-colors"><Instagram className="w-5 h-5" /></a>
-              <a href="#" className="text-gray-400 hover:text-neon-glow transition-colors"><MessageCircle className="w-5 h-5" /></a>
-              <a href="mailto:info@dopamina.com" className="text-gray-400 hover:text-neon-glow transition-colors"><Mail className="w-5 h-5" /></a>
+              <a 
+                href="https://www.instagram.com/dopaminalab.eventos/" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-gray-400 hover:text-neon-glow transition-colors"
+                title="Siguenos en Instagram"
+              >
+                <Instagram className="w-5 h-5" />
+              </a>
             </div>
           </div>
 

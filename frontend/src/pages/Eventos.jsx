@@ -20,12 +20,23 @@ export default function Eventos() {
   const [cantidad, setCantidad] = useState(1);
   const [activeModalTab, setActiveModalTab] = useState('info'); // 'info' | 'mapa'
   const [isPlayingPreview, setIsPlayingPreview] = useState(false);
+  // Promo de 4+ boletas: de un solo uso por usuario. Para usuarios no logueados se
+  // muestra como disponible (verán el estado real al pagar tras iniciar sesión).
+  const [promoParcheDisponible, setPromoParcheDisponible] = useState(true);
   const audioRef = useRef(null);
 
   useEffect(() => {
     api.getEventos()
       .then(data => { setEventos(data); setLoading(false); })
       .catch(() => { setError('No se pudieron cargar los eventos.'); setLoading(false); });
+  }, []);
+
+  // Si hay sesión, consultar si la promo de parche sigue disponible para este usuario
+  useEffect(() => {
+    if (!api.isAuthenticated()) return;
+    api.getPromoParcheDisponible()
+      .then(res => setPromoParcheDisponible(!!res.disponible))
+      .catch(() => {});
   }, []);
 
   // Safe release of audio on unmount
@@ -53,6 +64,34 @@ export default function Eventos() {
   const formatPrecio = (precio) => {
     if (!precio || precio === 0) return 'GRATIS';
     return `$${Number(precio).toLocaleString('es-CO')}`;
+  };
+
+  // ── Helpers de preventa ─────────────────────────────────────────────────────
+  // Entradas de preventa aún disponibles para un evento.
+  const preventaRestante = (ev) => {
+    if (!ev || ev.precioPreventa == null || !ev.cantidadPreventa) return 0;
+    return Math.max(0, ev.cantidadPreventa - (ev.vendidas || 0));
+  };
+
+  // Precio "desde" que se muestra: el de preventa si todavía quedan cupos.
+  const precioDesde = (ev) => (preventaRestante(ev) > 0 ? ev.precioPreventa : (ev?.precio || 0));
+
+  // Total estimado de una compra aplicando precio mixto de preventa + descuento por cantidad.
+  // Espeja el cálculo del backend para que coincida con el cobro real de la pasarela.
+  const totalEstimado = (ev, cant) => {
+    if (!ev) return 0;
+    const precioRegular = ev.precio || 0;
+    let subtotal;
+    const rest = preventaRestante(ev);
+    if (rest > 0) {
+      const enPreventa = Math.min(cant, rest);
+      subtotal = enPreventa * ev.precioPreventa + (cant - enPreventa) * precioRegular;
+    } else {
+      subtotal = cant * precioRegular;
+    }
+    // El 10% por 4+ boletas solo aplica si el usuario aún no usó la promo.
+    const aplicaPromo = cant >= 4 && promoParcheDisponible;
+    return subtotal * (aplicaPromo ? 0.9 : 1);
   };
 
   const handleSelectEvento = (evento) => {
@@ -151,7 +190,7 @@ export default function Eventos() {
             <span style={{ color: '#B14EFF' }}>DOPAMINA</span>
           </h1>
           <p style={{ color: '#9A9A9A', fontSize: '1.05rem', maxWidth: '500px', margin: '0 auto' }}>
-            Underground techno · Industrial · Berlin sound · Medellin
+            Underground techno · Industrial · Mocoa sound · Medellin
           </p>
         </motion.div>
       </div>
@@ -292,14 +331,18 @@ export default function Eventos() {
                 {/* Right Side: Price and Action */}
                 <div className="flex items-center justify-between md:justify-end gap-4 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-industrial-800/40 flex-shrink-0">
                   <div className="text-left md:text-right font-mono">
-                    <span className="text-[8px] text-gray-600 uppercase block leading-none">Boletas desde</span>
-                    <span className="text-xs font-black text-white">{formatPrecio(evento.precio)}</span>
+                    <span className="text-[8px] text-gray-600 uppercase block leading-none">{preventaRestante(evento) > 0 ? 'Preventa desde' : 'Boletas desde'}</span>
+                    <span className="text-xs font-black text-white">{formatPrecio(precioDesde(evento))}</span>
                   </div>
 
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate('/checkout', { state: { evento, cantidad: 1 } });
+                      if (!api.getUser()) {
+                        navigate('/login', { state: { from: '/checkout', eventoState: { evento, cantidad: 1 } } });
+                      } else {
+                        navigate('/checkout', { state: { evento, cantidad: 1 } });
+                      }
                     }}
                     className="bg-neon-purple hover:bg-neon-violet text-white text-[9px] font-black tracking-widest px-3 py-2 rounded uppercase transition-all cursor-pointer shadow-neon-sm border-none"
                   >
@@ -539,9 +582,18 @@ export default function Eventos() {
                   <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center justify-between">
                     <span>Selección de Boletas</span>
                     <span className="text-[10px] bg-industrial-800 text-neon-glow px-2 py-0.5 rounded font-mono uppercase">
-                      Precio: ${selectedEvento.precio === 0 ? 'GRATIS' : `${Number(selectedEvento.precio).toLocaleString('es-CO')} COP`}
+                      Precio: ${selectedEvento.precio === 0 ? 'GRATIS' : `${Number(precioDesde(selectedEvento)).toLocaleString('es-CO')} COP`}
                     </span>
                   </h3>
+
+                  {preventaRestante(selectedEvento) > 0 && (
+                    <div className="bg-emerald-500/10 border border-emerald-500/30 rounded p-2.5 text-[10px] text-emerald-400 flex items-start space-x-2">
+                      <span className="text-sm flex-shrink-0 mt-0.5">🎟️</span>
+                      <span>
+                        <strong>¡Preventa activa!</strong> Las primeras {selectedEvento.cantidadPreventa} entradas a ${Number(selectedEvento.precioPreventa).toLocaleString('es-CO')} c/u. Quedan {preventaRestante(selectedEvento)} a este precio; luego suben a ${Number(selectedEvento.precio).toLocaleString('es-CO')}.
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between py-2 border-t border-industrial-850 pt-4">
                     <div className="space-y-0.5">
@@ -572,21 +624,37 @@ export default function Eventos() {
                   </div>
 
                   {/* Promo notice */}
-                  {cantidad >= 4 && (
+                  {cantidad >= 4 && promoParcheDisponible && (
                     <div className="bg-emerald-500/10 border border-emerald-500/30 rounded p-2.5 text-[10px] text-emerald-400 flex items-start space-x-2">
                       <BadgePercent className="w-4 h-4 flex-shrink-0 mt-0.5" />
                       <span>
-                        <strong>¡Descuento de Parche Activado!</strong> Obtienes un 10% de descuento automático en tu compra al llevar 4 o más entradas.
+                        <strong>¡Descuento de Parche Activado!</strong> Obtienes un 10% de descuento automático en tu compra al llevar 4 o más entradas. Solo se puede usar una vez.
                       </span>
                     </div>
                   )}
+                  {cantidad >= 4 && !promoParcheDisponible && (
+                    <div className="bg-industrial-800/40 border border-industrial-700 rounded p-2.5 text-[10px] text-gray-400 flex items-start space-x-2">
+                      <BadgePercent className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      <span>
+                        Ya usaste tu <strong>Promo Parche</strong> (10% por 4+ boletas) en una compra anterior, así que este descuento ya no aplica.
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Sorteo notice */}
+                  <div className="bg-purple-950/20 border border-purple-500/20 rounded p-2.5 text-[10px] text-purple-400 flex items-start space-x-2">
+                    <span className="text-sm flex-shrink-0 mt-0.5">🎰</span>
+                    <span>
+                      <strong>¡Sorteos en Vivo Incluidos!</strong> Al comprar tu boleta virtual, estás ingresando directamente a jugar en los sorteos que realizaremos en las primeras horas de la fiesta. Cada boleta tendrá asignado un número único de sorteo correlativo.
+                    </span>
+                  </div>
 
                   {/* Price Summary and Checkout CTA */}
                   <div className="border-t border-industrial-850 pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="text-center sm:text-left">
                       <span className="text-[9px] text-gray-500 uppercase font-mono block">Total Estimado</span>
                       <span className="text-md font-black text-neon-glow font-mono">
-                        ${((cantidad * selectedEvento.precio) * (cantidad >= 4 ? 0.9 : 1)).toLocaleString('es-CO')} COP
+                        ${totalEstimado(selectedEvento, cantidad).toLocaleString('es-CO')} COP
                       </span>
                     </div>
 

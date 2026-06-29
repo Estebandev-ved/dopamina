@@ -39,8 +39,10 @@ CREATE TABLE IF NOT EXISTS `compras` (
     `descuento` DECIMAL(10, 2) NOT NULL,
     `total` DECIMAL(10, 2) NOT NULL,
     `codigo_cupon` VARCHAR(50),
-    `estado` VARCHAR(50) NOT NULL DEFAULT 'PAGADO',
+    `estado` VARCHAR(50) NOT NULL DEFAULT 'PENDIENTE',
     `codigo_qr` VARCHAR(255) NOT NULL UNIQUE,
+    `efipay_payment_id` VARCHAR(100) DEFAULT NULL,
+    `efipay_status` VARCHAR(50) DEFAULT NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (`evento_id`) REFERENCES `eventos` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
@@ -52,6 +54,7 @@ CREATE TABLE IF NOT EXISTS `boletas` (
     `compra_id` BIGINT NOT NULL,
     `codigo_qr` VARCHAR(255) NOT NULL UNIQUE,
     `estado` VARCHAR(50) NOT NULL DEFAULT 'ACTIVA', -- 'ACTIVA', 'USADA'
+    `numero_sorteo` INT DEFAULT NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (`compra_id`) REFERENCES `compras` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
@@ -69,5 +72,35 @@ CREATE TABLE IF NOT EXISTS `canjes` (
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 6. Create Cupones Table (dynamic coupons)
+CREATE TABLE IF NOT EXISTS `cupones` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `codigo` VARCHAR(50) NOT NULL UNIQUE,
+    `descuento_porcentaje` DOUBLE NOT NULL,
+    `activo` BOOLEAN NOT NULL DEFAULT TRUE,
+    `descripcion` VARCHAR(255),
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Seed default coupons
+INSERT INTO `cupones` (`codigo`, `descuento_porcentaje`, `activo`, `descripcion`) 
+VALUES ('DOPAMINA10', 10.0, TRUE, 'Descuento general del 10%')
+ON DUPLICATE KEY UPDATE `codigo`=`codigo`;
+
+INSERT INTO `cupones` (`codigo`, `descuento_porcentaje`, `activo`, `descripcion`) 
+VALUES ('REGALO15', 15.0, TRUE, 'Cupón regalo sorpresa del 15%')
+ON DUPLICATE KEY UPDATE `codigo`=`codigo`;
+
+-- 7. Create Sugerencias Table (public song/genre suggestions)
+CREATE TABLE IF NOT EXISTS `sugerencias` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `contenido` TEXT NOT NULL,
+    `nombre` VARCHAR(100) DEFAULT NULL,
+    `email` VARCHAR(150) DEFAULT NULL,
+    `estado` VARCHAR(50) NOT NULL DEFAULT 'PENDIENTE',
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 

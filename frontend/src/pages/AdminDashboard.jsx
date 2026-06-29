@@ -315,6 +315,22 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (!mobile) {
+        setSidebarOpen(true);
+      } else {
+        setSidebarOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [stats, setStats] = useState(null);
   const [compras, setCompras] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
@@ -1302,17 +1318,20 @@ export default function AdminDashboard() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: theme.bg, color: theme.text, fontFamily: "'Outfit', 'Inter', sans-serif", position: 'relative' }}>
       {/* Mobile overlay */}
-      {sidebarOpen && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 40, display: 'none' }} onClick={() => setSidebarOpen(false)} />}
+      {sidebarOpen && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 40, display: isMobile ? 'block' : 'none' }} onClick={() => setSidebarOpen(false)} />}
 
       {/* Sidebar */}
       <aside style={{
         width: '240px', background: theme.sidebar, borderRight: `1px solid ${theme.border}`,
         display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 50,
+        transform: sidebarOpen ? 'translateX(0)' : 'translateX(-240px)',
         transition: 'transform 0.3s ease',
       }}>
         {/* Logo */}
         <div style={{ padding: '20px 20px', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <SvgIcon letter="D" />
+          <div style={{ width: '32px', height: '32px', borderRadius: '6px', border: `1px solid ${theme.accent}`, background: '#000', display: 'flex', alignItems: 'center', justifycontent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+            <img src="/src/assets/logo.png" alt="Logo" style={{ width: '22px', height: '22px', objectFit: 'contain' }} />
+          </div>
           <div>
             <div style={{ fontWeight: 900, fontSize: '1rem', color: theme.text, letterSpacing: '1px' }}>DOPAMINA</div>
             <div style={{ fontSize: '0.68rem', color: theme.textMuted, fontWeight: 500, letterSpacing: '0.5px' }}>CREW CONTROL PANEL</div>
@@ -1322,7 +1341,7 @@ export default function AdminDashboard() {
         {/* Nav */}
         <nav style={{ flex: 1, padding: '12px', display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto' }}>
           {SIDEBAR_ITEMS.map(item => (
-            <button key={item.id} onClick={() => setActiveTab(item.id)}
+            <button key={item.id} onClick={() => { setActiveTab(item.id); if (isMobile) setSidebarOpen(false); }}
               style={navBtnStyle(activeTab === item.id)}
               onMouseEnter={e => { if (activeTab !== item.id) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
               onMouseLeave={e => { if (activeTab !== item.id) e.currentTarget.style.background = 'transparent'; }}
@@ -1357,7 +1376,20 @@ export default function AdminDashboard() {
       </aside>
 
       {/* Main content */}
-      <main style={{ flex: 1, marginLeft: '240px', padding: '28px 32px', maxWidth: 'calc(100vw - 240px)', overflowX: 'hidden' }}>
+      <main style={{ flex: 1, marginLeft: isMobile ? '0' : '240px', padding: isMobile ? '16px' : '28px 32px', maxWidth: isMobile ? '100vw' : 'calc(100vw - 240px)', overflowX: 'hidden' }}>
+        {/* Mobile Header Bar */}
+        {isMobile && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: theme.sidebar, border: `1px solid ${theme.border}`, borderRadius: '10px', padding: '12px 16px', marginBottom: '20px' }}>
+            <button 
+              onClick={() => setSidebarOpen(true)}
+              style={{ background: 'none', border: 'none', color: theme.text, fontSize: '1.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', outline: 'none' }}
+            >
+              ☰
+            </button>
+            <span style={{ fontWeight: 800, fontSize: '0.85rem', letterSpacing: '1.5px', color: theme.accentLight }}>DOPAMINA CONTROL</span>
+          </div>
+        )}
+
         {/* Error */}
         {error && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}

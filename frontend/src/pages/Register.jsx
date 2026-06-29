@@ -18,6 +18,49 @@ function decodeJwtPayload(token) {
   }
 }
 
+function GoogleRegisterSection({ loading, setSubmitError, setLoading, navigate }) {
+  const googleLogin = useGoogleLogin({
+    flow: 'implicit',
+    onSuccess: async (tokenResponse) => {
+      setLoading(true);
+      setSubmitError('');
+      try {
+        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        });
+        const payload = await userInfoRes.json();
+        if (!payload || !payload.email) throw new Error('No se pudo obtener la información de Google.');
+        
+        await api.loginWithGoogle(payload.email, payload.name, payload.sub);
+        navigate('/');
+      } catch (err) {
+        setSubmitError(err.message || 'Error al registrarse con Google.');
+      } finally { setLoading(false); }
+    },
+    onError: () => setSubmitError('Error al autenticar con Google. Intente de nuevo.'),
+  });
+
+  return (
+    <>
+      <div className="relative my-4 flex items-center justify-center">
+        <div className="absolute inset-x-0 h-[1px] bg-industrial-800" />
+        <span className="relative z-10 bg-industrial-900 px-3 text-[10px] font-mono text-gray-500 uppercase">o bien</span>
+      </div>
+      <button type="button" onClick={() => googleLogin()} disabled={loading}
+        className="w-full border border-industrial-800 hover:border-neon-purple/50 bg-black text-gray-300 hover:text-white py-3 rounded text-xs font-black tracking-[0.15em] transition-all duration-300 flex items-center justify-center space-x-2.5 focus:outline-none"
+      >
+        <svg className="w-4 h-4" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        <span>CONTINUAR CON GOOGLE</span>
+      </button>
+    </>
+  );
+}
+
 export default function Register() {
   const navigate = useNavigate();
   const [nombre, setNombre] = useState('');
@@ -32,8 +75,6 @@ export default function Register() {
   const [success, setSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const hasGoogleClientId = !!import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   useEffect(() => {
     if (!nombre) { setNombreError(''); return; }
@@ -80,26 +121,6 @@ export default function Register() {
     } finally { setLoading(false); }
   };
 
-  const googleLogin = useGoogleLogin({
-    flow: 'implicit',
-    onSuccess: async (tokenResponse) => {
-      setLoading(true);
-      setSubmitError('');
-      try {
-        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-        });
-        const payload = await userInfoRes.json();
-        if (!payload || !payload.email) throw new Error('No se pudo obtener la información de Google.');
-        
-        await api.loginWithGoogle(payload.email, payload.name, payload.sub);
-        navigate('/');
-      } catch (err) {
-        setSubmitError(err.message || 'Error al registrarse con Google.');
-      } finally { setLoading(false); }
-    },
-    onError: () => setSubmitError('Error al autenticar con Google. Intente de nuevo.'),
-  });
 
   return (
     <PageTransition>
@@ -115,6 +136,32 @@ export default function Register() {
             <p className="mt-2 text-xs font-mono text-gray-500 uppercase tracking-widest">
               Unirse al parche del underground
             </p>
+          </div>
+
+          {/* Tarjeta de Incentivo / Beneficios */}
+          <div className="bg-gradient-to-r from-purple-950/20 to-black border border-purple-500/30 rounded-lg p-5 shadow-neon-sm space-y-3">
+            <div className="flex items-center space-x-2 text-neon-glow font-bold text-xs uppercase tracking-wider">
+              <span>🎟️</span>
+              <span>¿Por qué necesitas una cuenta?</span>
+            </div>
+            <ul className="space-y-2 text-[11px] text-gray-300 font-mono">
+              <li className="flex items-start space-x-1.5">
+                <span className="text-emerald-400">✔</span>
+                <span><strong>Orden y Seguridad:</strong> Las compras se hacen solo con cuenta creada para poder asociar tus códigos QR y boletas de forma organizada.</span>
+              </li>
+              <li className="flex items-start space-x-1.5">
+                <span className="text-emerald-400">✔</span>
+                <span><strong>Sorteos en Vivo:</strong> Con tu cuenta, juegas automáticamente en los sorteos de la noche con tus números asignados.</span>
+              </li>
+              <li className="flex items-start space-x-1.5">
+                <span className="text-emerald-400">✔</span>
+                <span><strong>10% Off Parche:</strong> 10% de descuento automático en tu compra al llevar 4 o más boletas.</span>
+              </li>
+              <li className="flex items-start space-x-1.5">
+                <span className="text-emerald-400">✔</span>
+                <span><strong>Dos clics con Google:</strong> Créala o ingresa al instante usando tu cuenta de Google.</span>
+              </li>
+            </ul>
           </div>
 
           <div className="bg-industrial-900 border border-industrial-800 rounded-lg p-8 shadow-neon-sm">
@@ -212,25 +259,12 @@ export default function Register() {
                   <span className="relative z-10 uppercase">{loading ? 'CREANDO CUENTA...' : 'REGISTRARME'}</span>
                 </button>
 
-                {hasGoogleClientId && (
-                  <>
-                    <div className="relative my-4 flex items-center justify-center">
-                      <div className="absolute inset-x-0 h-[1px] bg-industrial-800" />
-                      <span className="relative z-10 bg-industrial-900 px-3 text-[10px] font-mono text-gray-500 uppercase">o bien</span>
-                    </div>
-                    <button type="button" onClick={() => googleLogin()} disabled={loading}
-                      className="w-full border border-industrial-800 hover:border-neon-purple/50 bg-black text-gray-300 hover:text-white py-3 rounded text-xs font-black tracking-[0.15em] transition-all duration-300 flex items-center justify-center space-x-2.5 focus:outline-none"
-                    >
-                      <svg className="w-4 h-4" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                      </svg>
-                      <span>CONTINUAR CON GOOGLE</span>
-                    </button>
-                  </>
-                )}
+                <GoogleRegisterSection 
+                  loading={loading}
+                  setSubmitError={setSubmitError}
+                  setLoading={setLoading}
+                  navigate={navigate}
+                />
               </form>
             )}
 

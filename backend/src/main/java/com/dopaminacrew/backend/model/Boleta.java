@@ -34,9 +34,17 @@ public class Boleta {
     @Column(nullable = false, length = 50)
     private String estado = "ACTIVA"; // Default: ACTIVA. Changed to USADA upon validation check-in
 
-    @Column(name = "created_at", insertable = false, updatable = false)
+    @Column(name = "numero_sorteo")
+    private Integer numeroSorteo;
+
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at", insertable = false, updatable = false)
     private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
 }
