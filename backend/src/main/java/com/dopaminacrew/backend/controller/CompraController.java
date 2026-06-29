@@ -90,8 +90,14 @@ public class CompraController {
         // Fetch all purchases for this user
         List<Compra> compras = compraService.getMisBoletas(currentUser.getId());
         
-        // Ensure every purchased ticket is backed by an individual Boleta entity
+        // Ensure every purchased ticket is backed by an individual Boleta entity.
+        // IMPORTANTE: solo se generan QR de compras realmente PAGADAS. Una compra
+        // PENDIENTE (pago no completado o abandonado en la pasarela) NO debe generar
+        // boletas ni QR.
         for (Compra compra : compras) {
+            if (!"PAGADO".equals(compra.getEstado())) {
+                continue;
+            }
             int expectedCount = compra.getCantidad() != null ? compra.getCantidad() : 0;
             long existingCount = boletaRepository.countByCompraId(compra.getId());
             if (existingCount < expectedCount) {
@@ -112,8 +118,11 @@ public class CompraController {
             }
         }
 
+        // Solo se muestran QR de compras PAGADAS (defensa también contra boletas que
+        // hayan podido quedar de compras pendientes anteriores a este arreglo).
         List<Boleta> boletas = boletaRepository.findByUsuarioIdOrderByCreatedAtDesc(currentUser.getId());
         List<BoletaResponse> response = boletas.stream()
+                .filter(b -> b.getCompra() != null && "PAGADO".equals(b.getCompra().getEstado()))
                 .map(this::mapToBoletaResponse)
                 .collect(Collectors.toList());
                 

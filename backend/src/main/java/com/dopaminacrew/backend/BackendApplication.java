@@ -3,12 +3,14 @@ package com.dopaminacrew.backend;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Main application entry point for the Dopamina Crew Backend.
  * Security Note: CORS configuration and CSRF prevention are set up in the SecurityConfig class.
  */
 @SpringBootApplication
+@EnableScheduling
 public class BackendApplication {
 
     public static void main(String[] args) {

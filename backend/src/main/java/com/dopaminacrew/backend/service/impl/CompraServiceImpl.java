@@ -149,12 +149,18 @@ public class CompraServiceImpl implements CompraService {
         Compra compra = compraRepository.findById(compraId)
                 .orElseThrow(() -> new RuntimeException("Error: Compra no encontrada."));
 
-        if (!"PENDIENTE".equals(compra.getEstado())) {
-            long boletasCount = boletaRepository.countByCompraId(compraId);
-            if (boletasCount > 0 || !"PAGADO".equals(compra.getEstado())) {
-                return;
-            }
+        long boletasCount = boletaRepository.countByCompraId(compraId);
+
+        // Idempotente: si ya está PAGADO y con boletas generadas, no hay nada que hacer.
+        if ("PAGADO".equals(compra.getEstado()) && boletasCount > 0) {
+            return;
         }
+        // No reactivar compras rechazadas por la pasarela.
+        if ("RECHAZADO".equals(compra.getEstado())) {
+            return;
+        }
+        // PENDIENTE o EXPIRADO (pago que llegó tarde, tras vencer la reserva) → se confirma:
+        // el pago real de la pasarela manda sobre nuestra expiración interna.
 
         compra.setEstado("PAGADO");
         compraRepository.save(compra);

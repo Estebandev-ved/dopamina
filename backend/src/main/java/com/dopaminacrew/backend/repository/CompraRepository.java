@@ -3,6 +3,7 @@ package com.dopaminacrew.backend.repository;
 import com.dopaminacrew.backend.model.Compra;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
@@ -54,4 +55,13 @@ public interface CompraRepository extends JpaRepository<Compra, Long> {
     default boolean usuarioYaUsoPromoParche(Long usuarioId) {
         return existePromoParcheUsada(usuarioId, LocalDateTime.now().minusMinutes(MINUTOS_RESERVA));
     }
+
+    /**
+     * Marca como EXPIRADO las compras que llevan PENDIENTE más tiempo que la ventana
+     * de reserva (pagos abandonados en la pasarela). Libera su cupo y limpia el listado.
+     * Devuelve cuántas compras se expiraron.
+     */
+    @Modifying
+    @Query("UPDATE Compra c SET c.estado = 'EXPIRADO' WHERE c.estado = 'PENDIENTE' AND c.createdAt < :limite")
+    int expirarPendientesAntiguas(@Param("limite") LocalDateTime limite);
 }
