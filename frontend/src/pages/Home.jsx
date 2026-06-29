@@ -238,12 +238,6 @@ export default function Home() {
             )}
           </h1>
 
-          <p className="max-w-xl mx-auto text-sm sm:text-base text-gray-400 mb-8 sm:mb-10 leading-relaxed px-2">
-            {featuredEvent
-              ? featuredEvent.descripcion
-              : "Una noche donde la pista no tiene jerarquías, el volumen rompe la cotidianidad y el sonido industrial se fusiona con el sudor del perreo pesado. Bienvenidos a la resistencia sonora."}
-          </p>
-
           {/* CTA TICKET BUTTON — full-width on mobile */}
           <div className="flex flex-col items-center justify-center space-y-3 px-4 sm:px-0">
             <button

@@ -33,9 +33,14 @@ public class AdminServiceImpl implements AdminService {
         List<User> todosUsuarios = userRepository.findAll();
 
         long totalUsuarios = todosUsuarios.size();
-        long totalCompras = todasCompras.size();
-        double totalIngresos = todasCompras.stream().mapToDouble(Compra::getTotal).sum();
-        long totalBoletas = todasCompras.stream().mapToLong(c -> c.getCantidad()).sum();
+        
+        List<Compra> comprasExitosas = todasCompras.stream()
+                .filter(c -> "PAGADO".equals(c.getEstado()))
+                .collect(Collectors.toList());
+
+        long totalCompras = comprasExitosas.size();
+        double totalIngresos = comprasExitosas.stream().mapToDouble(Compra::getTotal).sum();
+        long totalBoletas = comprasExitosas.stream().mapToLong(c -> c.getCantidad()).sum();
         double promedio = totalCompras > 0 ? (double) totalBoletas / totalCompras : 0;
 
         // Return last 10 purchases and last 10 users for the dashboard overview
