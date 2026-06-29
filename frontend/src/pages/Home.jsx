@@ -266,17 +266,17 @@ export default function Home() {
             <div className="animate-ticker-scroll flex items-center space-x-8 sm:space-x-12 select-none">
               {[1, 2].map((loop) => (
                 <React.Fragment key={loop}>
-                  <span className="text-xs sm:text-sm font-black text-industrial-400 hover:text-neon-glow font-mono uppercase tracking-[0.2em] sm:tracking-[0.25em] transition-colors duration-300 whitespace-nowrap">MOCOA RAW BEATS</span>
+                  <span className="text-xs sm:text-sm font-black text-industrial-400 hover:text-neon-glow font-mono uppercase tracking-[0.2em] sm:tracking-[0.25em] transition-colors duration-300 whitespace-nowrap">JEAN TATTOO</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-industrial-700 flex-shrink-0" />
-                  <span className="text-xs sm:text-sm font-black text-industrial-400 hover:text-neon-glow font-mono uppercase tracking-[0.2em] sm:tracking-[0.25em] transition-colors duration-300 whitespace-nowrap">TRESOR RECORDS</span>
+                  <span className="text-xs sm:text-sm font-black text-industrial-400 hover:text-neon-glow font-mono uppercase tracking-[0.2em] sm:tracking-[0.25em] transition-colors duration-300 whitespace-nowrap">VAPES MOCOA</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-industrial-700 flex-shrink-0" />
-                  <span className="text-xs sm:text-sm font-black text-industrial-400 hover:text-neon-glow font-mono uppercase tracking-[0.2em] sm:tracking-[0.25em] transition-colors duration-300 whitespace-nowrap">OSTGUT SOUNDS</span>
+                  <span className="text-xs sm:text-sm font-black text-industrial-400 hover:text-neon-glow font-mono uppercase tracking-[0.2em] sm:tracking-[0.25em] transition-colors duration-300 whitespace-nowrap">TRIBU SHOP</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-industrial-700 flex-shrink-0" />
-                  <span className="text-xs sm:text-sm font-black text-industrial-400 hover:text-neon-glow font-mono uppercase tracking-[0.2em] sm:tracking-[0.25em] transition-colors duration-300 whitespace-nowrap">KLOCKWORKS INC</span>
+                  <span className="text-xs sm:text-sm font-black text-industrial-400 hover:text-neon-glow font-mono uppercase tracking-[0.2em] sm:tracking-[0.25em] transition-colors duration-300 whitespace-nowrap">GENERACIÓN Z</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-industrial-700 flex-shrink-0" />
-                  <span className="text-xs sm:text-sm font-black text-industrial-400 hover:text-neon-glow font-mono uppercase tracking-[0.2em] sm:tracking-[0.25em] transition-colors duration-300 whitespace-nowrap">INDUSTRIAL AUDIO</span>
+                  <span className="text-xs sm:text-sm font-black text-industrial-400 hover:text-neon-glow font-mono uppercase tracking-[0.2em] sm:tracking-[0.25em] transition-colors duration-300 whitespace-nowrap">ARAWA CAFÉ</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-industrial-700 flex-shrink-0" />
-                  <span className="text-xs sm:text-sm font-black text-industrial-400 hover:text-neon-glow font-mono uppercase tracking-[0.2em] sm:tracking-[0.25em] transition-colors duration-300 whitespace-nowrap">RAW RECORDS</span>
+                  <span className="text-xs sm:text-sm font-black text-industrial-400 hover:text-neon-glow font-mono uppercase tracking-[0.2em] sm:tracking-[0.25em] transition-colors duration-300 whitespace-nowrap">LUAU</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-industrial-700 flex-shrink-0" />
                 </React.Fragment>
               ))}

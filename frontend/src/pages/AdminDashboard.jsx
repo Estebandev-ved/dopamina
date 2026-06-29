@@ -385,6 +385,12 @@ export default function AdminDashboard() {
   const streamRef = useRef(null);
   const scanLoopRef = useRef(null);
 
+  // Estados para Regalar Boletas
+  const [formRegalo, setFormRegalo] = useState({ eventoId: '', nombre: '', email: '', telefono: '', cantidad: 1, nota: '' });
+  const [loadingRegalo, setLoadingRegalo] = useState(false);
+  const [errorRegalo, setErrorRegalo] = useState('');
+  const [successRegalo, setSuccessRegalo] = useState('');
+
   // Estados para Sorteos
   const [selectedSorteoEvento, setSelectedSorteoEvento] = useState('');
   const [participantesSorteo, setParticipantesSorteo] = useState([]);
@@ -1327,6 +1333,148 @@ export default function AdminDashboard() {
           </Section>
         </div>
       </div>
+    </motion.div>
+  );
+
+  const handleGiftTickets = async (e) => {
+    e.preventDefault();
+    if (!formRegalo.eventoId || !formRegalo.nombre || !formRegalo.email || !formRegalo.cantidad) {
+      setErrorRegalo('Por favor complete todos los campos obligatorios.');
+      return;
+    }
+    setLoadingRegalo(true);
+    setErrorRegalo('');
+    setSuccessRegalo('');
+    try {
+      await api.adminRegalarBoletas({
+        eventoId: parseInt(formRegalo.eventoId),
+        nombre: formRegalo.nombre,
+        email: formRegalo.email,
+        telefono: formRegalo.telefono || '3000000000',
+        cantidad: parseInt(formRegalo.cantidad),
+        nota: formRegalo.nota || ''
+      });
+      setSuccessRegalo(`¡Boletas de cortesía enviadas con éxito a ${formRegalo.nombre}!`);
+      setFormRegalo({ eventoId: '', nombre: '', email: '', telefono: '', cantidad: 1, nota: '' });
+      fetchAll();
+    } catch (err) {
+      setErrorRegalo(err.message || 'Error al regalar boletas.');
+    } finally {
+      setLoadingRegalo(false);
+    }
+  };
+
+  const renderRegalos = () => (
+    <motion.div key="regalos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <Section icon="gift" title="Regalar Boletas (Entradas de Cortesía)">
+        <p style={{ color: theme.textSec, fontSize: '0.85rem', marginBottom: '24px', lineHeight: 1.5 }}>
+          Genera boletas gratuitas para invitados especiales, organizadores o relaciones públicas. Se creará la compra en estado <strong style={{ color: theme.success }}>PAGADO</strong> a valor $0 y se enviará el correo con los códigos QR automáticamente al beneficiario.
+        </p>
+
+        {errorRegalo && (
+          <div style={{ background: 'rgba(239,68,68,0.1)', border: `1px solid rgba(239,68,68,0.2)`, borderRadius: '8px', padding: '12px 16px', marginBottom: '20px', color: theme.danger, fontSize: '0.85rem' }}>
+            ⚠️ {errorRegalo}
+          </div>
+        )}
+
+        {successRegalo && (
+          <div style={{ background: 'rgba(74,222,128,0.1)', border: `1px solid rgba(74,222,128,0.2)`, borderRadius: '8px', padding: '12px 16px', marginBottom: '20px', color: theme.success, fontSize: '0.85rem' }}>
+            ✅ {successRegalo}
+          </div>
+        )}
+
+        <form onSubmit={handleGiftTickets} style={{ maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Evento de Destino *</label>
+            <select
+              value={formRegalo.eventoId}
+              onChange={e => setFormRegalo(prev => ({ ...prev, eventoId: e.target.value }))}
+              style={inputStyle}
+              required
+            >
+              <option value="">-- Seleccione el evento --</option>
+              {eventos.map(ev => (
+                <option key={ev.id} value={ev.id}>{ev.nombre} ({ev.ciudad})</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Nombre del Invitado *</label>
+              <input
+                type="text"
+                placeholder="Nombre completo"
+                value={formRegalo.nombre}
+                onChange={e => setFormRegalo(prev => ({ ...prev, nombre: e.target.value }))}
+                style={inputStyle}
+                required
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Correo Electrónico *</label>
+              <input
+                type="email"
+                placeholder="invitado@correo.com"
+                value={formRegalo.email}
+                onChange={e => setFormRegalo(prev => ({ ...prev, email: e.target.value }))}
+                style={inputStyle}
+                required
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Teléfono (Opcional)</label>
+              <input
+                type="text"
+                placeholder="Ej: 3001234567"
+                value={formRegalo.telefono}
+                onChange={e => setFormRegalo(prev => ({ ...prev, telefono: e.target.value }))}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Cantidad de Entradas *</label>
+              <input
+                type="number"
+                min="1"
+                max="50"
+                value={formRegalo.cantidad}
+                onChange={e => setFormRegalo(prev => ({ ...prev, cantidad: e.target.value }))}
+                style={inputStyle}
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Nota / Razón de la Cortesía</label>
+            <input
+              type="text"
+              placeholder="Ej: Invitado de Charlotte de Witte"
+              value={formRegalo.nota}
+              onChange={e => setFormRegalo(prev => ({ ...prev, nota: e.target.value }))}
+              style={inputStyle}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loadingRegalo}
+            style={{
+              ...btnPrimary,
+              alignSelf: 'flex-start',
+              padding: '12px 32px',
+              opacity: loadingRegalo ? 0.6 : 1,
+              cursor: loadingRegalo ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {loadingRegalo ? 'Procesando Cortesía...' : '🎁 Enviar Cortesías'}
+          </button>
+        </form>
+      </Section>
     </motion.div>
   );
 
