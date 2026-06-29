@@ -122,8 +122,11 @@ public class AdminServiceImpl implements AdminService {
     }
 
     private AdminStatsResponse.UsuarioAdminDTO toUsuarioDTO(User u, List<Compra> todasCompras) {
+        // Solo compras PAGADAS cuentan como compras reales y gasto del usuario.
+        // Las PENDIENTE/EXPIRADO/RECHAZADO (pagos no completados) no deben contar.
         List<Compra> comprasUsuario = todasCompras.stream()
                 .filter(c -> c.getUsuario() != null && c.getUsuario().getId().equals(u.getId()))
+                .filter(c -> "PAGADO".equals(c.getEstado()))
                 .collect(Collectors.toList());
 
         double totalGastado = comprasUsuario.stream().mapToDouble(Compra::getTotal).sum();
