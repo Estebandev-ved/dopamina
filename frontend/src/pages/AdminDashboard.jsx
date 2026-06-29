@@ -39,7 +39,10 @@ const SIDEBAR_ITEMS = [
   { id: 'compras', label: 'Compras', icon: 'C' },
   { id: 'usuarios', label: 'Usuarios', icon: 'U' },
   { id: 'canjes', label: 'Canjes', icon: 'G' },
+  { id: 'regalos', label: 'Regalar Boletas', icon: 'R' },
   { id: 'puerta', label: 'Puerta', icon: 'Q' },
+  { id: 'sorteos', label: 'Sorteos', icon: 'T' },
+  { id: 'cupones', label: 'Cupones', icon: 'K' },
   { id: 'seguridad', label: 'Seguridad', icon: 'S' },
 ];
 
@@ -382,6 +385,163 @@ export default function AdminDashboard() {
   const streamRef = useRef(null);
   const scanLoopRef = useRef(null);
 
+  // Estados para Sorteos
+  const [selectedSorteoEvento, setSelectedSorteoEvento] = useState('');
+  const [participantesSorteo, setParticipantesSorteo] = useState([]);
+  const [loadingParticipantes, setLoadingParticipantes] = useState(false);
+  const [numeroSorteoInput, setNumeroSorteoInput] = useState('');
+  const [ganadorSorteo, setGanadorSorteo] = useState(null);
+  const [buscandoGanador, setBuscandoGanador] = useState(false);
+  const [errorSorteo, setErrorSorteo] = useState('');
+  
+  // Tómbola animada
+  const [girandoTombola, setGirandoTombola] = useState(false);
+  const [tombolaNumeroVis, setTombolaNumeroVis] = useState('???');
+  
+  // Historial de ganadores (persistencia local)
+  const [ganadoresHistorial, setGanadoresHistorial] = useState([]);
+
+  // Estados para Cupones
+  const [cupones, setCupones] = useState([]);
+  const [loadingCupones, setLoadingCupones] = useState(false);
+  const [formCupon, setFormCupon] = useState({ codigo: '', descuentoPorcentaje: '', descripcion: '', activo: true });
+  const [searchCupon, setSearchCupon] = useState('');
+
+
+  const fetchCupones = useCallback(async () => {
+    setLoadingCupones(true);
+    try {
+      const data = await api.adminGetCupones();
+      setCupones(data || []);
+    } catch (err) {
+      console.error('Error fetching cupones:', err);
+    } finally {
+      setLoadingCupones(false);
+    }
+  }, []);
+
+  const handleCreateCupon = async (e) => {
+    e.preventDefault();
+    if (!formCupon.codigo.trim()) return;
+    const discount = parseFloat(formCupon.descuentoPorcentaje);
+    if (isNaN(discount) || discount <= 0 || discount > 100) {
+      alert('El porcentaje de descuento debe ser un número entre 0.1 y 100.');
+      return;
+    }
+
+    try {
+      await api.adminCreateCupon({
+        codigo: formCupon.codigo.trim().toUpperCase(),
+        descuentoPorcentaje: discount,
+        descripcion: formCupon.descripcion,
+        activo: formCupon.activo
+      });
+      setFormCupon({ codigo: '', descuentoPorcentaje: '', descripcion: '', activo: true });
+      fetchCupones();
+      fetchAll();
+    } catch (err) {
+      alert(err.message || 'Error al crear el cupón.');
+    }
+  };
+
+  const handleToggleCupon = async (id) => {
+    try {
+      await api.adminToggleCupon(id);
+      fetchCupones();
+    } catch (err) {
+      alert(err.message || 'Error al cambiar estado del cupón.');
+    }
+  };
+
+  const handleDeleteCupon = async (id) => {
+    if (!window.confirm('¿Está seguro de que desea eliminar este cupón?')) return;
+    try {
+      await api.adminDeleteCupon(id);
+      fetchCupones();
+    } catch (err) {
+      alert(err.message || 'Error al eliminar el cupón.');
+    }
+  };
+
+  // Cargar participantes del sorteo al cambiar de evento
+  const fetchParticipantesSorteo = useCallback(async (eventoId) => {
+    if (!eventoId) {
+      setParticipantesSorteo([]);
+      setGanadoresHistorial([]);
+      return;
+    }
+    setLoadingParticipantes(true);
+    setErrorSorteo('');
+    setGanadorSorteo(null);
+    try {
+      const response = await api.adminGetSorteoParticipantes(eventoId);
+      setParticipantesSorteo(response || []);
+      // Cargar historial de localStorage
+      const stored = localStorage.getItem(`dopamina_sorteo_ganadores_${eventoId}`);
+      if (stored) {
+        setGanadoresHistorial(JSON.parse(stored));
+      } else {
+        setGanadoresHistorial([]);
+      }
+    } catch (err) {
+      setErrorSorteo('Error al obtener la lista de participantes del sorteo.');
+    } finally {
+      setLoadingParticipantes(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedSorteoEvento) {
+      fetchParticipantesSorteo(selectedSorteoEvento);
+    }
+  }, [selectedSorteoEvento, fetchParticipantesSorteo]);
+
+  const buscarGanadorManual = async (numero) => {
+    if (!selectedSorteoEvento) {
+      setErrorSorteo('Seleccione un evento primero.');
+      return;
+    }
+    if (!numero || isNaN(numero)) {
+      setErrorSorteo('Ingrese un número de sorteo válido.');
+      return;
+    }
+    setBuscandoGanador(true);
+    setErrorSorteo('');
+    setGanadorSorteo(null);
+    try {
+      const response = await api.adminGetSorteoGanador(selectedSorteoEvento, parseInt(numero));
+      setGanadorSorteo(response);
+      agregarAlHistorial(response);
+    } catch (err) {
+      setErrorSorteo(err.message || 'No se encontró ninguna boleta con ese número.');
+    } finally {
+      setBuscandoGanador(false);
+    }
+  };
+
+  const agregarAlHistorial = useCallback((ganador) => {
+    if (!ganador) return;
+    setGanadoresHistorial(prev => {
+      if (prev.some(h => h.id === ganador.id)) return prev;
+      const nuevoHistorial = [{
+        id: ganador.id,
+        numeroSorteo: ganador.numeroSorteo,
+        usuarioNombre: ganador.usuarioNombre || 'Desconocido',
+        timestamp: new Date().toISOString()
+      }, ...prev];
+      localStorage.setItem(`dopamina_sorteo_ganadores_${selectedSorteoEvento}`, JSON.stringify(nuevoHistorial));
+      return nuevoHistorial;
+    });
+  }, [selectedSorteoEvento]);
+
+  const reiniciarSorteo = () => {
+    if (!selectedSorteoEvento) return;
+    localStorage.removeItem(`dopamina_sorteo_ganadores_${selectedSorteoEvento}`);
+    setGanadoresHistorial([]);
+    setGanadorSorteo(null);
+    setErrorSorteo('');
+  };
+
   useEffect(() => {
     const user = api.getUser();
     if (!user || user.rol !== 'ROLE_ADMIN') navigate('/');
@@ -390,7 +550,7 @@ export default function AdminDashboard() {
   const fetchAll = useCallback(async () => {
     try {
       setRefreshing(true);
-      const [statsData, comprasData, usuariosData, eventosData, canjesData, reportesData, transferenciasData, artistasData, logsData, accessLogsData] = await Promise.all([
+      const [statsData, comprasData, usuariosData, eventosData, canjesData, reportesData, transferenciasData, artistasData, logsData, accessLogsData, cuponesData] = await Promise.all([
         api.adminGetStats(),
         api.adminGetCompras(),
         api.adminGetUsuarios(),
@@ -401,6 +561,7 @@ export default function AdminDashboard() {
         api.adminGetArtistas().catch(() => []),
         api.adminGetLoginLogs().catch(() => []),
         api.adminGetLogsAcceso().catch(() => []),
+        api.adminGetCupones().catch(() => []),
       ]);
       setStats(statsData);
       setCompras(comprasData);
@@ -412,6 +573,7 @@ export default function AdminDashboard() {
       setArtistas(artistasData || []);
       setLoginLogs(logsData || []);
       setRecentScans(accessLogsData || []);
+      setCupones(cuponesData || []);
       setError('');
     } catch (err) {
       setError('Error al cargar datos del panel. Verifica tu sesión de administrador.');
@@ -1168,6 +1330,479 @@ export default function AdminDashboard() {
     </motion.div>
   );
 
+  const renderSorteos = () => {
+    const elegibles = participantesSorteo.filter(p => !ganadoresHistorial.some(h => h.id === p.id) && (p.estado === 'ACTIVA' || p.estado === 'USADA'));
+    
+    const handleGirarTombola = () => {
+      if (girandoTombola) return;
+      if (!selectedSorteoEvento) {
+        setErrorSorteo('Por favor seleccione un evento.');
+        return;
+      }
+      if (elegibles.length === 0) {
+        setErrorSorteo('No hay boletas participantes disponibles para sortear.');
+        return;
+      }
+      
+      setGirandoTombola(true);
+      setErrorSorteo('');
+      setGanadorSorteo(null);
+      
+      let duracion = 2500; // 2.5s
+      let intervaloTiempo = 80;
+      let paso = 0;
+      
+      const interval = setInterval(() => {
+        const indexAzar = Math.floor(Math.random() * elegibles.length);
+        const numVis = String(elegibles[indexAzar].numeroSorteo).padStart(3, '0');
+        setTombolaNumeroVis(numVis);
+        paso += intervaloTiempo;
+        if (paso >= duracion) {
+          clearInterval(interval);
+          // Elegir ganador definitivo
+          const ganadorDefinitivo = elegibles[Math.floor(Math.random() * elegibles.length)];
+          setTombolaNumeroVis(String(ganadorDefinitivo.numeroSorteo).padStart(3, '0'));
+          setGanadorSorteo(ganadorDefinitivo);
+          agregarAlHistorial(ganadorDefinitivo);
+          setGirandoTombola(false);
+        }
+      }, intervaloTiempo);
+    };
+
+    return (
+      <motion.div key="sorteos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
+          {/* Fila superior: Selector de Evento */}
+          <Section icon="gift" title="Configuración del Sorteo">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
+              <div style={{ flex: 1, minWidth: '250px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Evento Activo</label>
+                <select 
+                  value={selectedSorteoEvento} 
+                  onChange={e => setSelectedSorteoEvento(e.target.value)}
+                  style={{ ...inputStyle, marginBottom: 0 }}
+                >
+                  <option value="">-- Seleccione un evento para iniciar el sorteo --</option>
+                  {eventos.map(ev => (
+                    <option key={ev.id} value={ev.id}>{ev.nombre} ({ev.ciudad})</option>
+                  ))}
+                </select>
+              </div>
+              
+              {selectedSorteoEvento && (
+                <div style={{ display: 'flex', gap: '16px', background: 'rgba(255,255,255,0.02)', padding: '12px 24px', borderRadius: '10px', border: `1px solid ${theme.border}` }}>
+                  <div>
+                    <span style={{ fontSize: '0.65rem', color: theme.textMuted, display: 'block', textTransform: 'uppercase', fontWeight: 600 }}>Boletas Participantes</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: theme.text, fontFamily: 'monospace' }}>{participantesSorteo.length}</span>
+                  </div>
+                  <div style={{ borderLeft: `1px solid ${theme.border}`, paddingLeft: '16px' }}>
+                    <span style={{ fontSize: '0.65rem', color: theme.textMuted, display: 'block', textTransform: 'uppercase', fontWeight: 600 }}>Restantes en Juego</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: theme.success, fontFamily: 'monospace' }}>{elegibles.length}</span>
+                  </div>
+                  <div style={{ borderLeft: `1px solid ${theme.border}`, paddingLeft: '16px' }}>
+                    <span style={{ fontSize: '0.65rem', color: theme.textMuted, display: 'block', textTransform: 'uppercase', fontWeight: 600 }}>Ganadores Cantados</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: theme.accent, fontFamily: 'monospace' }}>{ganadoresHistorial.length}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Section>
+        </div>
+
+        {selectedSorteoEvento ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+            {/* Tómbola y Búsqueda */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <Section icon="refresh" title="Tómbola Virtual Dopamina">
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0', gap: '24px' }}>
+                  {/* Visor digital gigante */}
+                  <div style={{
+                    width: '260px', height: '160px', borderRadius: '20px',
+                    background: '#050508', border: `3px solid ${girandoTombola ? theme.accent : theme.borderLight}`,
+                    boxShadow: girandoTombola 
+                      ? `0 0 30px rgba(177, 78, 255, 0.4), inset 0 0 20px rgba(177, 78, 255, 0.2)`
+                      : `0 8px 32px rgba(0,0,0,0.5)`,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    position: 'relative', overflow: 'hidden'
+                  }}>
+                    <div style={{ position: 'absolute', inset: 0, opacity: 0.15, background: 'linear-gradient(rgba(177,78,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(177,78,255,0.1) 1px, transparent 1px)', backgroundSize: '10px 10px' }} />
+                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '2px', zIndex: 2, marginBottom: '6px' }}>NÚMERO GANADOR</div>
+                    <div style={{
+                      fontSize: '4.5rem', fontWeight: 900,
+                      color: girandoTombola ? theme.accentLight : theme.text,
+                      fontFamily: "'JetBrains Mono', monospace",
+                      textShadow: girandoTombola 
+                        ? `0 0 20px ${theme.accent}`
+                        : `0 0 10px rgba(255,255,255,0.1)`,
+                      zIndex: 2,
+                      letterSpacing: '4px'
+                    }}>
+                      {tombolaNumeroVis}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleGirarTombola}
+                    disabled={girandoTombola || elegibles.length === 0}
+                    style={{
+                      width: '100%', maxWidth: '260px', padding: '16px 24px', borderRadius: '12px', border: 'none',
+                      background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentDark})`,
+                      boxShadow: '0 8px 24px rgba(177, 78, 255, 0.3)',
+                      color: '#fff', cursor: 'pointer', fontWeight: 800, fontSize: '0.95rem',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                      transition: 'transform 0.2s, box-shadow 0.2s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'none'; }}
+                  >
+                    {girandoTombola ? (
+                      <span>Sorteando...</span>
+                    ) : (
+                      <>
+                        <span>🎰</span>
+                        <span>¡GIRAR TÓMBOLA!</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </Section>
+
+              <Section icon="search" title="Buscar Número Manual">
+                <p style={{ fontSize: '0.78rem', color: theme.textMuted, margin: '0 0 16px' }}>
+                  Si sacaron un número físico en la fiesta, digítalo aquí para encontrar al ganador.
+                </p>
+                <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                  <input
+                    type="number"
+                    placeholder="Ej. 30"
+                    value={numeroSorteoInput}
+                    onChange={e => setNumeroSorteoInput(e.target.value)}
+                    style={{ ...inputStyle, marginBottom: 0, flex: 1 }}
+                    onKeyDown={e => { if (e.key === 'Enter') buscarGanadorManual(numeroSorteoInput); }}
+                  />
+                  <button
+                    onClick={() => buscarGanadorManual(numeroSorteoInput)}
+                    disabled={buscandoGanador || !numeroSorteoInput}
+                    style={{ ...btnPrimary, padding: '10px 20px', flexShrink: 0 }}
+                  >
+                    {buscandoGanador ? 'Buscando...' : 'Buscar'}
+                  </button>
+                </div>
+              </Section>
+            </div>
+
+            {/* Ganador y Historial */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {errorSorteo && (
+                <div style={{ background: 'rgba(239,68,68,0.1)', border: `1px solid rgba(239,68,68,0.2)`, borderRadius: '10px', padding: '14px 20px', color: theme.danger, fontSize: '0.85rem' }}>
+                  ⚠️ {errorSorteo}
+                </div>
+              )}
+
+              {/* Tarjeta del Ganador */}
+              {ganadorSorteo ? (
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  style={{
+                    background: `linear-gradient(145deg, #18122B, #0A0A0F)`,
+                    border: `2px solid ${theme.accent}`,
+                    borderRadius: '16px', padding: '24px',
+                    boxShadow: `0 12px 40px rgba(177, 78, 255, 0.25)`,
+                    position: 'relative', overflow: 'hidden'
+                  }}
+                >
+                  <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '4px', background: `linear-gradient(90deg, ${theme.accent}, #ec4899)` }} />
+                  
+                  <div style={{
+                    position: 'absolute', top: '15px', right: '-35px',
+                    background: `linear-gradient(135deg, #ec4899, ${theme.accent})`,
+                    color: '#fff', fontSize: '0.65rem', fontWeight: 900,
+                    padding: '6px 40px', transform: 'rotate(45deg)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                    letterSpacing: '1px', textTransform: 'uppercase'
+                  }}>
+                    GANADOR
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '20px' }}>
+                    <div style={{
+                      width: '60px', height: '60px', borderRadius: '50%',
+                      background: `rgba(177, 78, 255, 0.15)`, border: `1px solid ${theme.accent}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '2rem', flexShrink: 0
+                    }}>
+                      🏆
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: theme.accentLight, letterSpacing: '1px', textTransform: 'uppercase', display: 'block' }}>NÚMERO SORTEADO</span>
+                      <span style={{ fontSize: '2.5rem', fontWeight: 900, color: '#fff', fontFamily: 'monospace', lineHeight: 1 }}>
+                        #{String(ganadorSorteo.numeroSorteo).padStart(3, '0')}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', borderTop: `1px solid rgba(255,255,255,0.06)`, paddingTop: '16px', marginBottom: '16px' }}>
+                    <div>
+                      <span style={{ fontSize: '0.65rem', color: theme.textMuted, display: 'block', textTransform: 'uppercase', fontWeight: 600 }}>Nombre del Cliente</span>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 700, color: theme.text }}>{ganadorSorteo.usuarioNombre || 'Desconocido'}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.65rem', color: theme.textMuted, display: 'block', textTransform: 'uppercase', fontWeight: 600 }}>Estado de la Boleta</span>
+                      <span style={badgeStyle(ganadorSorteo.estado === 'USADA' ? theme.success : theme.info)}>
+                        {ganadorSorteo.estado === 'USADA' ? 'INGRESÓ (EN FIESTA)' : 'ACTIVA (SIN ENTRAR)'}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.65rem', color: theme.textMuted, display: 'block', textTransform: 'uppercase', fontWeight: 600 }}>Código de Entrada</span>
+                      <span style={{ fontSize: '0.8rem', fontFamily: 'monospace', color: theme.textSec }}>#{ganadorSorteo.id}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.65rem', color: theme.textMuted, display: 'block', textTransform: 'uppercase', fontWeight: 600 }}>Código QR</span>
+                      <span style={{ fontSize: '0.78rem', fontFamily: 'monospace', color: theme.textMuted }}>{(ganadorSorteo.codigoQr || '').substring(0, 16)}...</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    <button 
+                      onClick={() => setGanadorSorteo(null)} 
+                      style={{ ...btnGhost, padding: '8px 16px', fontSize: '0.75rem' }}
+                    >
+                      Listo / Siguiente
+                    </button>
+                  </div>
+                </motion.div>
+              ) : (
+                <div style={{
+                  background: theme.card, border: `1px dashed ${theme.borderLight}`,
+                  borderRadius: '16px', padding: '40px 24px', textAlign: 'center', color: theme.textMuted,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px'
+                }}>
+                  <span style={{ fontSize: '2.5rem' }}>🎲</span>
+                  <p style={{ fontSize: '0.85rem', margin: 0, maxWidth: '280px' }}>
+                    Gira la tómbola o busca un número para revelar la identidad del ganador.
+                  </p>
+                </div>
+              )}
+
+              {/* Historial de Ganadores */}
+              <Section 
+                icon="shield" 
+                title="Historial de la Noche"
+                extra={
+                  ganadoresHistorial.length > 0 && (
+                    <button 
+                      onClick={reiniciarSorteo}
+                      style={{
+                        background: 'rgba(239,68,68,0.06)', border: `1px solid rgba(239,68,68,0.2)`,
+                        color: theme.danger, padding: '4px 10px', borderRadius: '6px', fontSize: '0.7rem',
+                        fontWeight: 700, cursor: 'pointer'
+                      }}
+                    >
+                      Reiniciar Sorteo
+                    </button>
+                  )
+                }
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '350px', overflowY: 'auto' }}>
+                  {ganadoresHistorial.map((hist, i) => (
+                    <div 
+                      key={hist.id} 
+                      style={{ 
+                        padding: '12px 16px', borderRadius: '10px', background: 'rgba(255,255,255,0.02)',
+                        border: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'space-between',
+                        alignItems: 'center', gap: '12px'
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: 800, fontSize: '1rem', color: theme.accentLight, fontFamily: 'monospace' }}>
+                            #{String(hist.numeroSorteo).padStart(3, '0')}
+                          </span>
+                          <span style={{ fontWeight: 700, fontSize: '0.85rem', color: theme.text }}>
+                            {hist.usuarioNombre}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.7rem', color: theme.textMuted }}>
+                          Hora: {new Date(hist.timestamp).toLocaleTimeString('es-CO')}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '0.65rem', color: theme.textMuted, fontFamily: 'monospace' }}>
+                        ID: #{hist.id}
+                      </span>
+                    </div>
+                  ))}
+                  {ganadoresHistorial.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '30px 0', color: theme.textMuted, fontSize: '0.82rem' }}>
+                      Nadie ha ganado premios aún en este evento.
+                    </div>
+                  )}
+                </div>
+              </Section>
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '14px',
+            padding: '80px 24px', textAlign: 'center', color: theme.textMuted
+          }}>
+            <span style={{ fontSize: '3rem', display: 'block', marginBottom: '16px' }}>🎉</span>
+            <h3 style={{ color: theme.text, fontSize: '1.1rem', fontWeight: 700, margin: '0 0 8px' }}>Sorteos en la Fiesta</h3>
+            <p style={{ fontSize: '0.85rem', margin: 0, maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.6 }}>
+              Seleccione un evento en el panel superior para activar la tómbola digital y comenzar a rifar premios entre los asistentes de Dopamina Crew.
+            </p>
+          </div>
+        )}
+      </motion.div>
+    );
+  };
+
+  const renderCupones = () => {
+    const filteredCupones = cupones.filter(c => 
+      c.codigo?.toLowerCase().includes(searchCupon.toLowerCase()) || 
+      c.descripcion?.toLowerCase().includes(searchCupon.toLowerCase())
+    );
+
+    return (
+      <motion.div key="cupones" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'flex-start' }}>
+          
+          {/* Formulario de Creación */}
+          <div style={{ flex: '1 1 350px', background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '14px', padding: '24px' }}>
+            <h3 style={{ color: theme.text, fontSize: '1rem', fontWeight: 800, margin: '0 0 20px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              Crear Nuevo Cupón
+            </h3>
+            <form onSubmit={handleCreateCupon}>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Código del Cupón</label>
+              <input 
+                type="text" 
+                style={inputStyle} 
+                placeholder="Ej: OFF20, PARCHE15" 
+                value={formCupon.codigo} 
+                onChange={e => setFormCupon(prev => ({ ...prev, codigo: e.target.value }))} 
+                required 
+              />
+
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Descuento (%)</label>
+              <input 
+                type="number" 
+                step="0.1"
+                min="0.1"
+                max="100"
+                style={inputStyle} 
+                placeholder="Porcentaje (ej: 15)" 
+                value={formCupon.descuentoPorcentaje} 
+                onChange={e => setFormCupon(prev => ({ ...prev, descuentoPorcentaje: e.target.value }))} 
+                required 
+              />
+
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Descripción</label>
+              <input 
+                type="text" 
+                style={inputStyle} 
+                placeholder="Descripción del descuento" 
+                value={formCupon.descripcion} 
+                onChange={e => setFormCupon(prev => ({ ...prev, descripcion: e.target.value }))} 
+              />
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                <input 
+                  type="checkbox" 
+                  id="cuponActivo" 
+                  checked={formCupon.activo} 
+                  onChange={e => setFormCupon(prev => ({ ...prev, activo: e.target.checked }))} 
+                  style={{ width: '16px', height: '16px', accentColor: theme.accent, cursor: 'pointer' }}
+                />
+                <label htmlFor="cuponActivo" style={{ fontSize: '0.8rem', color: theme.textSec, fontWeight: 600, cursor: 'pointer' }}>Activo de inmediato</label>
+              </div>
+
+              <button type="submit" style={{ ...btnPrimary, width: '100%' }}>
+                Guardar Cupón
+              </button>
+            </form>
+          </div>
+
+          {/* Listado de Cupones */}
+          <div style={{ flex: '2 1 500px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <Section 
+              icon="ticket" 
+              title="Cuponera Vigente" 
+              extra={
+                <input 
+                  type="text" 
+                  placeholder="Buscar cupón..." 
+                  value={searchCupon} 
+                  onChange={e => setSearchCupon(e.target.value)} 
+                  style={{ ...inputStyle, width: '180px', padding: '6px 12px', margin: 0 }} 
+                />
+              }
+            >
+              <div style={{ overflowX: 'auto' }}>
+                <table style={tableStyle}>
+                  <thead>
+                    <tr>
+                      {['Código', 'Descuento', 'Descripción', 'Estado', 'Creado', 'Acciones'].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCupones.map(c => (
+                      <tr key={c.id}>
+                        <td style={{ ...tdStyle, fontWeight: 800, color: theme.accentLight, fontFamily: 'monospace' }}>{c.codigo}</td>
+                        <td style={{ ...tdStyle, fontWeight: 700, color: theme.text }}>{c.descuentoPorcentaje}%</td>
+                        <td style={tdStyle}>{c.descripcion || '—'}</td>
+                        <td style={tdStyle}>
+                          <span style={badgeStyle(c.activo ? theme.success : theme.danger)}>
+                            {c.activo ? 'ACTIVO' : 'INACTIVO'}
+                          </span>
+                        </td>
+                        <td style={{ ...tdStyle, fontSize: '0.78rem', color: theme.textMuted }}>
+                          {c.createdAt ? new Date(c.createdAt).toLocaleDateString('es-CO') : '—'}
+                        </td>
+                        <td style={tdStyle}>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button 
+                              onClick={() => handleToggleCupon(c.id)} 
+                              style={{ 
+                                padding: '4px 8px', borderRadius: '4px', border: 'none', 
+                                background: c.activo ? 'rgba(239,68,68,0.1)' : 'rgba(74,222,128,0.1)', 
+                                color: c.activo ? theme.danger : theme.success, 
+                                cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700 
+                              }}
+                            >
+                              {c.activo ? 'Desactivar' : 'Activar'}
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteCupon(c.id)} 
+                              style={{ 
+                                padding: '4px 8px', borderRadius: '4px', border: 'none', 
+                                background: 'rgba(255,255,255,0.05)', color: theme.textSec, 
+                                cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600 
+                              }}
+                            >
+                              Eliminar
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredCupones.length === 0 && (
+                      <tr>
+                        <td colSpan={6} style={{ ...tdStyle, textAlign: 'center', color: theme.textMuted, padding: '30px' }}>
+                          No hay cupones registrados.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Section>
+          </div>
+
+        </div>
+      </motion.div>
+    );
+  };
+
   const renderSeguridad = () => (
     <motion.div key="seguridad" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: `1px solid ${theme.border}`, paddingBottom: '12px' }}>
@@ -1418,6 +2053,9 @@ export default function AdminDashboard() {
           {activeTab === 'usuarios' && renderUsuarios()}
           {activeTab === 'canjes' && renderCanjes()}
           {activeTab === 'puerta' && renderPuerta()}
+          {activeTab === 'regalos' && renderRegalos()}
+          {activeTab === 'sorteos' && renderSorteos()}
+          {activeTab === 'cupones' && renderCupones()}
           {activeTab === 'seguridad' && renderSeguridad()}
         </AnimatePresence>
       </main>
