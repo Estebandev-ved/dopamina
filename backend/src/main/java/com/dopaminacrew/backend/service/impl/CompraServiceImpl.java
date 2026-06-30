@@ -113,6 +113,14 @@ public class CompraServiceImpl implements CompraService {
             if (usosPrevios > 0) {
                 throw new RuntimeException("Ya has usado el cupón '" + cupon.getCodigo() + "' en una compra anterior.");
             }
+
+            // Validar límite global de usos totales (por ejemplo, para ganadores de sorteos)
+            if (cupon.getMaxUsos() != null && cupon.getMaxUsos() > 0) {
+                long usosTotales = compraRepository.countTotalUsagesOfCoupon(cupon.getCodigo());
+                if (usosTotales >= cupon.getMaxUsos()) {
+                    throw new RuntimeException("El cupón '" + cupon.getCodigo() + "' ya no está disponible (alcanzó su límite máximo de usos).");
+                }
+            }
             
             descuento = subtotal * (cupon.getDescuentoPorcentaje() / 100.0);
         } else if (cantidad >= 4 && !compraRepository.usuarioYaUsoPromoParche(user.getId())) {

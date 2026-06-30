@@ -32,6 +32,9 @@ public class Cupon {
     @Column(length = 255)
     private String descripcion;
 
+    @Column(name = "max_usos")
+    private Integer maxUsos = 0; // 0 o null = ilimitado
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

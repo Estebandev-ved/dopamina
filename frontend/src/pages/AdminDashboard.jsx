@@ -429,8 +429,9 @@ export default function AdminDashboard() {
   // Estados para Cupones
   const [cupones, setCupones] = useState([]);
   const [loadingCupones, setLoadingCupones] = useState(false);
-  const [formCupon, setFormCupon] = useState({ codigo: '', descuentoPorcentaje: '', descripcion: '', activo: true });
+  const [formCupon, setFormCupon] = useState({ codigo: '', descuentoPorcentaje: '', descripcion: '', activo: true, maxUsos: '' });
   const [searchCupon, setSearchCupon] = useState('');
+  const [selectedCuponReport, setSelectedCuponReport] = useState(null);
 
   // Estados para Sets Musicales
   const [sets, setSets] = useState([]);
@@ -489,7 +490,7 @@ export default function AdminDashboard() {
   const fetchCupones = useCallback(async () => {
     setLoadingCupones(true);
     try {
-      const data = await api.adminGetCupones();
+      const data = await api.adminGetCuponesReporte();
       setCupones(data || []);
     } catch (err) {
       console.error('Error fetching cupones:', err);
@@ -512,9 +513,10 @@ export default function AdminDashboard() {
         codigo: formCupon.codigo.trim().toUpperCase(),
         descuentoPorcentaje: discount,
         descripcion: formCupon.descripcion,
-        activo: formCupon.activo
+        activo: formCupon.activo,
+        maxUsos: formCupon.maxUsos ? parseInt(formCupon.maxUsos) : 0
       });
-      setFormCupon({ codigo: '', descuentoPorcentaje: '', descripcion: '', activo: true });
+      setFormCupon({ codigo: '', descuentoPorcentaje: '', descripcion: '', activo: true, maxUsos: '' });
       fetchCupones();
       fetchAll();
     } catch (err) {
@@ -671,7 +673,7 @@ export default function AdminDashboard() {
           api.adminGetArtistas().catch(() => []),
           api.adminGetLoginLogs().catch(() => []),
           api.adminGetLogsAcceso().catch(() => []),
-          api.adminGetCupones().catch(() => []),
+          api.adminGetCuponesReporte().catch(() => []),
           api.adminGetSugerencias().catch(() => []),
         ]);
         setStats(statsData);
@@ -2247,6 +2249,16 @@ export default function AdminDashboard() {
                 onChange={e => setFormCupon(prev => ({ ...prev, descripcion: e.target.value }))} 
               />
 
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Límite de usos global</label>
+              <input 
+                type="number" 
+                min="0"
+                style={inputStyle} 
+                placeholder="Ej: 1 (sorteos). Vacío = ilimitado" 
+                value={formCupon.maxUsos} 
+                onChange={e => setFormCupon(prev => ({ ...prev, maxUsos: e.target.value }))} 
+              />
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
                 <input 
                   type="checkbox" 
@@ -2283,7 +2295,7 @@ export default function AdminDashboard() {
                 <table style={tableStyle}>
                   <thead>
                     <tr>
-                      {['Código', 'Descuento', 'Descripción', 'Estado', 'Creado', 'Acciones'].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                      {['Código', 'Descuento', 'Descripción', 'Usos', 'Estado', 'Creado', 'Acciones'].map(h => <th key={h} style={thStyle}>{h}</th>)}
                     </tr>
                   </thead>
                   <tbody>
@@ -2292,6 +2304,25 @@ export default function AdminDashboard() {
                         <td style={{ ...tdStyle, fontWeight: 800, color: theme.accentLight, fontFamily: 'monospace' }}>{c.codigo}</td>
                         <td style={{ ...tdStyle, fontWeight: 700, color: theme.text }}>{c.descuentoPorcentaje}%</td>
                         <td style={tdStyle}>{c.descripcion || '—'}</td>
+                        <td style={tdStyle}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontWeight: 700, color: theme.textSec, fontFamily: 'monospace' }}>
+                              {c.usosActuales || 0} / {c.maxUsos && c.maxUsos > 0 ? c.maxUsos : '♾️'}
+                            </span>
+                            {c.usuarios && c.usuarios.length > 0 && (
+                              <button
+                                onClick={() => setSelectedCuponReport(c)}
+                                style={{
+                                  background: 'rgba(177,78,255,0.12)', border: 'none', color: theme.accentLight,
+                                  padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.68rem', fontWeight: 700,
+                                  display: 'flex', alignItems: 'center', gap: '2px'
+                                }}
+                              >
+                                👥 Ver
+                              </button>
+                            )}
+                          </div>
+                        </td>
                         <td style={tdStyle}>
                           <span style={badgeStyle(c.activo ? theme.success : theme.danger)}>
                             {c.activo ? 'ACTIVO' : 'INACTIVO'}
@@ -2329,7 +2360,7 @@ export default function AdminDashboard() {
                     ))}
                     {filteredCupones.length === 0 && (
                       <tr>
-                        <td colSpan={6} style={{ ...tdStyle, textAlign: 'center', color: theme.textMuted, padding: '30px' }}>
+                        <td colSpan={7} style={{ ...tdStyle, textAlign: 'center', color: theme.textMuted, padding: '30px' }}>
                           No hay cupones registrados.
                         </td>
                       </tr>
@@ -2341,6 +2372,94 @@ export default function AdminDashboard() {
           </div>
 
         </div>
+
+        {/* Modal de Detalle de Usos de Cupón */}
+        {selectedCuponReport && (
+          <div style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px'
+          }}>
+            <div style={{
+              background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '16px',
+              width: '100%', maxWidth: '650px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '20px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${theme.border}`, paddingBottom: '14px' }}>
+                <div>
+                  <h3 style={{ color: theme.accentLight, fontSize: '1.25rem', fontWeight: 950, letterSpacing: '1px', fontFamily: 'monospace' }}>
+                    REPORTE: {selectedCuponReport.codigo}
+                  </h3>
+                  <p style={{ color: theme.textMuted, fontSize: '0.78rem', margin: '4px 0 0' }}>
+                    {selectedCuponReport.descripcion || 'Sin descripción'}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setSelectedCuponReport(null)}
+                  style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: theme.text, fontSize: '1.2rem', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer' }}
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: `1px solid ${theme.border}`, textAlign: 'center' }}>
+                  <span style={{ display: 'block', fontSize: '0.7rem', color: theme.textMuted, textTransform: 'uppercase', fontWeight: 700 }}>Descuento</span>
+                  <span style={{ fontSize: '1.4rem', fontWeight: 800, color: theme.accentLight }}>{selectedCuponReport.descuentoPorcentaje}%</span>
+                </div>
+                <div style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: `1px solid ${theme.border}`, textAlign: 'center' }}>
+                  <span style={{ display: 'block', fontSize: '0.7rem', color: theme.textMuted, textTransform: 'uppercase', fontWeight: 700 }}>Usos Totales</span>
+                  <span style={{ fontSize: '1.4rem', fontWeight: 800, color: theme.success }}>{selectedCuponReport.usosActuales}</span>
+                </div>
+                <div style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: `1px solid ${theme.border}`, textAlign: 'center' }}>
+                  <span style={{ display: 'block', fontSize: '0.7rem', color: theme.textMuted, textTransform: 'uppercase', fontWeight: 700 }}>Límite Global</span>
+                  <span style={{ fontSize: '1.4rem', fontWeight: 800, color: theme.text }}>
+                    {selectedCuponReport.maxUsos && selectedCuponReport.maxUsos > 0 ? selectedCuponReport.maxUsos : 'Ilimitado'}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h4 style={{ color: theme.text, fontSize: '0.85rem', fontWeight: 700, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Historial de Canjes:
+                </h4>
+                <div style={{ maxHeight: '220px', overflowY: 'auto', border: `1px solid ${theme.border}`, borderRadius: '8px' }}>
+                  <table style={tableStyle}>
+                    <thead>
+                      <tr style={{ background: 'rgba(0,0,0,0.2)' }}>
+                        {['Usuario', 'Compra ID', 'Estado Pago', 'Fecha'].map(h => <th key={h} style={{ ...thStyle, padding: '8px 12px' }}>{h}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedCuponReport.usuarios && selectedCuponReport.usuarios.map((u, idx) => (
+                        <tr key={idx}>
+                          <td style={{ ...tdStyle, padding: '10px 12px' }}>
+                            <div style={{ fontWeight: 600, color: theme.text }}>{u.nombre}</div>
+                            <div style={{ fontSize: '0.75rem', color: theme.textMuted }}>{u.email}</div>
+                          </td>
+                          <td style={{ ...tdStyle, padding: '10px 12px', fontFamily: 'monospace' }}>#{u.compraId}</td>
+                          <td style={{ ...tdStyle, padding: '10px 12px' }}>
+                            <span style={badgeStyle(u.compraEstado === 'PAGADO' || u.compraEstado === 'REGALADA' ? theme.success : theme.danger)}>
+                              {u.compraEstado}
+                            </span>
+                          </td>
+                          <td style={{ ...tdStyle, padding: '10px 12px', fontSize: '0.75rem', color: theme.textMuted }}>{u.fecha}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                <button 
+                  onClick={() => setSelectedCuponReport(null)}
+                  style={{ ...btnPrimary, padding: '10px 20px', background: 'rgba(255,255,255,0.05)', border: `1px solid ${theme.border}`, color: theme.textSec }}
+                >
+                  Cerrar Reporte
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </motion.div>
     );
   };

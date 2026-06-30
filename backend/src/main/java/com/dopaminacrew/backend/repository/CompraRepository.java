@@ -64,4 +64,14 @@ public interface CompraRepository extends JpaRepository<Compra, Long> {
     @Modifying
     @Query("UPDATE Compra c SET c.estado = 'EXPIRADO' WHERE c.estado = 'PENDIENTE' AND c.createdAt < :limite")
     int expirarPendientesAntiguas(@Param("limite") LocalDateTime limite);
+
+    @Query("SELECT COUNT(c) FROM Compra c WHERE c.codigoCupon = :cupon AND (c.estado = 'PAGADO' OR (c.estado = 'PENDIENTE' AND c.createdAt >= :limiteReserva))")
+    long countTotalUsagesOfCoupon(@Param("cupon") String cupon, @Param("limiteReserva") LocalDateTime reserveLimit);
+
+    default long countTotalUsagesOfCoupon(String cupon) {
+        return countTotalUsagesOfCoupon(cupon, LocalDateTime.now().minusMinutes(MINUTOS_RESERVA));
+    }
+
+    @Query("SELECT c FROM Compra c JOIN FETCH c.usuario WHERE c.codigoCupon = :cupon ORDER BY c.createdAt DESC")
+    List<Compra> findUsagesByCodigoCupon(@Param("cupon") String cupon);
 }

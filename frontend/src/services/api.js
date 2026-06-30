@@ -432,6 +432,10 @@ class ApiService {
     return this.get('/api/admin/cupones');
   }
 
+  adminGetCuponesReporte() {
+    return this.get('/api/admin/cupones/reporte');
+  }
+
   adminCreateCupon(data) {
     return this.post('/api/admin/cupones', data);
   }
