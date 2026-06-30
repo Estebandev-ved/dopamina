@@ -102,7 +102,7 @@ public class CanjeController {
      * Security: Admin-only role check.
      */
     @GetMapping("/admin/canjes")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
     public ResponseEntity<List<CanjeResponse>> getTodosCanjes() {
         List<Canje> canjes = canjeService.getTodosCanjes();
         List<CanjeResponse> response = canjes.stream()
@@ -116,7 +116,7 @@ public class CanjeController {
      * Security: Admin-only role check. Validates the incoming status.
      */
     @PutMapping("/admin/canjes/{id}/estado")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
     public ResponseEntity<?> actualizarEstadoCanje(@PathVariable Long id,
                                                    @RequestBody Map<String, String> body) {
         String estado = body.get("estado");

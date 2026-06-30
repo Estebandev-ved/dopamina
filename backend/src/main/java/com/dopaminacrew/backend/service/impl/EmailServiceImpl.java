@@ -259,4 +259,24 @@ public class EmailServiceImpl implements EmailService {
 
         sendSafe(fromGeneral, email, "🎵 Gracias por tu sugerencia — Dopamina Crew", html);
     }
+
+    @Override
+    public void sendManualCustomEmail(String to, String subject, String bodyText) {
+        String html = """
+            <div style="font-family: 'Inter', sans-serif; max-width: 600px; margin: 0 auto; background: #0A0A0F; padding: 40px; border-radius: 16px; border: 1px solid #222;">
+                <div style="text-align: center; margin-bottom: 32px;">
+                    <h1 style="color: #B14EFF; font-size: 28px; font-weight: 900; margin: 0; letter-spacing: 2px;">DOPAMINA</h1>
+                    <p style="color: #666; font-size: 12px; letter-spacing: 1px;">CREW</p>
+                </div>
+                <div style="color: #F2F0F5; font-size: 15px; line-height: 1.6; white-space: pre-line; margin-bottom: 24px;">
+                    %s
+                </div>
+                <div style="text-align: center; margin-top: 32px; padding-top: 24px; border-top: 1px solid #222;">
+                    <p style="color: #555; font-size: 12px;">Dopamina Crew — Underground Music & Culture</p>
+                </div>
+            </div>
+        """.formatted(bodyText);
+
+        sendSafe(fromGeneral, to, subject, html);
+    }
 }

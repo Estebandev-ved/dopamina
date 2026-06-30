@@ -1,7 +1,11 @@
 package com.dopaminacrew.backend.controller;
 
 import com.dopaminacrew.backend.dto.AdminStatsResponse;
+import com.dopaminacrew.backend.dto.EmailManualRequest;
+import com.dopaminacrew.backend.dto.MessageResponse;
 import com.dopaminacrew.backend.service.AdminService;
+import com.dopaminacrew.backend.service.EmailService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,6 +27,9 @@ public class AdminController {
 
     @Autowired
     private AdminService adminService;
+
+    @Autowired
+    private EmailService emailService;
 
     /**
      * Returns aggregated dashboard statistics:
@@ -71,5 +78,16 @@ public class AdminController {
     public ResponseEntity<Void> deleteUsuario(@PathVariable Long id) {
         adminService.deleteUsuario(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Envía un correo electrónico de forma manual a un usuario.
+     * Seguridad: ADMIN o SUBADMIN únicamente.
+     * Medida de Seguridad: Entrada saneada mediante DTO validado (@Valid).
+     */
+    @PostMapping("/enviar-correo")
+    public ResponseEntity<?> enviarCorreoManual(@Valid @RequestBody EmailManualRequest request) {
+        emailService.sendManualCustomEmail(request.getTo(), request.getSubject(), request.getBody());
+        return ResponseEntity.ok(new MessageResponse("Correo enviado exitosamente"));
     }
 }

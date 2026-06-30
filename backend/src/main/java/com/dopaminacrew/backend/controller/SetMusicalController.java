@@ -34,13 +34,13 @@ public class SetMusicalController {
     }
 
     @GetMapping("/admin/sets")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
     public ResponseEntity<List<SetMusicalResponse>> getAllSetsAdmin() {
         return ResponseEntity.ok(setMusicalService.getAllSetsAdmin());
     }
 
     @PostMapping("/admin/sets")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
     public ResponseEntity<?> crearSet(@Valid @RequestBody SetMusicalRequest request, BindingResult bindingResult) {
         if (bindingResult.hasErrors()) {
             Map<String, String> errors = new HashMap<>();
@@ -54,7 +54,7 @@ public class SetMusicalController {
     }
 
     @PutMapping("/admin/sets/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
     public ResponseEntity<?> actualizarSet(@PathVariable Long id,
                                            @Valid @RequestBody SetMusicalRequest request,
                                            BindingResult bindingResult) {
@@ -74,7 +74,7 @@ public class SetMusicalController {
     }
 
     @DeleteMapping("/admin/sets/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
     public ResponseEntity<?> eliminarSet(@PathVariable Long id) {
         try {
             setMusicalService.eliminarSet(id);

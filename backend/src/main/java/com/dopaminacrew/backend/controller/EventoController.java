@@ -53,21 +53,21 @@ public class EventoController {
 
     /** Admin: get all events (including inactive). */
     @GetMapping("/api/admin/eventos")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
     public ResponseEntity<List<EventoResponse>> getAllAdmin() {
         return ResponseEntity.ok(eventoService.getAllEventosAdmin());
     }
 
     /** Admin: create a new event. */
     @PostMapping("/api/admin/eventos")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
     public ResponseEntity<EventoResponse> crear(@Valid @RequestBody EventoRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(eventoService.crearEvento(req));
     }
 
     /** Admin: update an existing event. */
     @PutMapping("/api/admin/eventos/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
     public ResponseEntity<EventoResponse> actualizar(@PathVariable Long id,
                                                       @Valid @RequestBody EventoRequest req) {
         try {
@@ -79,7 +79,7 @@ public class EventoController {
 
     /** Admin: toggle activo/inactivo without deleting. */
     @PatchMapping("/api/admin/eventos/{id}/toggle")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
     public ResponseEntity<EventoResponse> toggle(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(eventoService.toggleActivo(id));

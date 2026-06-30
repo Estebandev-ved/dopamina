@@ -104,6 +104,7 @@ const Icon = ({ name, size = 20 }) => {
     plus: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width={size} height={size}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
     search: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width={size} height={size}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
     star: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width={size} height={size}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+    home: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width={size} height={size}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
   };
   return icons[name] || null;
 };
@@ -354,6 +355,15 @@ export default function AdminDashboard() {
   const [searchLog, setSearchLog] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [confirmModal, setConfirmModal] = useState(null);
+  const [emailModal, setEmailModal] = useState({
+    open: false,
+    to: '',
+    subject: '',
+    body: '',
+    loading: false,
+    success: '',
+    error: ''
+  });
 
   const [reportesSeguridad, setReportesSeguridad] = useState([]);
   const [transferencias, setTransferencias] = useState([]);
@@ -531,6 +541,20 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleSendEmail = async (e) => {
+    e.preventDefault();
+    setEmailModal(prev => ({ ...prev, loading: true, error: '', success: '' }));
+    try {
+      await api.adminEnviarCorreo(emailModal.to, emailModal.subject, emailModal.body);
+      setEmailModal(prev => ({ ...prev, loading: false, success: '¡Correo enviado exitosamente!' }));
+      setTimeout(() => {
+        setEmailModal(prev => ({ ...prev, open: false, success: '', error: '' }));
+      }, 1500);
+    } catch (err) {
+      setEmailModal(prev => ({ ...prev, loading: false, error: err.message || 'Error al enviar el correo.' }));
+    }
+  };
+
   // Cargar participantes del sorteo al cambiar de evento
   const fetchParticipantesSorteo = useCallback(async (eventoId) => {
     if (!eventoId) {
@@ -622,12 +646,18 @@ export default function AdminDashboard() {
       const subAdmin = userObj?.rol === 'ROLE_SUBADMIN';
 
       if (subAdmin) {
-        const [statsData, comprasData] = await Promise.all([
+        const [statsData, comprasData, eventosData, artistasData, canjesData] = await Promise.all([
           api.adminGetStats(),
           api.adminGetCompras(),
+          api.adminGetEventos(),
+          api.adminGetArtistas().catch(() => []),
+          api.adminGetCanjes().catch(() => []),
         ]);
         setStats(statsData);
         setCompras(comprasData);
+        setEventos(eventosData);
+        setArtistas(artistasData);
+        setCanjes(canjesData);
         setError('');
       } else {
         const [statsData, comprasData, usuariosData, eventosData, canjesData, reportesData, transferenciasData, artistasData, logsData, accessLogsData, cuponesData, sugerenciasData] = await Promise.all([
@@ -1212,7 +1242,33 @@ export default function AdminDashboard() {
                   <td><span style={badgeStyle(c.estado === 'PAGADO' ? theme.success : theme.warning)}>{c.estado}</span></td>
                   <td style={{ ...tdStyle, fontFamily: "'JetBrains Mono', monospace", fontSize: '0.72rem', color: theme.textMuted, maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.codigoQr}</td>
                   <td style={{ ...tdStyle, color: theme.textMuted, fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{c.createdAt ? new Date(c.createdAt).toLocaleString('es-CO') : '—'}</td>
-                  <td><button onClick={() => handleDeleteCompra(c.id)} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: theme.danger, borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}><Icon name="trash" size={14} /> Eliminar</button></td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {c.estado !== 'PAGADO' && (
+                        <button 
+                          onClick={() => setEmailModal({
+                            open: true,
+                            to: c.usuarioEmail,
+                            subject: `Dopamina Crew - ¿Alguna duda con tu reserva para ${c.eventoNombre || 'el evento'}?`,
+                            body: `Hola ${c.usuarioNombre},\n\nVimos que intentaste adquirir entradas para ${c.eventoNombre || 'nuestro evento'} pero el pago no se completó (estado: ${c.estado}).\n\n¿Tuviste algún problema o tienes alguna duda? Puedes responder directamente a este correo o escribirle a nuestro Dopa-Raver en la web.\n\n¡Esperamos verte en la pista de baile! 🖤`,
+                            loading: false,
+                            success: '',
+                            error: ''
+                          })} 
+                          style={{ 
+                            background: 'rgba(177,78,255,0.1)', border: `1px solid ${theme.border}`, color: theme.accentLight, 
+                            borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600,
+                            display: 'flex', alignItems: 'center', gap: '4px'
+                          }}
+                        >
+                          📨 Recordar
+                        </button>
+                      )}
+                      {api.getUser()?.rol === 'ROLE_ADMIN' && (
+                        <button onClick={() => handleDeleteCompra(c.id)} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: theme.danger, borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}><Icon name="trash" size={14} /> Eliminar</button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
               {filteredCompras.length === 0 && <tr><td colSpan={12} style={{ ...tdStyle, textAlign: 'center', color: theme.textMuted, padding: '40px' }}>No se encontraron compras.</td></tr>}
@@ -1748,6 +1804,26 @@ export default function AdminDashboard() {
                               }}
                             >
                               Archivar
+                            </button>
+                          )}
+                          {s.email && (
+                            <button
+                              onClick={() => setEmailModal({
+                                open: true,
+                                to: s.email,
+                                subject: 'Dopamina Crew - Respuesta a tu sugerencia',
+                                body: `Hola ${s.nombre || 'Amante de la música'},\n\nMuchas gracias por enviarnos tu sugerencia:\n"${s.contenido}"\n\n[Escribe tu respuesta aquí]\n\nAtentamente,\nStaff de Dopamina Crew 🖤`,
+                                loading: false,
+                                success: '',
+                                error: ''
+                              })}
+                              style={{ 
+                                padding: '4px 8px', borderRadius: '4px', border: 'none',
+                                background: 'rgba(177,78,255,0.1)', color: theme.accentLight,
+                                cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700
+                              }}
+                            >
+                              📨 Responder
                             </button>
                           )}
                           {s.estado === 'ARCHIVADA' && (
@@ -2694,8 +2770,9 @@ export default function AdminDashboard() {
         <nav style={{ flex: 1, padding: '12px', display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto' }}>
           {(() => {
             const userObj = api.getUser();
+            const restrictedTabs = ['usuarios', 'regalos', 'cupones', 'seguridad'];
             const filteredItems = userObj?.rol === 'ROLE_SUBADMIN' 
-              ? SIDEBAR_ITEMS.filter(item => item.id === 'overview') 
+              ? SIDEBAR_ITEMS.filter(item => !restrictedTabs.includes(item.id)) 
               : SIDEBAR_ITEMS;
             return filteredItems.map(item => (
               <button key={item.id} onClick={() => { setActiveTab(item.id); if (isMobile) setSidebarOpen(false); }}
@@ -2718,6 +2795,11 @@ export default function AdminDashboard() {
 
         {/* Footer */}
         <div style={{ padding: '16px 20px', borderTop: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <button onClick={() => navigate('/')}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '10px 12px', borderRadius: '8px', border: `1px solid ${theme.border}`, background: 'rgba(177, 78, 255, 0.08)', color: theme.accentLight, cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}>
+            <Icon name="home" size={16} />
+            Volver a la Tienda
+          </button>
           <button onClick={fetchAll} disabled={refreshing}
             style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '10px 12px', borderRadius: '8px', border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textSec, cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}>
             <motion.div animate={refreshing ? { rotate: 360 } : {}} transition={{ duration: 0.8, repeat: refreshing ? Infinity : 0, ease: 'linear' }}>
@@ -2772,22 +2854,119 @@ export default function AdminDashboard() {
           {activeTab === 'eventos' && renderEventos()}
           {activeTab === 'artistas' && renderArtistas()}
           {activeTab === 'compras' && renderCompras()}
-          {activeTab === 'usuarios' && renderUsuarios()}
+          {activeTab === 'usuarios' && api.getUser()?.rol === 'ROLE_ADMIN' && renderUsuarios()}
           {activeTab === 'canjes' && renderCanjes()}
           {activeTab === 'puerta' && renderPuerta()}
-          {activeTab === 'regalos' && renderRegalos()}
+          {activeTab === 'regalos' && api.getUser()?.rol === 'ROLE_ADMIN' && renderRegalos()}
           {activeTab === 'sorteos' && renderSorteos()}
-          {activeTab === 'cupones' && renderCupones()}
+          {activeTab === 'cupones' && api.getUser()?.rol === 'ROLE_ADMIN' && renderCupones()}
           {activeTab === 'visitas' && renderVisitas()}
           {activeTab === 'sets' && renderSets()}
           {activeTab === 'sugerencias' && renderSugerencias()}
-          {activeTab === 'seguridad' && renderSeguridad()}
+          {activeTab === 'seguridad' && api.getUser()?.rol === 'ROLE_ADMIN' && renderSeguridad()}
         </AnimatePresence>
       </main>
 
-      {/* Confirm Modal */}
       <AnimatePresence>
         {confirmModal && <ConfirmModal message={confirmModal.message} onConfirm={confirmDelete} onCancel={() => setConfirmModal(null)} />}
+      </AnimatePresence>
+
+      {/* Modal de Envío de Correo Manual */}
+      <AnimatePresence>
+        {emailModal.open && (
+          <div 
+            style={{ 
+              position: 'fixed', inset: 0, zIndex: 1000, 
+              background: 'rgba(0,0,0,0.85)', display: 'flex', 
+              alignItems: 'center', justifyContent: 'center', padding: '24px',
+              backdropFilter: 'blur(4px)'
+            }}
+            onClick={() => !emailModal.loading && setEmailModal(prev => ({ ...prev, open: false }))}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              style={{ 
+                background: theme.card, border: `1px solid ${theme.border}`, 
+                borderRadius: '16px', padding: '28px', maxWidth: '500px', width: '100%' 
+              }}
+            >
+              <h3 style={{ color: theme.text, fontSize: '1.1rem', fontWeight: 800, margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                ✉️ Enviar Correo Personalizado
+              </h3>
+
+              {emailModal.error && (
+                <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', color: theme.danger, fontSize: '0.8rem' }}>
+                  ⚠️ {emailModal.error}
+                </div>
+              )}
+
+              {emailModal.success && (
+                <div style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', color: theme.success, fontSize: '0.8rem' }}>
+                  ✅ {emailModal.success}
+                </div>
+              )}
+
+              <form onSubmit={handleSendEmail}>
+                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Destinatario</label>
+                <input 
+                  type="email" 
+                  value={emailModal.to} 
+                  onChange={e => setEmailModal(prev => ({ ...prev, to: e.target.value }))}
+                  required 
+                  disabled
+                  style={{ ...inputStyle, background: 'rgba(0,0,0,0.2)', cursor: 'not-allowed', color: theme.textMuted, marginBottom: '16px' }}
+                />
+
+                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Asunto del Correo</label>
+                <input 
+                  type="text" 
+                  value={emailModal.subject} 
+                  onChange={e => setEmailModal(prev => ({ ...prev, subject: e.target.value }))}
+                  required 
+                  disabled={emailModal.loading}
+                  style={inputStyle}
+                  placeholder="Asunto"
+                />
+
+                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Mensaje (Texto Plano)</label>
+                <textarea 
+                  value={emailModal.body} 
+                  onChange={e => setEmailModal(prev => ({ ...prev, body: e.target.value }))}
+                  required 
+                  disabled={emailModal.loading}
+                  style={{ ...inputStyle, height: '180px', resize: 'none', lineHeight: 1.5 }}
+                  placeholder="Escribe el cuerpo del mensaje..."
+                />
+
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                  <button 
+                    type="button" 
+                    onClick={() => setEmailModal(prev => ({ ...prev, open: false }))} 
+                    disabled={emailModal.loading}
+                    style={btnGhost}
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={emailModal.loading}
+                    style={{ 
+                      ...btnPrimary, 
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      opacity: emailModal.loading ? 0.6 : 1,
+                      cursor: emailModal.loading ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {emailModal.loading ? 'Enviando...' : 'Enviar Correo'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
     </div>
   );

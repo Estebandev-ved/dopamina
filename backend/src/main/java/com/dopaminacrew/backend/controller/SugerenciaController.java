@@ -38,13 +38,13 @@ public class SugerenciaController {
     }
 
     @GetMapping("/admin/sugerencias")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
     public ResponseEntity<List<SugerenciaResponse>> getTodasSugerencias() {
         return ResponseEntity.ok(sugerenciaService.getTodasSugerencias());
     }
 
     @PutMapping("/admin/sugerencias/{id}/estado")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
     public ResponseEntity<?> actualizarEstado(@PathVariable Long id,
                                                @RequestBody Map<String, String> body) {
         String estado = body.get("estado");

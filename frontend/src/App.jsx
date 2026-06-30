@@ -18,6 +18,7 @@ import PagoResultado from './pages/PagoResultado';
 import AdminDashboard from './pages/AdminDashboard';
 import { api } from './services/api';
 import usePageTracking from './services/usePageTracking';
+import ChatbotWidget from './components/ChatbotWidget';
 
 /**
  * Route guard: only allows access if user is authenticated.
@@ -44,7 +45,7 @@ const AdminRoute = ({ children }) => {
     api.clearAuth();
     return <Navigate to="/login" replace />;
   }
-  if (user.rol !== 'ROLE_ADMIN') return <Navigate to="/" replace />;
+  if (user.rol !== 'ROLE_ADMIN' && user.rol !== 'ROLE_SUBADMIN') return <Navigate to="/" replace />;
   return children;
 };
 
@@ -129,6 +130,7 @@ export default function App() {
               </AnimatePresence>
             </main>
             <Footer />
+            <ChatbotWidget />
           </div>
         )}
       </AnimatePresence>

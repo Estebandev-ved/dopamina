@@ -39,13 +39,13 @@ public class ArtistaController {
     // ── Admin Endpoints ───────────────────────────────────────────────────────
 
     @GetMapping("/admin/artistas")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
     public ResponseEntity<List<ArtistaResponse>> getAllArtistasAdmin() {
         return ResponseEntity.ok(artistaService.getAllArtistasAdmin());
     }
 
     @PostMapping("/admin/artistas")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
     public ResponseEntity<?> crearArtista(@Valid @RequestBody ArtistaRequest request, BindingResult bindingResult) {
         if (bindingResult.hasErrors()) {
             Map<String, String> errors = new HashMap<>();
@@ -59,7 +59,7 @@ public class ArtistaController {
     }
 
     @PutMapping("/admin/artistas/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
     public ResponseEntity<?> actualizarArtista(@PathVariable Long id,
                                                @Valid @RequestBody ArtistaRequest request,
                                                BindingResult bindingResult) {

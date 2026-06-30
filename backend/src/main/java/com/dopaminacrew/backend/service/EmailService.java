@@ -17,4 +17,6 @@ public interface EmailService {
     void sendTicketTransferNotification(User origen, User destino, String boletaRef, String eventoNombre);
 
     void sendSuggestionReceived(String nombre, String email, String contenido);
+
+    void sendManualCustomEmail(String to, String subject, String bodyText);
 }
