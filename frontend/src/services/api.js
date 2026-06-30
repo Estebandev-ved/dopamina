@@ -302,6 +302,10 @@ class ApiService {
     return this.get(`/api/pagos/efipay/status/${compraId}`);
   }
 
+  adminVerifyPaymentStatus(compraId) {
+    return this.get(`/api/admin/pagos/efipay/status/${compraId}`);
+  }
+
   // ── Artistas ───────────────────────────────────────────────────────────────
   getArtistas() {
     return this.get('/api/public/artistas');

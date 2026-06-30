@@ -736,6 +736,17 @@ export default function AdminDashboard() {
   // ── Handlers ──
   const handleLogout = () => { api.clearAuth(); navigate('/'); };
   const handleDeleteCompra = (id) => setConfirmModal({ type: 'compra', id, message: `¿Eliminar la compra #${id}? Esta acción no se puede deshacer.` });
+  
+  const handleVerifyPayment = async (compraId) => {
+    try {
+      const res = await api.adminVerifyPaymentStatus(compraId);
+      alert(`Estado verificado: ${res.estado} (Efipay: ${res.efipayStatus || 'desconocido'})`);
+      fetchAll();
+    } catch (err) {
+      alert(`Error al verificar pago: ${err.message || err}`);
+    }
+  };
+
   const handleDeleteUsuario = (id) => {
     const user = usuarios.find(u => u.id === id);
     setConfirmModal({ type: 'usuario', id, message: `¿Eliminar al usuario "${user?.nombre}"? Se eliminarán todos sus datos.` });
@@ -1262,6 +1273,18 @@ export default function AdminDashboard() {
                           }}
                         >
                           📨 Recordar
+                        </button>
+                      )}
+                      {c.estado === 'PENDIENTE' && (
+                        <button 
+                          onClick={() => handleVerifyPayment(c.id)} 
+                          style={{ 
+                            background: 'rgba(59,130,246,0.1)', border: `1px solid ${theme.border}`, color: '#60A5FA', 
+                            borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600,
+                            display: 'flex', alignItems: 'center', gap: '4px'
+                          }}
+                        >
+                          🔍 Verificar
                         </button>
                       )}
                       {api.getUser()?.rol === 'ROLE_ADMIN' && (

@@ -243,4 +243,67 @@ public class EfipayController {
         response.put("efipayPaymentId", compra.getEfipayPaymentId());
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Permite a un administrador o subadministrador verificar el estado de un pago en tiempo real.
+     * Si el pago fue aprobado, confirma la compra y envía los correos.
+     */
+    @GetMapping("/api/admin/pagos/efipay/status/{compraId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
+    public ResponseEntity<?> adminGetPaymentStatus(@PathVariable Long compraId) {
+        Optional<Compra> compraOpt = compraRepository.findById(compraId);
+        if (compraOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(new MessageResponse("Compra no encontrada."));
+        }
+
+        Compra compra = compraOpt.get();
+        if ("PENDIENTE".equals(compra.getEstado())) {
+            try {
+                if (efipayService.getAccessToken() != null && !efipayService.getAccessToken().trim().isEmpty()) {
+                    if (compra.getEfipayPaymentId() != null) {
+                        JsonNode paymentDetails = efipayService.getPaymentStatus(compra.getEfipayPaymentId());
+                        if (paymentDetails != null) {
+                            JsonNode transaction = paymentDetails.get("transaction");
+                            String status = null;
+                            if (transaction != null && transaction.has("status")) {
+                                status = transaction.get("status").asText();
+                            } else if (paymentDetails.has("status")) {
+                                status = paymentDetails.get("status").asText();
+                            } else if (paymentDetails.has("estado")) {
+                                status = paymentDetails.get("estado").asText();
+                            }
+
+                            if (status != null) {
+                                compra.setEfipayStatus(status);
+                                switch (status.toLowerCase()) {
+                                    case "aprobada":
+                                    case "aprobado":
+                                    case "pagado":
+                                    case "success":
+                                        compraService.confirmCompra(compra.getId());
+                                        break;
+                                    case "rechazada":
+                                    case "fallida":
+                                    case "rejected":
+                                    case "failed":
+                                        compra.setEstado("RECHAZADO");
+                                        break;
+                                }
+                                compraRepository.save(compra);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Error verificando estado del pago en Efipay por Admin: " + e.getMessage());
+            }
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("compraId", compra.getId());
+        response.put("estado", compra.getEstado());
+        response.put("efipayStatus", compra.getEfipayStatus());
+        response.put("efipayPaymentId", compra.getEfipayPaymentId());
+        return ResponseEntity.ok(response);
+    }
 }
