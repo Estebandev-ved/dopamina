@@ -18,7 +18,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/admin")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
 public class AdminController {
 
     @Autowired
@@ -56,6 +56,7 @@ public class AdminController {
      * Security: ADMIN-only. Validates existence before deletion to avoid enumeration leaks.
      */
     @DeleteMapping("/compras/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteCompra(@PathVariable Long id) {
         adminService.deleteCompra(id);
         return ResponseEntity.noContent().build();
@@ -66,6 +67,7 @@ public class AdminController {
      * Security: ADMIN-only. Validates existence before deletion.
      */
     @DeleteMapping("/usuarios/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteUsuario(@PathVariable Long id) {
         adminService.deleteUsuario(id);
         return ResponseEntity.noContent().build();

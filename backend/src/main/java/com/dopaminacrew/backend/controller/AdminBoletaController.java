@@ -102,7 +102,7 @@ public class AdminBoletaController {
         compra.setDescuento(0.0);
         compra.setTotal(0.0);
         compra.setCodigoCupon(request.getNota() != null && !request.getNota().trim().isEmpty() ? request.getNota().trim() : "CORTESIA");
-        compra.setEstado("PAGADO");
+        compra.setEstado("REGALADA");
 
         String purchaseRef = "DOPAMINA-GIFT-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase() + "-" + System.currentTimeMillis();
         compra.setCodigoQr(purchaseRef);

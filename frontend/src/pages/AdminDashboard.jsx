@@ -43,6 +43,9 @@ const SIDEBAR_ITEMS = [
   { id: 'puerta', label: 'Puerta', icon: 'Q' },
   { id: 'sorteos', label: 'Sorteos', icon: 'T' },
   { id: 'cupones', label: 'Cupones', icon: 'K' },
+  { id: 'sugerencias', label: 'Sugerencias', icon: 'I' },
+  { id: 'visitas', label: 'Visitas', icon: 'V' },
+  { id: 'sets', label: 'Sets', icon: 'M' },
   { id: 'seguridad', label: 'Seguridad', icon: 'S' },
 ];
 
@@ -390,6 +393,12 @@ export default function AdminDashboard() {
   const [loadingRegalo, setLoadingRegalo] = useState(false);
   const [errorRegalo, setErrorRegalo] = useState('');
   const [successRegalo, setSuccessRegalo] = useState('');
+  const [searchRegaloUser, setSearchRegaloUser] = useState('');
+
+  // Estados para Sugerencias
+  const [sugerencias, setSugerencias] = useState([]);
+  const [loadingSugerencias, setLoadingSugerencias] = useState(false);
+  const [searchSugerencia, setSearchSugerencia] = useState('');
 
   // Estados para Sorteos
   const [selectedSorteoEvento, setSelectedSorteoEvento] = useState('');
@@ -413,6 +422,59 @@ export default function AdminDashboard() {
   const [formCupon, setFormCupon] = useState({ codigo: '', descuentoPorcentaje: '', descripcion: '', activo: true });
   const [searchCupon, setSearchCupon] = useState('');
 
+  // Estados para Sets Musicales
+  const [sets, setSets] = useState([]);
+  const [loadingSets, setLoadingSets] = useState(false);
+  const [showSetForm, setShowSetForm] = useState(false);
+  const [editingSet, setEditingSet] = useState(null);
+  const [formSet, setFormSet] = useState({ titulo: '', artista: '', youtubeUrl: '', genero: '', descripcion: '', imagenUrl: '', activo: true });
+  const [searchSet, setSearchSet] = useState('');
+
+  const fetchSets = useCallback(async () => {
+    setLoadingSets(true);
+    try {
+      const data = await api.adminGetSets();
+      setSets(data || []);
+    } catch (err) {
+      console.error('Error fetching sets:', err);
+    } finally {
+      setLoadingSets(false);
+    }
+  }, []);
+
+  // Estados para Visitas
+  const [visitStats, setVisitStats] = useState(null);
+  const [allVisits, setAllVisits] = useState([]);
+  const [loadingVisits, setLoadingVisits] = useState(false);
+  const [searchVisit, setSearchVisit] = useState('');
+
+  const fetchVisitStats = useCallback(async () => {
+    setLoadingVisits(true);
+    try {
+      const [stats, visits] = await Promise.all([
+        api.adminGetVisitStats(),
+        api.adminGetAllVisits().catch(() => []),
+      ]);
+      setVisitStats(stats);
+      setAllVisits(visits || []);
+    } catch (err) {
+      console.error('Error fetching visit stats:', err);
+    } finally {
+      setLoadingVisits(false);
+    }
+  }, []);
+
+  const fetchSugerencias = useCallback(async () => {
+    setLoadingSugerencias(true);
+    try {
+      const data = await api.adminGetSugerencias();
+      setSugerencias(data || []);
+    } catch (err) {
+      console.error('Error fetching sugerencias:', err);
+    } finally {
+      setLoadingSugerencias(false);
+    }
+  }, []);
 
   const fetchCupones = useCallback(async () => {
     setLoadingCupones(true);
@@ -550,39 +612,54 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const user = api.getUser();
-    if (!user || user.rol !== 'ROLE_ADMIN') navigate('/');
+    if (!user || (user.rol !== 'ROLE_ADMIN' && user.rol !== 'ROLE_SUBADMIN')) navigate('/');
   }, [navigate]);
 
   const fetchAll = useCallback(async () => {
     try {
       setRefreshing(true);
-      const [statsData, comprasData, usuariosData, eventosData, canjesData, reportesData, transferenciasData, artistasData, logsData, accessLogsData, cuponesData] = await Promise.all([
-        api.adminGetStats(),
-        api.adminGetCompras(),
-        api.adminGetUsuarios(),
-        api.adminGetEventos(),
-        api.adminGetCanjes(),
-        api.adminGetReportesSeguridad().catch(() => []),
-        api.adminGetTransferencias().catch(() => []),
-        api.adminGetArtistas().catch(() => []),
-        api.adminGetLoginLogs().catch(() => []),
-        api.adminGetLogsAcceso().catch(() => []),
-        api.adminGetCupones().catch(() => []),
-      ]);
-      setStats(statsData);
-      setCompras(comprasData);
-      setUsuarios(usuariosData);
-      setEventos(eventosData);
-      setCanjes(canjesData || []);
-      setReportesSeguridad(reportesData || []);
-      setTransferencias(transferenciasData || []);
-      setArtistas(artistasData || []);
-      setLoginLogs(logsData || []);
-      setRecentScans(accessLogsData || []);
-      setCupones(cuponesData || []);
-      setError('');
+      const userObj = api.getUser();
+      const subAdmin = userObj?.rol === 'ROLE_SUBADMIN';
+
+      if (subAdmin) {
+        const [statsData, comprasData] = await Promise.all([
+          api.adminGetStats(),
+          api.adminGetCompras(),
+        ]);
+        setStats(statsData);
+        setCompras(comprasData);
+        setError('');
+      } else {
+        const [statsData, comprasData, usuariosData, eventosData, canjesData, reportesData, transferenciasData, artistasData, logsData, accessLogsData, cuponesData, sugerenciasData] = await Promise.all([
+          api.adminGetStats(),
+          api.adminGetCompras(),
+          api.adminGetUsuarios(),
+          api.adminGetEventos(),
+          api.adminGetCanjes(),
+          api.adminGetReportesSeguridad().catch(() => []),
+          api.adminGetTransferencias().catch(() => []),
+          api.adminGetArtistas().catch(() => []),
+          api.adminGetLoginLogs().catch(() => []),
+          api.adminGetLogsAcceso().catch(() => []),
+          api.adminGetCupones().catch(() => []),
+          api.adminGetSugerencias().catch(() => []),
+        ]);
+        setStats(statsData);
+        setCompras(comprasData);
+        setUsuarios(usuariosData);
+        setEventos(eventosData);
+        setCanjes(canjesData || []);
+        setReportesSeguridad(reportesData || []);
+        setTransferencias(transferenciasData || []);
+        setArtistas(artistasData || []);
+        setLoginLogs(logsData || []);
+        setRecentScans(accessLogsData || []);
+        setCupones(cuponesData || []);
+        setSugerencias(sugerenciasData || []);
+        setError('');
+      }
     } catch (err) {
-      setError('Error al cargar datos del panel. Verifica tu sesión de administrador.');
+      setError('Error al cargar datos del panel. Verifica tu sesión.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -590,6 +667,12 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  useEffect(() => {
+    if (activeTab === 'visitas') fetchVisitStats();
+    if (activeTab === 'sets') fetchSets();
+    if (activeTab === 'sugerencias') fetchSugerencias();
+  }, [activeTab, fetchVisitStats, fetchSets, fetchSugerencias]);
 
   // ── Derived chart data ──
   const comprasConEvento = useMemo(() => compras.filter(c => c.eventoNombre), [compras]);
@@ -676,6 +759,19 @@ export default function AdminDashboard() {
       await api.adminUpdateCanjeEstado(id, 'ENTREGADO');
       setCanjes(prev => prev.map(c => c.id === id ? { ...c, estado: 'ENTREGADO' } : c));
     } catch (err) { setError('Error al actualizar el estado del premio.'); }
+  };
+
+  const handleChangeUserRole = async (userId, nuevoRol, nombreUsuario) => {
+    if (!window.confirm(`¿Está seguro de cambiar el rol de "${nombreUsuario}" a ${nuevoRol.replace('ROLE_', '')}?`)) {
+      return;
+    }
+    try {
+      setError('');
+      await api.adminActualizarRolUsuario(userId, nuevoRol);
+      setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, rol: nuevoRol } : u));
+    } catch (err) {
+      setError('Error al cambiar el rol del usuario: ' + (err.message || err));
+    }
   };
 
   const handleToggleEvento = async (id) => {
@@ -1146,7 +1242,43 @@ export default function AdminDashboard() {
                   <td style={{ ...tdStyle, fontWeight: 700, color: theme.text }}>{u.nombre}</td>
                   <td style={{ ...tdStyle, color: theme.textMuted, fontSize: '0.8rem' }}>{u.email}</td>
                   <td style={{ ...tdStyle, color: theme.textMuted }}>{u.telefono}</td>
-                  <td><span style={badgeStyle(u.rol === 'ROLE_ADMIN' ? theme.warning : theme.info)}>{u.rol === 'ROLE_ADMIN' ? 'ADMIN' : 'USER'}</span></td>
+                  <td>
+                    {(() => {
+                      const currentUser = api.getUser();
+                      const isAdmin = currentUser?.rol === 'ROLE_ADMIN';
+                      const isSelf = currentUser?.id === u.id;
+
+                      if (isAdmin && !isSelf) {
+                        return (
+                          <select
+                            value={u.rol}
+                            onChange={(e) => handleChangeUserRole(u.id, e.target.value, u.nombre)}
+                            style={{
+                              background: theme.bg,
+                              border: `1px solid ${theme.border}`,
+                              borderRadius: '6px',
+                              color: theme.text,
+                              fontSize: '0.75rem',
+                              padding: '4px 8px',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                              outline: 'none',
+                            }}
+                          >
+                            <option value="ROLE_USER">USER</option>
+                            <option value="ROLE_SUBADMIN">SUBADMIN</option>
+                            <option value="ROLE_ADMIN">ADMIN</option>
+                          </select>
+                        );
+                      } else {
+                        return (
+                          <span style={badgeStyle(u.rol === 'ROLE_ADMIN' ? theme.warning : u.rol === 'ROLE_SUBADMIN' ? theme.accent : theme.info)}>
+                            {u.rol === 'ROLE_ADMIN' ? 'ADMIN' : u.rol === 'ROLE_SUBADMIN' ? 'SUBADMIN' : 'USER'}
+                          </span>
+                        );
+                      }
+                    })()}
+                  </td>
                   <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700, color: theme.accent }}>{u.totalCompras}</td>
                   <td style={{ ...tdStyle, fontWeight: 700, color: theme.warning }}>${u.totalGastado?.toLocaleString('es-CO')}</td>
                   <td style={{ ...tdStyle, color: theme.textMuted, fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{u.createdAt ? new Date(u.createdAt).toLocaleDateString('es-CO') : '—'}</td>
@@ -1364,119 +1496,282 @@ export default function AdminDashboard() {
     }
   };
 
-  const renderRegalos = () => (
-    <motion.div key="regalos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <Section icon="gift" title="Regalar Boletas (Entradas de Cortesía)">
-        <p style={{ color: theme.textSec, fontSize: '0.85rem', marginBottom: '24px', lineHeight: 1.5 }}>
-          Genera boletas gratuitas para invitados especiales, organizadores o relaciones públicas. Se creará la compra en estado <strong style={{ color: theme.success }}>PAGADO</strong> a valor $0 y se enviará el correo con los códigos QR automáticamente al beneficiario.
-        </p>
+  const renderRegalos = () => {
+    const filteredRegaloUsers = usuarios.filter(u =>
+      !searchRegaloUser ||
+      u.nombre?.toLowerCase().includes(searchRegaloUser.toLowerCase()) ||
+      u.email?.toLowerCase().includes(searchRegaloUser.toLowerCase())
+    );
 
-        {errorRegalo && (
-          <div style={{ background: 'rgba(239,68,68,0.1)', border: `1px solid rgba(239,68,68,0.2)`, borderRadius: '8px', padding: '12px 16px', marginBottom: '20px', color: theme.danger, fontSize: '0.85rem' }}>
-            ⚠️ {errorRegalo}
-          </div>
-        )}
+    return (
+      <motion.div key="regalos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <Section icon="gift" title="Regalar Boletas (Entradas de Cortesía)">
+          <p style={{ color: theme.textSec, fontSize: '0.85rem', marginBottom: '24px', lineHeight: 1.5 }}>
+            Genera boletas gratuitas para invitados especiales, organizadores o relaciones públicas. Se creará la compra en estado <strong style={{ color: theme.success }}>PAGADO</strong> a valor $0 y se enviará el correo con los códigos QR automáticamente al beneficiario.
+          </p>
 
-        {successRegalo && (
-          <div style={{ background: 'rgba(74,222,128,0.1)', border: `1px solid rgba(74,222,128,0.2)`, borderRadius: '8px', padding: '12px 16px', marginBottom: '20px', color: theme.success, fontSize: '0.85rem' }}>
-            ✅ {successRegalo}
-          </div>
-        )}
+          {errorRegalo && (
+            <div style={{ background: 'rgba(239,68,68,0.1)', border: `1px solid rgba(239,68,68,0.2)`, borderRadius: '8px', padding: '12px 16px', marginBottom: '20px', color: theme.danger, fontSize: '0.85rem' }}>
+              ⚠️ {errorRegalo}
+            </div>
+          )}
 
-        <form onSubmit={handleGiftTickets} style={{ maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Evento de Destino *</label>
-            <select
-              value={formRegalo.eventoId}
-              onChange={e => setFormRegalo(prev => ({ ...prev, eventoId: e.target.value }))}
-              style={inputStyle}
-              required
-            >
-              <option value="">-- Seleccione el evento --</option>
-              {eventos.map(ev => (
-                <option key={ev.id} value={ev.id}>{ev.nombre} ({ev.ciudad})</option>
-              ))}
-            </select>
-          </div>
+          {successRegalo && (
+            <div style={{ background: 'rgba(74,222,128,0.1)', border: `1px solid rgba(74,222,128,0.2)`, borderRadius: '8px', padding: '12px 16px', marginBottom: '20px', color: theme.success, fontSize: '0.85rem' }}>
+              ✅ {successRegalo}
+            </div>
+          )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Nombre del Invitado *</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '32px' }}>
+            {/* Columna Izquierda: Listado de Usuarios */}
+            <div style={{ flex: '1 1 300px', minWidth: '280px', display: 'flex', flexDirection: 'column', gap: '12px', borderRight: isMobile ? 'none' : `1px solid ${theme.border}`, paddingRight: isMobile ? '0' : '24px' }}>
+              <h4 style={{ color: theme.text, fontSize: '0.85rem', fontWeight: 800, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Seleccionar Usuario Creado</h4>
+              <p style={{ color: theme.textMuted, fontSize: '0.75rem', margin: '0 0 12px' }}>Busca un usuario para auto-completar el formulario.</p>
+              
               <input
                 type="text"
-                placeholder="Nombre completo"
-                value={formRegalo.nombre}
-                onChange={e => setFormRegalo(prev => ({ ...prev, nombre: e.target.value }))}
-                style={inputStyle}
-                required
+                placeholder="Buscar usuario..."
+                value={searchRegaloUser}
+                onChange={e => setSearchRegaloUser(e.target.value)}
+                style={{ ...inputStyle, marginBottom: '12px' }}
               />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Correo Electrónico *</label>
-              <input
-                type="email"
-                placeholder="invitado@correo.com"
-                value={formRegalo.email}
-                onChange={e => setFormRegalo(prev => ({ ...prev, email: e.target.value }))}
-                style={inputStyle}
-                required
-              />
-            </div>
-          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Teléfono (Opcional)</label>
-              <input
-                type="text"
-                placeholder="Ej: 3001234567"
-                value={formRegalo.telefono}
-                onChange={e => setFormRegalo(prev => ({ ...prev, telefono: e.target.value }))}
-                style={inputStyle}
-              />
+              <div style={{ maxHeight: '350px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
+                {filteredRegaloUsers.map(u => (
+                  <div 
+                    key={u.id} 
+                    onClick={() => {
+                      setFormRegalo(prev => ({
+                        ...prev,
+                        nombre: u.nombre || '',
+                        email: u.email || '',
+                        telefono: u.telefono || ''
+                      }));
+                    }}
+                    style={{ 
+                      padding: '10px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${theme.border}`, cursor: 'pointer', display: 'flex', 
+                      flexDirection: 'column', gap: '2px', transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = theme.cardHover}
+                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+                  >
+                    <span style={{ color: theme.text, fontWeight: 700, fontSize: '0.8rem' }}>{u.nombre}</span>
+                    <span style={{ color: theme.textMuted, fontSize: '0.72rem' }}>{u.email}</span>
+                    {u.telefono && <span style={{ color: theme.accentLight, fontSize: '0.7rem', fontFamily: 'monospace' }}>{u.telefono}</span>}
+                  </div>
+                ))}
+                {filteredRegaloUsers.length === 0 && (
+                  <div style={{ color: theme.textMuted, fontSize: '0.78rem', textAlign: 'center', padding: '20px 0' }}>No se encontraron usuarios.</div>
+                )}
+              </div>
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Cantidad de Entradas *</label>
-              <input
-                type="number"
-                min="1"
-                max="50"
-                value={formRegalo.cantidad}
-                onChange={e => setFormRegalo(prev => ({ ...prev, cantidad: e.target.value }))}
-                style={inputStyle}
-                required
-              />
-            </div>
-          </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Nota / Razón de la Cortesía</label>
-            <input
-              type="text"
-              placeholder="Ej: Invitado de Charlotte de Witte"
-              value={formRegalo.nota}
-              onChange={e => setFormRegalo(prev => ({ ...prev, nota: e.target.value }))}
-              style={inputStyle}
-            />
-          </div>
+            {/* Columna Derecha: Formulario */}
+            <form onSubmit={handleGiftTickets} style={{ flex: '1.5 1 350px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Evento de Destino *</label>
+                <select
+                  value={formRegalo.eventoId}
+                  onChange={e => setFormRegalo(prev => ({ ...prev, eventoId: e.target.value }))}
+                  style={inputStyle}
+                  required
+                >
+                  <option value="">-- Seleccione el evento --</option>
+                  {eventos.map(ev => (
+                    <option key={ev.id} value={ev.id}>{ev.nombre} ({ev.ciudad})</option>
+                  ))}
+                </select>
+              </div>
 
-          <button
-            type="submit"
-            disabled={loadingRegalo}
-            style={{
-              ...btnPrimary,
-              alignSelf: 'flex-start',
-              padding: '12px 32px',
-              opacity: loadingRegalo ? 0.6 : 1,
-              cursor: loadingRegalo ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {loadingRegalo ? 'Procesando Cortesía...' : '🎁 Enviar Cortesías'}
-          </button>
-        </form>
-      </Section>
-    </motion.div>
-  );
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Nombre del Invitado *</label>
+                  <input
+                    type="text"
+                    placeholder="Nombre completo"
+                    value={formRegalo.nombre}
+                    onChange={e => setFormRegalo(prev => ({ ...prev, nombre: e.target.value }))}
+                    style={inputStyle}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Correo Electrónico *</label>
+                  <input
+                    type="email"
+                    placeholder="invitado@correo.com"
+                    value={formRegalo.email}
+                    onChange={e => setFormRegalo(prev => ({ ...prev, email: e.target.value }))}
+                    style={inputStyle}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Teléfono (Opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="Ej: 3001234567"
+                    value={formRegalo.telefono}
+                    onChange={e => setFormRegalo(prev => ({ ...prev, telefono: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Cantidad de Entradas *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={formRegalo.cantidad}
+                    onChange={e => setFormRegalo(prev => ({ ...prev, cantidad: e.target.value }))}
+                    style={inputStyle}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Nota / Razón de la Cortesía</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Invitado de Charlotte de Witte"
+                  value={formRegalo.nota}
+                  onChange={e => setFormRegalo(prev => ({ ...prev, nota: e.target.value }))}
+                  style={inputStyle}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loadingRegalo}
+                style={{
+                  ...btnPrimary,
+                  alignSelf: 'flex-start',
+                  padding: '12px 32px',
+                  opacity: loadingRegalo ? 0.6 : 1,
+                  cursor: loadingRegalo ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {loadingRegalo ? 'Procesando Cortesía...' : '🎁 Enviar Cortesías'}
+              </button>
+            </form>
+          </div>
+        </Section>
+      </motion.div>
+    );
+  };
+
+  const handleResolveSugerencia = async (id, nuevoEstado) => {
+    try {
+      await api.adminActualizarEstadoSugerencia(id, nuevoEstado);
+      setSugerencias(prev => prev.map(s => s.id === id ? { ...s, estado: nuevoEstado } : s));
+    } catch (err) {
+      setError('Error al actualizar el estado de la sugerencia: ' + (err.message || err));
+    }
+  };
+
+  const renderSugerencias = () => {
+    const filteredSugerencias = sugerencias.filter(s =>
+      !searchSugerencia ||
+      s.contenido?.toLowerCase().includes(searchSugerencia.toLowerCase()) ||
+      s.nombre?.toLowerCase().includes(searchSugerencia.toLowerCase()) ||
+      s.email?.toLowerCase().includes(searchSugerencia.toLowerCase())
+    );
+
+    return (
+      <motion.div key="sugerencias" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <Section icon="star" title={`Sugerencias del Público (${filteredSugerencias.length})`}>
+          <p style={{ color: theme.textSec, fontSize: '0.85rem', marginBottom: '24px', lineHeight: 1.5 }}>
+            Consulte y gestione las sugerencias, ideas y opiniones que los asistentes envían para mejorar las fiestas de Dopamina Crew.
+          </p>
+
+          <input
+            style={inputStyle}
+            placeholder="Buscar sugerencias por contenido, nombre o correo..."
+            value={searchSugerencia}
+            onChange={e => setSearchSugerencia(e.target.value)}
+          />
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  {['#', 'Fecha', 'Autor', 'Correo', 'Sugerencia', 'Estado', 'Acciones'].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSugerencias.map(s => {
+                  const estadoColor = s.estado === 'PENDIENTE' ? theme.warning : s.estado === 'LEIDA' ? theme.success : theme.textMuted;
+                  return (
+                    <tr 
+                      key={s.id}
+                      onMouseEnter={e => e.currentTarget.style.background = theme.cardHover}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <td style={{ ...tdStyle, color: theme.accent, fontFamily: "'JetBrains Mono', monospace" }}>#{s.id}</td>
+                      <td style={{ ...tdStyle, fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+                        {s.createdAt ? new Date(s.createdAt).toLocaleString('es-CO') : '—'}
+                      </td>
+                      <td style={{ ...tdStyle, fontWeight: 700, color: theme.text }}>{s.nombre || 'Anónimo'}</td>
+                      <td style={{ ...tdStyle, color: theme.textMuted, fontSize: '0.8rem' }}>{s.email || '—'}</td>
+                      <td style={{ ...tdStyle, color: theme.textSec, maxWidth: '350px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.4 }}>
+                        {s.contenido}
+                      </td>
+                      <td>
+                        <span style={badgeStyle(estadoColor)}>{s.estado}</span>
+                      </td>
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          {s.estado === 'PENDIENTE' && (
+                            <button
+                              onClick={() => handleResolveSugerencia(s.id, 'LEIDA')}
+                              style={{ 
+                                padding: '4px 8px', borderRadius: '4px', border: 'none',
+                                background: 'rgba(74,222,128,0.1)', color: theme.success,
+                                cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700
+                              }}
+                            >
+                              Marcar Leída
+                            </button>
+                          )}
+                          {s.estado !== 'ARCHIVADA' && (
+                            <button
+                              onClick={() => handleResolveSugerencia(s.id, 'ARCHIVADA')}
+                              style={{ 
+                                padding: '4px 8px', borderRadius: '4px', border: 'none',
+                                background: 'rgba(255,255,255,0.05)', color: theme.textSec,
+                                cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700
+                              }}
+                            >
+                              Archivar
+                            </button>
+                          )}
+                          {s.estado === 'ARCHIVADA' && (
+                            <span style={{ color: theme.textMuted, fontSize: '0.7rem', fontWeight: 600 }}>Archivada</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredSugerencias.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ ...tdStyle, textAlign: 'center', color: theme.textMuted, padding: '40px' }}>
+                      No se encontraron sugerencias.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      </motion.div>
+    );
+  };
 
   const renderSorteos = () => {
     const elegibles = participantesSorteo.filter(p => !ganadoresHistorial.some(h => h.id === p.id) && (p.estado === 'ACTIVA' || p.estado === 'USADA'));
@@ -1951,6 +2246,279 @@ export default function AdminDashboard() {
     );
   };
 
+  const handleSubmitSet = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingSet) {
+        const updated = await api.adminActualizarSet(editingSet.id, formSet);
+        setSets(prev => prev.map(s => s.id === editingSet.id ? updated : s));
+      } else {
+        const created = await api.adminCrearSet(formSet);
+        setSets(prev => [...prev, created]);
+      }
+      setShowSetForm(false);
+      setEditingSet(null);
+      setFormSet({ titulo: '', artista: '', youtubeUrl: '', genero: '', descripcion: '', imagenUrl: '', activo: true });
+    } catch (err) {
+      setError('Error al guardar el set: ' + (err.message || err));
+    }
+  };
+
+  const handleDeleteSet = async (id) => {
+    if (!window.confirm('¿Eliminar este set musical?')) return;
+    try {
+      await api.adminEliminarSet(id);
+      setSets(prev => prev.filter(s => s.id !== id));
+    } catch (err) {
+      setError('Error al eliminar el set.');
+    }
+  };
+
+  const renderSets = () => (
+    <motion.div key="sets" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      {showSetForm ? (
+        <Section icon="music" title={editingSet ? 'Editar Set' : 'Nuevo Set Musical'}>
+          <form onSubmit={handleSubmitSet} style={{ display: 'grid', gap: '16px', gridTemplateColumns: '1fr 1fr' }}>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>TÍTULO</label>
+              <input required style={inputStyle} value={formSet.titulo} onChange={e => setFormSet({ ...formSet, titulo: e.target.value })} placeholder="Ej. Bodega Sessions Vol. 4" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>ARTISTA / DJ</label>
+              <input style={inputStyle} value={formSet.artista} onChange={e => setFormSet({ ...formSet, artista: e.target.value })} placeholder="Ej. Dopamina Resident DJ" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>GÉNERO</label>
+              <input style={inputStyle} value={formSet.genero} onChange={e => setFormSet({ ...formSet, genero: e.target.value })} placeholder="Ej. Dancehall, Techno..." />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>URL DE YOUTUBE</label>
+              <input required style={inputStyle} value={formSet.youtubeUrl} onChange={e => setFormSet({ ...formSet, youtubeUrl: e.target.value })} placeholder="https://youtube.com/watch?v=..." />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>DESCRIPCIÓN</label>
+              <textarea style={{ ...inputStyle, height: '80px', resize: 'vertical' }} value={formSet.descripcion} onChange={e => setFormSet({ ...formSet, descripcion: e.target.value })} />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>IMAGEN URL</label>
+              <input style={inputStyle} value={formSet.imagenUrl} onChange={e => setFormSet({ ...formSet, imagenUrl: e.target.value })} />
+            </div>
+            <div style={{ gridColumn: 'span 2', display: 'flex', gap: '24px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', color: theme.textSec }}>
+                <input type="checkbox" checked={formSet.activo} onChange={e => setFormSet({ ...formSet, activo: e.target.checked })} style={{ accentColor: theme.accent }} />
+                Activo
+              </label>
+            </div>
+            <div style={{ gridColumn: 'span 2', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => { setShowSetForm(false); setEditingSet(null); }} style={btnGhost}>Cancelar</button>
+              <button type="submit" style={btnPrimary}>Guardar Set</button>
+            </div>
+          </form>
+        </Section>
+      ) : (
+        <Section icon="music" title={`Sets Musicales (${sets.length})`}
+          extra={
+            <button onClick={() => { setEditingSet(null); setFormSet({ titulo: '', artista: '', youtubeUrl: '', genero: '', descripcion: '', imagenUrl: '', activo: true }); setShowSetForm(true); }}
+              style={{ ...btnPrimary, padding: '8px 18px' }}>
+              + Nuevo Set
+            </button>
+          }
+        >
+          <input style={inputStyle} placeholder="Buscar set por título, artista o género..." value={searchSet} onChange={e => setSearchSet(e.target.value)} />
+          <div style={{ overflowX: 'auto' }}>
+            <table style={tableStyle}>
+              <thead><tr>
+                {['#', 'Título', 'Artista', 'Género', 'YouTube', 'Estado', 'Creado', 'Acciones'].map(h => <th key={h} style={thStyle}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {sets.filter(s =>
+                  !searchSet ||
+                  s.titulo?.toLowerCase().includes(searchSet.toLowerCase()) ||
+                  s.artista?.toLowerCase().includes(searchSet.toLowerCase()) ||
+                  s.genero?.toLowerCase().includes(searchSet.toLowerCase())
+                ).map(s => (
+                  <tr key={s.id}
+                    onMouseEnter={e => e.currentTarget.style.background = theme.cardHover}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <td style={{ ...tdStyle, color: theme.accent, fontFamily: "'JetBrains Mono', monospace" }}>#{s.id}</td>
+                    <td style={{ ...tdStyle, fontWeight: 700, color: theme.text }}>{s.titulo}</td>
+                    <td style={tdStyle}>{s.artista || '—'}</td>
+                    <td><span style={badgeStyle(theme.info)}>{s.genero || '—'}</span></td>
+                    <td style={tdStyle}>
+                      <a href={s.youtubeUrl} target="_blank" rel="noopener noreferrer" style={{ color: theme.accent, fontSize: '0.75rem' }}>Ver</a>
+                    </td>
+                    <td><span style={badgeStyle(s.activo ? theme.success : theme.danger)}>{s.activo ? 'ACTIVO' : 'INACTIVO'}</span></td>
+                    <td style={{ ...tdStyle, fontSize: '0.78rem', color: theme.textMuted }}>{s.createdAt ? new Date(s.createdAt).toLocaleDateString('es-CO') : '—'}</td>
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button onClick={() => {
+                          setEditingSet(s);
+                          setFormSet({ titulo: s.titulo, artista: s.artista || '', youtubeUrl: s.youtubeUrl, genero: s.genero || '', descripcion: s.descripcion || '', imagenUrl: s.imagenUrl || '', activo: s.activo });
+                          setShowSetForm(true);
+                        }} style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', background: 'rgba(96,165,250,0.1)', color: theme.info, cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700 }}>Editar</button>
+                        <button onClick={() => handleDeleteSet(s.id)} style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', background: 'rgba(239,68,68,0.1)', color: theme.danger, cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700 }}>Eliminar</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {sets.length === 0 && (
+                  <tr><td colSpan={8} style={{ ...tdStyle, textAlign: 'center', color: theme.textMuted, padding: '30px' }}>No hay sets musicales registrados.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      )}
+    </motion.div>
+  );
+
+  const renderVisitas = () => (
+    <motion.div key="visitas" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      {loadingVisits ? (
+        <div style={{ textAlign: 'center', padding: '60px', color: theme.textMuted }}>Cargando estadísticas de visitas...</div>
+      ) : visitStats ? (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+            <StatCard label="Visitas Totales" value={visitStats.totalVisitas ?? 0} icon="chart" color={theme.accent} delay={0} />
+            <StatCard label="Visitas Hoy" value={visitStats.visitasHoy ?? 0} icon="chart" color={theme.info} delay={0.05} />
+            <StatCard label="Autenticados" value={visitStats.autenticados ?? 0} icon="users" color={theme.success} delay={0.1} />
+            <StatCard label="Anónimos" value={visitStats.anonimos ?? 0} icon="users" color={theme.warning} delay={0.15} />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+            {/* Páginas más visitadas */}
+            <Section icon="chart" title="Páginas Más Visitadas">
+              {visitStats.porPagina && visitStats.porPagina.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {visitStats.porPagina.slice(0, 10).map(([pagina, count], i) => (
+                    <div key={pagina} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ color: theme.textMuted, fontSize: '0.75rem', fontWeight: 700, minWidth: '20px' }}>#{i + 1}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span style={{ color: theme.text, fontSize: '0.85rem', fontWeight: 600 }}>{pagina}</span>
+                          <span style={{ color: theme.accent, fontWeight: 700, fontSize: '0.85rem' }}>{count}</span>
+                        </div>
+                        <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${(count / Math.max(...visitStats.porPagina.map(p => p[1]))) * 100}%`, background: `linear-gradient(90deg, ${theme.accent}, ${theme.accentLight})`, borderRadius: '3px', transition: 'width 0.6s ease' }} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '30px', color: theme.textMuted }}>No hay datos de visitas todavía.</div>
+              )}
+            </Section>
+
+            {/* Autenticados vs Anónimos */}
+            <Section icon="users" title="Autenticados vs Anónimos">
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '220px' }}>
+                <div style={{ position: 'relative', width: '160px', height: '160px', marginBottom: '16px' }}>
+                  <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+                    <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke={theme.border} strokeWidth="3" />
+                    <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke={theme.success} strokeWidth="3" strokeDasharray={`${visitStats.totalVisitas > 0 ? (visitStats.autenticados / visitStats.totalVisitas) * 100 : 0} 100`} />
+                    <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke={theme.warning} strokeWidth="3" strokeDasharray={`${visitStats.totalVisitas > 0 ? (visitStats.anonimos / visitStats.totalVisitas) * 100 : 0} 100`} strokeDashoffset={visitStats.totalVisitas > 0 ? -(visitStats.autenticados / visitStats.totalVisitas) * 100 : 0} />
+                  </svg>
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: theme.text }}>{visitStats.totalVisitas}</div>
+                    <div style={{ fontSize: '0.65rem', color: theme.textMuted, textTransform: 'uppercase', fontWeight: 600 }}>Total</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: theme.success }} />
+                    <span style={{ fontSize: '0.8rem', color: theme.textSec, fontWeight: 600 }}>Autenticados: {visitStats.autenticados}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: theme.warning }} />
+                    <span style={{ fontSize: '0.8rem', color: theme.textSec, fontWeight: 600 }}>Anónimos: {visitStats.anonimos}</span>
+                  </div>
+                </div>
+              </div>
+            </Section>
+          </div>
+
+          {/* Visitas por día */}
+          {visitStats.porDia && visitStats.porDia.length > 0 && (
+            <Section icon="chart" title="Visitas por Día">
+              <div style={{ overflowX: 'auto' }}>
+                <table style={tableStyle}>
+                  <thead><tr>
+                    {['Fecha', 'Visitas'].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                  </tr></thead>
+                  <tbody>
+                    {visitStats.porDia.slice(-30).reverse().map(([fecha, count]) => (
+                      <tr key={fecha}
+                        onMouseEnter={e => e.currentTarget.style.background = theme.cardHover}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <td style={{ ...tdStyle, color: theme.text, fontWeight: 600 }}>{fecha}</td>
+                        <td style={{ ...tdStyle, color: theme.accent, fontWeight: 700 }}>{count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Section>
+          )}
+
+          {/* Historial detallado de visitas */}
+          <Section icon="users" title={`Historial de Visitas (${allVisits.length})`}
+            extra={
+              <button onClick={fetchVisitStats} style={{ ...btnGhost, padding: '6px 14px', fontSize: '0.75rem' }}>
+                ↻ Refrescar
+              </button>
+            }
+          >
+            <input style={inputStyle} placeholder="Buscar por página, IP o User-Agent..." value={searchVisit} onChange={e => setSearchVisit(e.target.value)} />
+            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              <table style={tableStyle}>
+                <thead><tr style={{ position: 'sticky', top: 0, background: theme.card, zIndex: 1 }}>
+                  {['ID', 'Página', 'Usuario', 'IP', 'User-Agent', 'Referrer', 'Fecha'].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {allVisits
+                    .filter(v =>
+                      !searchVisit ||
+                      (v.pagina || '').toLowerCase().includes(searchVisit.toLowerCase()) ||
+                      (v.ipAddress || '').includes(searchVisit) ||
+                      (v.userAgent || '').toLowerCase().includes(searchVisit.toLowerCase())
+                    )
+                    .slice(0, 100)
+                    .map(v => (
+                      <tr key={v.id}
+                        onMouseEnter={e => e.currentTarget.style.background = theme.cardHover}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <td style={{ ...tdStyle, color: theme.accent, fontFamily: "'JetBrains Mono', monospace" }}>#{v.id}</td>
+                        <td style={{ ...tdStyle, fontWeight: 600, color: theme.text }}>{v.pagina}{v.titulo ? <span style={{ color: theme.textMuted, fontSize: '0.75rem' }}> ({v.titulo})</span> : ''}</td>
+                        <td style={{ ...tdStyle, color: v.usuario ? theme.success : theme.textMuted }}>
+                          {v.usuario ? `${v.usuario.nombre || v.usuario.email || `#${v.usuario.id}`}` : 'Anónimo'}
+                        </td>
+                        <td style={{ ...tdStyle, fontSize: '0.78rem', color: theme.textMuted }}>{v.ipAddress || '—'}</td>
+                        <td style={{ ...tdStyle, fontSize: '0.7rem', color: theme.textMuted, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={v.userAgent}>{v.userAgent || '—'}</td>
+                        <td style={{ ...tdStyle, fontSize: '0.7rem', color: theme.textMuted, maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={v.referrer}>{v.referrer || '—'}</td>
+                        <td style={{ ...tdStyle, fontSize: '0.78rem', color: theme.textMuted }}>{v.createdAt ? new Date(v.createdAt + 'Z').toLocaleString('es-CO') : '—'}</td>
+                      </tr>
+                    ))}
+                  {allVisits.length === 0 && (
+                    <tr><td colSpan={7} style={{ ...tdStyle, textAlign: 'center', color: theme.textMuted, padding: '30px' }}>No hay visitas registradas todavía.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Section>
+        </>
+      ) : (
+        <div style={{ textAlign: 'center', padding: '60px' }}>
+          <p style={{ color: theme.danger, marginBottom: '16px' }}>Error al cargar estadísticas de visitas.</p>
+          <button onClick={fetchVisitStats} style={btnPrimary}>Reintentar</button>
+        </div>
+      )}
+    </motion.div>
+  );
+
   const renderSeguridad = () => (
     <motion.div key="seguridad" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: `1px solid ${theme.border}`, paddingBottom: '12px' }}>
@@ -2124,22 +2692,28 @@ export default function AdminDashboard() {
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: '12px', display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto' }}>
-          {SIDEBAR_ITEMS.map(item => (
-            <button key={item.id} onClick={() => { setActiveTab(item.id); if (isMobile) setSidebarOpen(false); }}
-              style={navBtnStyle(activeTab === item.id)}
-              onMouseEnter={e => { if (activeTab !== item.id) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
-              onMouseLeave={e => { if (activeTab !== item.id) e.currentTarget.style.background = 'transparent'; }}
-            >
-              <div style={{
-                width: '28px', height: '28px', borderRadius: '6px',
-                background: activeTab === item.id ? theme.accent : theme.border,
-                color: activeTab === item.id ? '#fff' : theme.textMuted,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 800, fontSize: '0.75rem', flexShrink: 0,
-              }}>{item.icon}</div>
-              {item.label}
-            </button>
-          ))}
+          {(() => {
+            const userObj = api.getUser();
+            const filteredItems = userObj?.rol === 'ROLE_SUBADMIN' 
+              ? SIDEBAR_ITEMS.filter(item => item.id === 'overview') 
+              : SIDEBAR_ITEMS;
+            return filteredItems.map(item => (
+              <button key={item.id} onClick={() => { setActiveTab(item.id); if (isMobile) setSidebarOpen(false); }}
+                style={navBtnStyle(activeTab === item.id)}
+                onMouseEnter={e => { if (activeTab !== item.id) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                onMouseLeave={e => { if (activeTab !== item.id) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div style={{
+                  width: '28px', height: '28px', borderRadius: '6px',
+                  background: activeTab === item.id ? theme.accent : theme.border,
+                  color: activeTab === item.id ? '#fff' : theme.textMuted,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 800, fontSize: '0.75rem', flexShrink: 0,
+                }}>{item.icon}</div>
+                {item.label}
+              </button>
+            ));
+          })()}
         </nav>
 
         {/* Footer */}
@@ -2204,6 +2778,9 @@ export default function AdminDashboard() {
           {activeTab === 'regalos' && renderRegalos()}
           {activeTab === 'sorteos' && renderSorteos()}
           {activeTab === 'cupones' && renderCupones()}
+          {activeTab === 'visitas' && renderVisitas()}
+          {activeTab === 'sets' && renderSets()}
+          {activeTab === 'sugerencias' && renderSugerencias()}
           {activeTab === 'seguridad' && renderSeguridad()}
         </AnimatePresence>
       </main>

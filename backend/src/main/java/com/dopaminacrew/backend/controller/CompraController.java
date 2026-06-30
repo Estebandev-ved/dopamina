@@ -95,7 +95,7 @@ public class CompraController {
         // PENDIENTE (pago no completado o abandonado en la pasarela) NO debe generar
         // boletas ni QR.
         for (Compra compra : compras) {
-            if (!"PAGADO".equals(compra.getEstado())) {
+            if (!"PAGADO".equals(compra.getEstado()) && !"REGALADA".equals(compra.getEstado())) {
                 continue;
             }
             int expectedCount = compra.getCantidad() != null ? compra.getCantidad() : 0;
@@ -122,7 +122,7 @@ public class CompraController {
         // hayan podido quedar de compras pendientes anteriores a este arreglo).
         List<Boleta> boletas = boletaRepository.findByUsuarioIdOrderByCreatedAtDesc(currentUser.getId());
         List<BoletaResponse> response = boletas.stream()
-                .filter(b -> b.getCompra() != null && "PAGADO".equals(b.getCompra().getEstado()))
+                .filter(b -> b.getCompra() != null && ("PAGADO".equals(b.getCompra().getEstado()) || "REGALADA".equals(b.getCompra().getEstado())))
                 .map(this::mapToBoletaResponse)
                 .collect(Collectors.toList());
                 

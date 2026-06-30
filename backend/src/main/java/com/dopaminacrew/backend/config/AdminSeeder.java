@@ -50,6 +50,12 @@ public class AdminSeeder implements CommandLineRunner {
                     return roleRepository.save(new Role(null, RoleName.ROLE_ADMIN));
                 });
 
+        Role subAdminRole = roleRepository.findByNombre(RoleName.ROLE_SUBADMIN)
+                .orElseGet(() -> {
+                    System.out.println("Sembrando rol por defecto: ROLE_SUBADMIN");
+                    return roleRepository.save(new Role(null, RoleName.ROLE_SUBADMIN));
+                });
+
         // 2. Sembrar cuenta inicial del Administrador si no existe en BD
         if (!userRepository.existsByEmail(adminEmail)) {
             System.out.println("No se encontró la cuenta de administrador principal. Creando cuenta de semilla...");

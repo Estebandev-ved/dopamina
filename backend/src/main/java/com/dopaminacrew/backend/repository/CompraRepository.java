@@ -29,7 +29,7 @@ public interface CompraRepository extends JpaRepository<Compra, Long> {
      * carritos abandonados. COALESCE garantiza 0 cuando no hay filas.
      */
     @Query("SELECT COALESCE(SUM(c.cantidad), 0) FROM Compra c WHERE c.evento.id = :eventoId "
-            + "AND (c.estado = 'PAGADO' OR (c.estado = 'PENDIENTE' AND c.createdAt >= :limiteReserva))")
+            + "AND (c.estado = 'PAGADO' OR c.estado = 'REGALADA' OR (c.estado = 'PENDIENTE' AND c.createdAt >= :limiteReserva))")
     int sumEntradasOcupadas(@Param("eventoId") Long eventoId, @Param("limiteReserva") LocalDateTime limiteReserva);
 
     /** Conveniencia: cuenta entradas ocupadas usando la ventana de reserva estándar. */

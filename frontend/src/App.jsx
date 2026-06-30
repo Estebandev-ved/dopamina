@@ -17,16 +17,18 @@ import Artistas from './pages/Artistas';
 import PagoResultado from './pages/PagoResultado';
 import AdminDashboard from './pages/AdminDashboard';
 import { api } from './services/api';
+import usePageTracking from './services/usePageTracking';
 
 /**
  * Route guard: only allows access if user is authenticated.
  */
 const ProtectedRoute = ({ children }) => {
   const user = api.getUser();
-  if (!user) return <Navigate to="/login" replace />;
+  const location = useLocation();
+  if (!user) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   if (api.isTokenExpired()) {
     api.clearAuth();
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
   return children;
 };
@@ -55,6 +57,7 @@ const AdminRoute = ({ children }) => {
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const location = useLocation();
+  usePageTracking();
 
   React.useEffect(() => {
     const theme = localStorage.getItem('neon-theme') || 'violet';

@@ -24,9 +24,11 @@ public interface BoletaRepository extends JpaRepository<Boleta, Long> {
     @Query("SELECT MAX(b.numeroSorteo) FROM Boleta b WHERE b.compra.evento.id = :eventoId")
     Integer findMaxNumeroSorteoByEventoId(@Param("eventoId") Long eventoId);
 
-    @Query("SELECT b FROM Boleta b WHERE b.compra.evento.id = :eventoId AND b.numeroSorteo = :numeroSorteo")
+    @Query("SELECT b FROM Boleta b JOIN b.compra c WHERE c.evento.id = :eventoId AND b.numeroSorteo = :numeroSorteo "
+            + "AND (c.estado = 'PAGADO' OR c.estado = 'REGALADA')")
     Optional<Boleta> findByEventoIdAndNumeroSorteo(@Param("eventoId") Long eventoId, @Param("numeroSorteo") Integer numeroSorteo);
 
-    @Query("SELECT b FROM Boleta b WHERE b.compra.evento.id = :eventoId AND b.numeroSorteo IS NOT NULL ORDER BY b.numeroSorteo ASC")
+    @Query("SELECT b FROM Boleta b JOIN b.compra c WHERE c.evento.id = :eventoId AND b.numeroSorteo IS NOT NULL "
+            + "AND (c.estado = 'PAGADO' OR c.estado = 'REGALADA') ORDER BY b.numeroSorteo ASC")
     List<Boleta> findBoletasParticipantesByEventoId(@Param("eventoId") Long eventoId);
 }

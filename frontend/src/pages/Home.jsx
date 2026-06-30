@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import PageTransition from '../components/PageTransition';
-import { Ticket, Radio, Flame, Sparkles, CheckCircle2, AlertTriangle, ArrowRight, ShieldCheck, Send, Gift, EyeOff, MessageCircle, Music } from 'lucide-react';
+import { Ticket, Radio, Flame, Sparkles, CheckCircle2, AlertTriangle, ArrowRight, ShieldCheck, Send, Gift, EyeOff, MessageCircle, Music, SkipBack, SkipForward, ChevronDown, ChevronUp } from 'lucide-react';
 import heroBg from '../assets/hero-bg.png';
 
 /**
@@ -17,7 +17,7 @@ import heroBg from '../assets/hero-bg.png';
 export default function Home() {
   const navigate = useNavigate();
   const currentUser = api.getUser();
-  const containerRef = useRef(null);
+  const homeContainerRef = useRef(null);
 
   const { scrollY } = useScroll();
   const yBg = useTransform(scrollY, [0, 800], [0, 100]);
@@ -39,7 +39,23 @@ export default function Home() {
 
   const [featuredEvent, setFeaturedEvent] = useState(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
-  const audioRef = useRef(null);
+
+  // Sets musicales (YouTube)
+  const [sets, setSets] = useState([]);
+  const [currentSetIdx, setCurrentSetIdx] = useState(0);
+  const [showSetSelector, setShowSetSelector] = useState(false);
+  const playerRef = useRef(null);
+  const playerReadyRef = useRef(false);
+  const containerRefPlayer = useRef(null);
+
+  const getYoutubeId = (url) => {
+    if (!url) return null;
+    const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    return match ? match[1] : null;
+  };
+
+  const currentSet = sets[currentSetIdx] || null;
+  const youtubeId = currentSet ? getYoutubeId(currentSet.youtubeUrl) : null;
 
 
   // FAQ and Contact states
@@ -98,24 +114,108 @@ export default function Home() {
     }
   };
 
-  // Audio playback handler
-  const handleTogglePlay = () => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play().catch(() => console.log('Audio playback blocked or failed'));
-    }
-    setIsPlaying(!isPlaying);
-  };
+  // YouTube IFrame Player API
+  const loadYoutubeApi = useCallback(() => {
+    if (window.YT) return;
+    const tag = document.createElement('script');
+    tag.src = `https://www.youtube.com/iframe_api?origin=${encodeURIComponent(window.location.origin)}`;
+    const first = document.getElementsByTagName('script')[0];
+    first.parentNode.insertBefore(tag, first);
+  }, []);
 
-  // Safe release of audio on unmount
+  const createPlayer = useCallback((videoId) => {
+    if (!containerRefPlayer.current) return;
+    if (playerRef.current) {
+      playerRef.current.loadVideoById(videoId);
+      playerRef.current.playVideo();
+      return;
+    }
+    playerRef.current = new window.YT.Player(containerRefPlayer.current, {
+      height: '360',
+      width: '640',
+      videoId: videoId,
+      playerVars: { autoplay: 1, rel: 0, modestbranding: 1, origin: window.location.origin },
+      events: {
+        onReady: (e) => {
+          playerReadyRef.current = true;
+          e.target.playVideo();
+        },
+        onStateChange: (e) => {
+          if (e.data === window.YT.PlayerState.PLAYING) setIsPlaying(true);
+          else if (e.data === window.YT.PlayerState.ENDED) setIsPlaying(false);
+          else if (e.data === window.YT.PlayerState.PAUSED) setIsPlaying(false);
+        },
+      },
+    });
+  }, []);
+
   useEffect(() => {
+    loadYoutubeApi();
+    window.onYouTubeIframeAPIReady = () => {};
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
       }
     };
+  }, [loadYoutubeApi]);
+
+  const playCurrentSet = useCallback(() => {
+    if (!youtubeId) return;
+    if (window.YT && window.YT.Player) {
+      createPlayer(youtubeId);
+    } else {
+      loadYoutubeApi();
+      const checkReady = setInterval(() => {
+        if (window.YT && window.YT.Player) {
+          clearInterval(checkReady);
+          createPlayer(youtubeId);
+        }
+      }, 300);
+    }
+  }, [youtubeId, createPlayer, loadYoutubeApi]);
+
+  const stopCurrentSet = useCallback(() => {
+    if (playerRef.current) {
+      playerRef.current.pauseVideo();
+    }
+    setIsPlaying(false);
+  }, []);
+
+  const handleTogglePlay = () => {
+    if (isPlaying) {
+      stopCurrentSet();
+    } else {
+      playCurrentSet();
+    }
+  };
+
+  const handlePrevSet = useCallback(() => {
+    if (playerRef.current) playerRef.current.destroy();
+    playerRef.current = null;
+    playerReadyRef.current = false;
+    setIsPlaying(false);
+    setCurrentSetIdx(prev => (prev - 1 + sets.length) % sets.length);
+  }, [sets.length]);
+
+  const handleNextSet = useCallback(() => {
+    if (playerRef.current) playerRef.current.destroy();
+    playerRef.current = null;
+    playerReadyRef.current = false;
+    setIsPlaying(false);
+    setCurrentSetIdx(prev => (prev + 1) % sets.length);
+  }, [sets.length]);
+
+  // Fetch sets from API
+  useEffect(() => {
+    api.getSets()
+      .then(data => {
+        setSets(data || []);
+        if (data && data.length > 0) {
+          setCurrentSetIdx(0);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   React.useEffect(() => {
@@ -180,16 +280,20 @@ export default function Home() {
   ];
 
   const handleBuyTicket = () => {
-    if (featuredEvent) {
-      navigate('/checkout', { state: { evento: featuredEvent } });
-    } else {
+    if (!featuredEvent) {
       navigate('/eventos');
+      return;
+    }
+    if (!api.getUser()) {
+      navigate('/login', { state: { from: '/checkout', eventoState: { evento: featuredEvent, cantidad: 1 } } });
+    } else {
+      navigate('/checkout', { state: { evento: featuredEvent } });
     }
   };
 
   return (
     <PageTransition>
-      <div ref={containerRef} className="relative min-h-screen bg-black flex flex-col overflow-x-hidden">
+      <div ref={homeContainerRef} className="relative min-h-screen bg-black flex flex-col overflow-x-hidden">
 
         {/* Parallax Background Image */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
@@ -341,41 +445,113 @@ export default function Home() {
               </div>
             </div>
 
-            {/* RESIDENT DJ PLAYER */}
-            <div className="max-w-xl mx-auto bg-industrial-950 border border-industrial-800 rounded-lg p-4 sm:p-5 flex items-center justify-between shadow-neon-sm relative overflow-hidden gap-3">
+            {/* RESIDENT DJ PLAYER — YouTube Sets */}
+            <div className="max-w-xl mx-auto bg-industrial-950 border border-industrial-800 rounded-lg p-4 sm:p-5 shadow-neon-sm relative overflow-hidden">
               <div className="absolute top-0 right-0 w-16 h-16 bg-neon-purple/5 blur-xl pointer-events-none" />
 
-              <div className="flex items-center space-x-3 sm:space-x-4 z-10 min-w-0">
-                <button
-                  onClick={handleTogglePlay}
-                  className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-neon-purple text-white flex items-center justify-center shadow-neon-sm hover:shadow-neon-md hover:scale-105 transition-all duration-300 focus:outline-none flex-shrink-0 touch-manipulation"
-                >
-                  {isPlaying ? (
-                    <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current"><rect x="5" y="4" width="4" height="16" /><rect x="15" y="4" width="4" height="16" /></svg>
-                  ) : (
-                    <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current ml-1"><polygon points="5,3 19,12 5,21" /></svg>
-                  )}
-                </button>
+              {/* YouTube Player container (invisible but active for background audio) */}
+              <div ref={containerRefPlayer} style={{ position: 'fixed', bottom: 0, right: 0, width: '320px', height: '180px', opacity: 0.01, pointerEvents: 'none', zIndex: -1 }} />
 
-                <div className="text-left min-w-0">
-                  <span className="text-[9px] font-mono font-bold text-neon-glow uppercase tracking-widest block">TRANSMISIÓN SONORA</span>
-                  <h4 className="text-[11px] sm:text-xs font-black text-white uppercase tracking-wider truncate">Resident Mix: Bodega Sessions Vol. 4</h4>
-                  <p className="text-[10px] text-gray-500 font-mono mt-0.5 hidden sm:block">Dopamina Resident DJ • 140 BPM Raw Techno</p>
+              {sets.length === 0 ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center space-x-3 sm:space-x-4 z-10 min-w-0">
+                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-industrial-800 flex items-center justify-center flex-shrink-0">
+                      <Radio className="w-5 h-5 text-gray-600" />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <span className="text-[9px] font-mono font-bold text-neon-glow uppercase tracking-widest block">TRANSMISIÓN SONORA</span>
+                      <h4 className="text-[11px] sm:text-xs font-black text-white uppercase tracking-wider truncate">Cargando sets...</h4>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center space-x-3 sm:space-x-4 z-10 min-w-0">
+                      <button
+                        onClick={handleTogglePlay}
+                        disabled={!youtubeId}
+                        className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-neon-purple text-white flex items-center justify-center shadow-neon-sm hover:shadow-neon-md hover:scale-105 transition-all duration-300 focus:outline-none flex-shrink-0 touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isPlaying ? (
+                          <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current"><rect x="5" y="4" width="4" height="16" /><rect x="15" y="4" width="4" height="16" /></svg>
+                        ) : (
+                          <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current ml-1"><polygon points="5,3 19,12 5,21" /></svg>
+                        )}
+                      </button>
 
-              {/* Sound waves Equalizer */}
-              <div className="flex items-end space-x-1 h-8 pr-1 sm:pr-2 flex-shrink-0">
-                <div className="eq-bar eq-bar-1" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
-                <div className="eq-bar eq-bar-2" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
-                <div className="eq-bar eq-bar-3" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
-                <div className="eq-bar eq-bar-4" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
-                <div className="eq-bar eq-bar-5" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
-                <div className="eq-bar eq-bar-6" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
-              </div>
+                      <div className="text-left min-w-0">
+                        <span className="text-[9px] font-mono font-bold text-neon-glow uppercase tracking-widest block">TRANSMISIÓN SONORA</span>
+                        <h4 className="text-[11px] sm:text-xs font-black text-white uppercase tracking-wider truncate max-w-[160px] sm:max-w-[220px]">
+                          {currentSet ? currentSet.titulo : 'Sin sets disponibles'}
+                        </h4>
+                        {currentSet && currentSet.artista && (
+                          <p className="text-[10px] text-gray-500 font-mono mt-0.5 hidden sm:block truncate max-w-[200px]">
+                            {currentSet.artista}{currentSet.genero ? ` • ${currentSet.genero}` : ''}
+                          </p>
+                        )}
+                      </div>
+                    </div>
 
-              {/* Real HTML5 audio element */}
-              <audio ref={audioRef} loop src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" />
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {/* Navegación entre sets */}
+                      {sets.length > 1 && (
+                        <>
+                          <button onClick={handlePrevSet} className="text-gray-500 hover:text-white transition-colors p-1 cursor-pointer" title="Anterior">
+                            <SkipBack className="w-4 h-4" />
+                          </button>
+                          <button onClick={handleNextSet} className="text-gray-500 hover:text-white transition-colors p-1 cursor-pointer" title="Siguiente">
+                            <SkipForward className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+
+                      {/* Equalizer */}
+                      <div className="flex items-end space-x-1 h-8">
+                        <div className="eq-bar eq-bar-1" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
+                        <div className="eq-bar eq-bar-2" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
+                        <div className="eq-bar eq-bar-3" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
+                        <div className="eq-bar eq-bar-4" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
+                        <div className="eq-bar eq-bar-5" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
+                        <div className="eq-bar eq-bar-6" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Selector de sets desplegable */}
+                  {sets.length > 1 && (
+                    <div className="mt-3 border-t border-industrial-800 pt-2">
+                      <button
+                        onClick={() => setShowSetSelector(!showSetSelector)}
+                        className="flex items-center justify-center gap-1 w-full text-[9px] font-mono text-gray-500 hover:text-gray-300 uppercase tracking-widest transition-colors cursor-pointer"
+                      >
+                        {showSetSelector ? 'Ocultar' : 'Ver todos los sets'}
+                        {showSetSelector ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      </button>
+
+                      {showSetSelector && (
+                        <div className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+                          {sets.map((set, idx) => (
+                            <button
+                              key={set.id}
+                              onClick={() => { if (playerRef.current) { playerRef.current.destroy(); playerRef.current = null; } setIsPlaying(false); setCurrentSetIdx(idx); setShowSetSelector(false); }}
+                              className={`w-full text-left px-3 py-2 rounded text-[10px] font-mono uppercase tracking-wider transition-colors cursor-pointer ${
+                                idx === currentSetIdx
+                                  ? 'bg-neon-purple/20 text-neon-glow border border-neon-purple/30'
+                                  : 'text-gray-400 hover:bg-industrial-900 hover:text-white border border-transparent'
+                              }`}
+                            >
+                              <span className="font-bold">{set.titulo}</span>
+                              {set.artista && <span className="text-gray-500 ml-2">— {set.artista}</span>}
+                              {set.genero && <span className="text-neon-purple ml-2 text-[8px]">[{set.genero}]</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
           </div>

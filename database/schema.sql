@@ -102,5 +102,37 @@ CREATE TABLE IF NOT EXISTS `sugerencias` (
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 8. Create Visitas_Pagina Table (page visit tracking)
+CREATE TABLE IF NOT EXISTS `visitas_pagina` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `pagina` VARCHAR(255) NOT NULL,
+    `titulo` VARCHAR(255) DEFAULT NULL,
+    `usuario_id` BIGINT DEFAULT NULL,
+    `ip_address` VARCHAR(45) DEFAULT NULL,
+    `user_agent` VARCHAR(500) DEFAULT NULL,
+    `referrer` VARCHAR(500) DEFAULT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX idx_visitas_pagina ON `visitas_pagina` (`pagina`);
+CREATE INDEX idx_visitas_created_at ON `visitas_pagina` (`created_at`);
+CREATE INDEX idx_visitas_usuario ON `visitas_pagina` (`usuario_id`);
+
+-- 9. Create Sets_Musicales Table (YouTube music sets/playlists)
+CREATE TABLE IF NOT EXISTS `sets_musicales` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `titulo` VARCHAR(200) NOT NULL,
+    `artista` VARCHAR(100) DEFAULT NULL,
+    `youtube_url` VARCHAR(1000) NOT NULL,
+    `genero` VARCHAR(100) DEFAULT NULL,
+    `descripcion` TEXT DEFAULT NULL,
+    `imagen_url` VARCHAR(2048) DEFAULT NULL,
+    `activo` BOOLEAN NOT NULL DEFAULT TRUE,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX idx_sets_genero ON `sets_musicales` (`genero`);
+CREATE INDEX idx_sets_activo ON `sets_musicales` (`activo`);
 
 

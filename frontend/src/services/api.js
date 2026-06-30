@@ -72,7 +72,7 @@ class ApiService {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        if ((response.status === 401 || response.status === 403) && !endpoint.includes('/api/auth/')) {
+        if ((response.status === 401 || response.status === 403) && !endpoint.includes('/api/auth/') && !endpoint.startsWith('/api/public/')) {
           this.clearAuth();
           if (!window.location.pathname.includes('/login')) {
             sessionStorage.setItem('dopamina_redirect_after_login', window.location.pathname + window.location.search);
@@ -339,6 +339,13 @@ class ApiService {
     return this.request(`/api/admin/seguridad/usuarios/${id}/unban`, { method: 'PUT' });
   }
 
+  adminActualizarRolUsuario(id, rol) {
+    return this.request(`/api/admin/seguridad/usuarios/${id}/rol`, {
+      method: 'PUT',
+      body: JSON.stringify({ rol }),
+    });
+  }
+
   adminRegalarBoletas(data) {
     return this.post('/api/admin/boletas/regalar', data);
   }
@@ -365,6 +372,50 @@ class ApiService {
       method: 'PUT',
       body: JSON.stringify({ estado }),
     });
+  }
+
+  // ── Sets Musicales (YouTube) ───────────────────────────────────────────
+  getSets() {
+    return this.get('/api/public/sets');
+  }
+
+  getSetsPorGenero(genero) {
+    return this.get(`/api/public/sets/genero/${genero}`);
+  }
+
+  adminGetSets() {
+    return this.get('/api/admin/sets');
+  }
+
+  adminCrearSet(data) {
+    return this.post('/api/admin/sets', data);
+  }
+
+  adminActualizarSet(id, data) {
+    return this.request(`/api/admin/sets/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  adminEliminarSet(id) {
+    return this.delete(`/api/admin/sets/${id}`);
+  }
+
+  // ── Tracking de Visitas ──────────────────────────────────────────────────
+  trackVisit(pagina, titulo) {
+    const user = this.getUser();
+    const body = { pagina, titulo };
+    if (user) body.usuarioId = user.id;
+    return this.post('/api/public/visitas/track', body);
+  }
+
+  adminGetVisitStats() {
+    return this.get('/api/public/visitas/stats');
+  }
+
+  adminGetAllVisits() {
+    return this.get('/api/public/visitas');
   }
 
   // Cupones Public

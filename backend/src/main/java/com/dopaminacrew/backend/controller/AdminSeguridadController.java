@@ -3,8 +3,11 @@ package com.dopaminacrew.backend.controller;
 import com.dopaminacrew.backend.dto.MessageResponse;
 import com.dopaminacrew.backend.model.LoginAudit;
 import com.dopaminacrew.backend.model.User;
+import com.dopaminacrew.backend.model.Role;
+import com.dopaminacrew.backend.model.RoleName;
 import com.dopaminacrew.backend.repository.LoginAuditRepository;
 import com.dopaminacrew.backend.repository.UserRepository;
+import com.dopaminacrew.backend.repository.RoleRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,6 +31,9 @@ public class AdminSeguridadController {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private RoleRepository roleRepository;
 
     /**
      * Get all login audits in chronological order (newest first).
@@ -67,5 +73,35 @@ public class AdminSeguridadController {
         user.setBanned(false);
         userRepository.save(user);
         return ResponseEntity.ok(new MessageResponse("Suspensión levantada exitosamente."));
+    }
+
+    /**
+     * Actualiza el rol de un usuario.
+     * Solo accesible por el administrador principal (ROLE_ADMIN).
+     */
+    @PutMapping("/usuarios/{id}/rol")
+    @Transactional
+    public ResponseEntity<?> cambiarRolUsuario(@PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con ID: " + id));
+
+        String nuevoRolStr = body.get("rol");
+        if (nuevoRolStr == null || nuevoRolStr.isBlank()) {
+            return ResponseEntity.badRequest().body(new MessageResponse("El rol es obligatorio."));
+        }
+
+        RoleName roleName;
+        try {
+            roleName = RoleName.valueOf(nuevoRolStr.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(new MessageResponse("El rol especificado no es válido. Roles válidos: ROLE_USER, ROLE_ADMIN, ROLE_SUBADMIN"));
+        }
+
+        Role role = roleRepository.findByNombre(roleName)
+                .orElseGet(() -> roleRepository.save(new Role(null, roleName)));
+
+        user.setRol(role);
+        userRepository.save(user);
+        return ResponseEntity.ok(new MessageResponse("Rol de usuario actualizado exitosamente a " + roleName.name() + "."));
     }
 }

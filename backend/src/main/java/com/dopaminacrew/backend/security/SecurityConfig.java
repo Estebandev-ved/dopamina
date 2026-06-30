@@ -66,7 +66,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()       // Authentication endpoints are public
                 .requestMatchers("/api/public/**").permitAll()      // Public resources
                 .requestMatchers("/api/webhook/**").permitAll()     // Webhook endpoints are public (signature verified internally)
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")  // Admin dashboard: ROLE_ADMIN only (defense-in-depth)
+                .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "SUBADMIN")  // Admin dashboard: ROLE_ADMIN or ROLE_SUBADMIN (defense-in-depth)
                 .anyRequest().authenticated()                        // Everything else requires a valid JWT
             )
             // Security headers: prevent clickjacking, XSS, and MIME sniffing
@@ -85,9 +85,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Solo se permiten los orígenes definidos en app.cors.allowed-origins (no comodín "*").
-        // Se usan patrones para soportar previews de Vercel si se incluyen explícitamente.
-        configuration.setAllowedOriginPatterns(allowedOrigins);
+        configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cache-Control"));
         configuration.setExposedHeaders(Collections.singletonList("Authorization"));
