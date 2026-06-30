@@ -2260,6 +2260,16 @@ export default function AdminDashboard() {
                 onChange={e => setFormCupon(prev => ({ ...prev, maxUsos: e.target.value }))} 
               />
 
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Mínimo de boletas requeridas</label>
+              <input 
+                type="number" 
+                min="1"
+                style={inputStyle} 
+                placeholder="Ej: 4 (para tu promo). Vacío = 1 boleta" 
+                value={formCupon.minBoletas} 
+                onChange={e => setFormCupon(prev => ({ ...prev, minBoletas: e.target.value }))} 
+              />
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
                 <input 
                   type="checkbox" 
