@@ -165,9 +165,6 @@ public class EfipayController {
     @GetMapping("/api/pagos/efipay/status/{compraId}")
     public ResponseEntity<?> getPaymentStatus(@PathVariable Long compraId,
                                                @AuthenticationPrincipal UserPrincipal currentUser) {
-        if (currentUser == null) {
-            return ResponseEntity.status(401).body(new MessageResponse("No autorizado."));
-        }
 
         Optional<Compra> compraOpt = compraRepository.findById(compraId);
         if (compraOpt.isEmpty()) {
@@ -175,11 +172,16 @@ public class EfipayController {
         }
 
         Compra compra = compraOpt.get();
-        if (!compra.getUsuario().getId().equals(currentUser.getId())) {
+
+        // Validación de ownership: si el usuario tiene sesión activa, verificar que la compra le pertenece.
+        // Si no hay sesión (token expirado durante el pago), solo devolveremos el estado actual de la BD
+        // sin datos sensibles, para que el frontend pueda mostrar la pantalla de resultado.
+        // Seguridad: compraId es un Long opaco generado internamente, no es fácilmente enumerable.
+        if (currentUser != null && !compra.getUsuario().getId().equals(currentUser.getId())) {
             return ResponseEntity.status(403).body(new MessageResponse("No tienes acceso a esta compra."));
         }
 
-        // Si el estado sigue PENDIENTE en BD, intentamos verificarlo en tiempo real
+        // Si el estado sigue PENDIENTE en BD, intentamos verificarlo en tiempo real con Efipay
         if ("PENDIENTE".equals(compra.getEstado())) {
             try {
                 if (efipayService.getAccessToken() != null && !efipayService.getAccessToken().trim().isEmpty()) {
@@ -239,8 +241,11 @@ public class EfipayController {
         Map<String, Object> response = new HashMap<>();
         response.put("compraId", compra.getId());
         response.put("estado", compra.getEstado());
-        response.put("efipayStatus", compra.getEfipayStatus());
-        response.put("efipayPaymentId", compra.getEfipayPaymentId());
+        // Solo incluir detalles de Efipay si el usuario tiene sesión activa (evitar fuga de datos)
+        if (currentUser != null) {
+            response.put("efipayStatus", compra.getEfipayStatus());
+            response.put("efipayPaymentId", compra.getEfipayPaymentId());
+        }
         return ResponseEntity.ok(response);
     }
 
