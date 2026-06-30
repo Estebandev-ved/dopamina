@@ -423,8 +423,9 @@ class ApiService {
   }
 
   // Cupones Public
-  publicValidarCupon(codigo) {
-    return this.get(`/api/public/cupones/validar?codigo=${codigo}`);
+  publicValidarCupon(codigo, cantidad = '') {
+    const qtyParam = cantidad !== '' ? `&cantidad=${cantidad}` : '';
+    return this.get(`/api/public/cupones/validar?codigo=${codigo}${qtyParam}`);
   }
 
   // Cupones Admin

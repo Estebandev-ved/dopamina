@@ -22,7 +22,9 @@ public class PublicCuponController {
 
     /** Validates if a coupon exists and is active, returning its discount. */
     @GetMapping("/validar")
-    public ResponseEntity<?> validarCupon(@RequestParam("codigo") String codigo) {
+    public ResponseEntity<?> validarCupon(
+            @RequestParam("codigo") String codigo,
+            @RequestParam(value = "cantidad", required = false) Integer cantidad) {
         if (codigo == null || codigo.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(new MessageResponse("Código de cupón vacío."));
         }
@@ -37,10 +39,17 @@ public class PublicCuponController {
             return ResponseEntity.badRequest().body(new MessageResponse("El cupón ingresado no está activo o ya venció."));
         }
 
+        if (cantidad != null && cupon.getMinBoletas() != null && cantidad < cupon.getMinBoletas()) {
+            return ResponseEntity.badRequest().body(new MessageResponse(
+                "El cupón '" + cupon.getCodigo() + "' requiere la compra de mínimo " + cupon.getMinBoletas() + " boletas."
+            ));
+        }
+
         Map<String, Object> response = new HashMap<>();
         response.put("codigo", cupon.getCodigo().toUpperCase());
         response.put("descuentoPorcentaje", cupon.getDescuentoPorcentaje());
         response.put("descripcion", cupon.getDescripcion());
+        response.put("minBoletas", cupon.getMinBoletas() != null ? cupon.getMinBoletas() : 1);
         response.put("valido", true);
 
         return ResponseEntity.ok(response);

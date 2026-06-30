@@ -33,6 +33,7 @@ export default function Checkout() {
   const [couponDiscountPercent, setCouponDiscountPercent] = useState(0);
   const [couponApplied, setCouponApplied] = useState(false);
   const [couponError, setCouponError] = useState('');
+  const [couponMinTickets, setCouponMinTickets] = useState(1);
 
   // Promo de "10% por 4+ boletas": es de un solo uso por usuario.
   const [promoParcheDisponible, setPromoParcheDisponible] = useState(true);
@@ -56,11 +57,12 @@ export default function Checkout() {
 
     if (targetCoupon) {
       setCouponCode(targetCoupon);
-      api.publicValidarCupon(targetCoupon)
+      api.publicValidarCupon(targetCoupon, cantidad)
         .then(res => {
           if (res.valido) {
             setCouponApplied(true);
             setCouponDiscountPercent(res.descuentoPorcentaje);
+            setCouponMinTickets(res.minBoletas || 1);
           }
         })
         .catch(err => console.log('Error al autoaplicar cupón sorpresa:', err));
@@ -117,18 +119,21 @@ export default function Checkout() {
     if (!couponCode.trim()) return;
 
     try {
-      const res = await api.publicValidarCupon(couponCode.trim());
+      const res = await api.publicValidarCupon(couponCode.trim(), cantidad);
       if (res.valido) {
         setCouponApplied(true);
         setCouponDiscountPercent(res.descuentoPorcentaje);
+        setCouponMinTickets(res.minBoletas || 1);
       } else {
         setCouponApplied(false);
         setCouponDiscountPercent(0);
+        setCouponMinTickets(1);
         setCouponError('Código de cupón inválido o inactivo.');
       }
     } catch (err) {
       setCouponApplied(false);
       setCouponDiscountPercent(0);
+      setCouponMinTickets(1);
       setCouponError(err.message || 'Error al validar el cupón.');
     }
   };
@@ -137,6 +142,12 @@ export default function Checkout() {
     const newQty = cantidad + val;
     if (newQty >= 1 && newQty <= 10) {
       setCantidad(newQty);
+      // Validar si la nueva cantidad no cumple la condición del cupón ya aplicado
+      if (couponApplied && newQty < couponMinTickets) {
+        setCouponApplied(false);
+        setCouponDiscountPercent(0);
+        setCouponError(`El cupón requiere la compra de mínimo ${couponMinTickets} boletas.`);
+      }
     }
   };
 
