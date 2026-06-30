@@ -35,6 +35,9 @@ public class Cupon {
     @Column(name = "max_usos")
     private Integer maxUsos = 0; // 0 o null = ilimitado
 
+    @Column(name = "min_boletas")
+    private Integer minBoletas = 1; // Mínimo de boletas requeridas (por defecto 1)
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

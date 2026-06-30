@@ -48,6 +48,7 @@ public class AdminCuponController {
         public Boolean activo;
         public String descripcion;
         public Integer maxUsos;
+        public Integer minBoletas;
         public long usosActuales;
         public List<UsoUsuario> usuarios;
     }
@@ -75,6 +76,7 @@ public class AdminCuponController {
             r.activo = cupon.getActivo();
             r.descripcion = cupon.getDescripcion();
             r.maxUsos = cupon.getMaxUsos();
+            r.minBoletas = cupon.getMinBoletas();
 
             // Buscar compras que usaron este cupón
             List<Compra> compras = compraRepository.findUsagesByCodigoCupon(cupon.getCodigo());
@@ -120,6 +122,7 @@ public class AdminCuponController {
         nuevoCupon.setCodigo(codigoNormalized);
         nuevoCupon.setActivo(nuevoCupon.getActivo() != null ? nuevoCupon.getActivo() : true);
         nuevoCupon.setMaxUsos(nuevoCupon.getMaxUsos() != null ? nuevoCupon.getMaxUsos() : 0);
+        nuevoCupon.setMinBoletas(nuevoCupon.getMinBoletas() != null ? nuevoCupon.getMinBoletas() : 1);
         Cupon saved = cuponRepository.save(nuevoCupon);
         return ResponseEntity.ok(saved);
     }

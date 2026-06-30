@@ -121,6 +121,11 @@ public class CompraServiceImpl implements CompraService {
                     throw new RuntimeException("El cupón '" + cupon.getCodigo() + "' ya no está disponible (alcanzó su límite máximo de usos).");
                 }
             }
+
+            // Validar mínimo de boletas requeridas
+            if (cupon.getMinBoletas() != null && cantidad < cupon.getMinBoletas()) {
+                throw new RuntimeException("El cupón '" + cupon.getCodigo() + "' requiere la compra de mínimo " + cupon.getMinBoletas() + " boletas.");
+            }
             
             descuento = subtotal * (cupon.getDescuentoPorcentaje() / 100.0);
         } else if (cantidad >= 4 && !compraRepository.usuarioYaUsoPromoParche(user.getId())) {

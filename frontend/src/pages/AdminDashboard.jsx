@@ -429,7 +429,7 @@ export default function AdminDashboard() {
   // Estados para Cupones
   const [cupones, setCupones] = useState([]);
   const [loadingCupones, setLoadingCupones] = useState(false);
-  const [formCupon, setFormCupon] = useState({ codigo: '', descuentoPorcentaje: '', descripcion: '', activo: true, maxUsos: '' });
+  const [formCupon, setFormCupon] = useState({ codigo: '', descuentoPorcentaje: '', descripcion: '', activo: true, maxUsos: '', minBoletas: '' });
   const [searchCupon, setSearchCupon] = useState('');
   const [selectedCuponReport, setSelectedCuponReport] = useState(null);
 
@@ -514,9 +514,10 @@ export default function AdminDashboard() {
         descuentoPorcentaje: discount,
         descripcion: formCupon.descripcion,
         activo: formCupon.activo,
-        maxUsos: formCupon.maxUsos ? parseInt(formCupon.maxUsos) : 0
+        maxUsos: formCupon.maxUsos ? parseInt(formCupon.maxUsos) : 0,
+        minBoletas: formCupon.minBoletas ? parseInt(formCupon.minBoletas) : 1
       });
-      setFormCupon({ codigo: '', descuentoPorcentaje: '', descripcion: '', activo: true, maxUsos: '' });
+      setFormCupon({ codigo: '', descuentoPorcentaje: '', descripcion: '', activo: true, maxUsos: '', minBoletas: '' });
       fetchCupones();
       fetchAll();
     } catch (err) {
@@ -2324,6 +2325,30 @@ export default function AdminDashboard() {
                           </div>
                         </td>
                         <td style={tdStyle}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontWeight: 700, color: theme.textSec, fontFamily: 'monospace' }}>
+                              {c.usosActuales || 0} / {c.maxUsos && c.maxUsos > 0 ? c.maxUsos : '♾️'}
+                            </span>
+                            {c.usuarios && c.usuarios.length > 0 && (
+                              <button
+                                onClick={() => setSelectedCuponReport(c)}
+                                style={{
+                                  background: 'rgba(177,78,255,0.12)', border: 'none', color: theme.accentLight,
+                                  padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.68rem', fontWeight: 700,
+                                  display: 'flex', alignItems: 'center', gap: '2px'
+                                }}
+                              >
+                                👥 Ver
+                              </button>
+                            )}
+                          </div>
+                          {c.minBoletas && c.minBoletas > 1 && (
+                            <div style={{ fontSize: '0.68rem', color: theme.accentLight, marginTop: '2px', fontWeight: 600 }}>
+                              Min. boletas: {c.minBoletas}
+                            </div>
+                          )}
+                        </td>
+                        <td style={tdStyle}>
                           <span style={badgeStyle(c.activo ? theme.success : theme.danger)}>
                             {c.activo ? 'ACTIVO' : 'INACTIVO'}
                           </span>
@@ -2400,19 +2425,25 @@ export default function AdminDashboard() {
                 </button>
               </div>
 
-              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                <div style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: `1px solid ${theme.border}`, textAlign: 'center' }}>
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 120px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: `1px solid ${theme.border}`, textAlign: 'center' }}>
                   <span style={{ display: 'block', fontSize: '0.7rem', color: theme.textMuted, textTransform: 'uppercase', fontWeight: 700 }}>Descuento</span>
                   <span style={{ fontSize: '1.4rem', fontWeight: 800, color: theme.accentLight }}>{selectedCuponReport.descuentoPorcentaje}%</span>
                 </div>
-                <div style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: `1px solid ${theme.border}`, textAlign: 'center' }}>
+                <div style={{ flex: '1 1 120px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: `1px solid ${theme.border}`, textAlign: 'center' }}>
                   <span style={{ display: 'block', fontSize: '0.7rem', color: theme.textMuted, textTransform: 'uppercase', fontWeight: 700 }}>Usos Totales</span>
                   <span style={{ fontSize: '1.4rem', fontWeight: 800, color: theme.success }}>{selectedCuponReport.usosActuales}</span>
                 </div>
-                <div style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: `1px solid ${theme.border}`, textAlign: 'center' }}>
+                <div style={{ flex: '1 1 120px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: `1px solid ${theme.border}`, textAlign: 'center' }}>
                   <span style={{ display: 'block', fontSize: '0.7rem', color: theme.textMuted, textTransform: 'uppercase', fontWeight: 700 }}>Límite Global</span>
                   <span style={{ fontSize: '1.4rem', fontWeight: 800, color: theme.text }}>
                     {selectedCuponReport.maxUsos && selectedCuponReport.maxUsos > 0 ? selectedCuponReport.maxUsos : 'Ilimitado'}
+                  </span>
+                </div>
+                <div style={{ flex: '1 1 120px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: `1px solid ${theme.border}`, textAlign: 'center' }}>
+                  <span style={{ display: 'block', fontSize: '0.7rem', color: theme.textMuted, textTransform: 'uppercase', fontWeight: 700 }}>Mín. Boletas</span>
+                  <span style={{ fontSize: '1.4rem', fontWeight: 800, color: theme.textSec }}>
+                    {selectedCuponReport.minBoletas || 1}
                   </span>
                 </div>
               </div>
@@ -2449,7 +2480,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+              <div style={{ display: 'flex', justifyOrigin: 'flex-end', justifyContent: 'flex-end', marginTop: '10px' }}>
                 <button 
                   onClick={() => setSelectedCuponReport(null)}
                   style={{ ...btnPrimary, padding: '10px 20px', background: 'rgba(255,255,255,0.05)', border: `1px solid ${theme.border}`, color: theme.textSec }}
