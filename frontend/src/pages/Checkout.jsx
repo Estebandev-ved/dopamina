@@ -80,20 +80,10 @@ export default function Checkout() {
 
   const getSeededViewers = (eventoId) => {
     const now = new Date();
-    const hour = now.getHours();
-    let hourFactor = 1.0;
-    if (hour >= 18 && hour <= 23) hourFactor = 2.2;
-    else if (hour >= 12 && hour < 18) hourFactor = 1.5;
-    else if (hour >= 0 && hour < 4) hourFactor = 1.8;
-    else hourFactor = 0.6;
-
-    const baseViewers = ((Number(eventoId) * 13) % 7) + 6; // 6 to 12
-    const minute = now.getMinutes();
-    const minuteVariation = (minute % 5) - 2; // -2 to +2
     const second = now.getSeconds();
-    const secondFluctuation = (second % 3) - 1; // -1 to +1
-
-    return Math.max(4, Math.round(baseViewers * hourFactor + minuteVariation + secondFluctuation));
+    const minute = now.getMinutes();
+    // Fluctuación consistente entre 14 y 26
+    return 14 + (second % 6) + (minute % 3) * 2;
   };
 
   useEffect(() => {
@@ -359,29 +349,23 @@ export default function Checkout() {
                    </div>
  
                    {(() => {
-                     const real24h = selectedEvento.vendidasUltimas24h || 0;
-                     const display24h = real24h > 0 ? real24h : ((selectedEvento.id * 3) % 4 + 2);
- 
-                     const realMin = selectedEvento.minutosDesdeUltimaCompra;
-                     let displayMin = null;
-                     if (realMin !== null && realMin !== undefined && realMin < 180) {
-                       displayMin = realMin;
-                     } else {
-                       displayMin = ((selectedEvento.id * 13) % 45) + 7;
-                     }
- 
-                     // Simulated active carts: between 1 and 3
-                     const activeCarts = ((selectedEvento.id * 7) % 3) + 1;
+                      const now = new Date();
+                      const second = now.getSeconds();
+                      const minute = now.getMinutes();
+
+                      const display24h = 3 + (second % 3);
+                      const displayMin = 9 + (minute % 14);
+                      const activeCarts = 2 + (second % 2);
  
                      return (
                        <div className="space-y-1.5 text-gray-400">
                          <p className="flex items-center gap-1.5">
                            <Ticket className="w-3.5 h-3.5 text-gray-500" />
-                           <span><strong>{display24h} boletas</strong> adquiridas en las últimas 24 horas.</span>
+                           <span><strong>{display24h} {display24h === 1 ? 'boleta' : 'boletas'}</strong> {display24h === 1 ? 'adquirida' : 'adquiridas'} en las últimas 24 horas.</span>
                          </p>
                          <p className="flex items-center gap-1.5">
                            <Zap className="w-3.5 h-3.5 text-neon-glow" />
-                           <span>Última entrada comprada hace <strong>{displayMin} minutos</strong>.</span>
+                           <span>Última entrada comprada hace <strong>{displayMin} {displayMin === 1 ? 'minuto' : 'minutos'}</strong>.</span>
                          </p>
                          <p className="flex items-center gap-1.5 text-amber-400/90 font-semibold">
                            <ShoppingCart className="w-3.5 h-3.5 text-amber-400" />
