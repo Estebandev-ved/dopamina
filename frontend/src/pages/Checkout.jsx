@@ -401,6 +401,17 @@ export default function Checkout() {
                       <ArrowRight className="w-4 h-4" />
                     </span>
                   </button>
+
+                  <div className="mt-4 flex items-center justify-center gap-2 p-2 rounded-lg bg-black/40 border border-industrial-800">
+                    <img 
+                      src="https://upload.wikimedia.org/wikipedia/commons/f/f3/Logo-nequi.svg" 
+                      alt="Nequi" 
+                      className="h-3.5 object-contain" 
+                    />
+                    <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">
+                      • PSE • TARJETAS • EFIPAY
+                    </span>
+                  </div>
                   
                   <p className="text-[9px] text-center text-gray-500 mt-3 leading-relaxed">
                     Las entradas serán almacenadas en tu perfil web de inmediato y enviadas a tu correo para mayor comodidad.

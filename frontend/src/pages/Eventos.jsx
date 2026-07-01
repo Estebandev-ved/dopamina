@@ -649,6 +649,21 @@ export default function Eventos() {
                     </span>
                   </div>
 
+                  {/* Nequi notice */}
+                  <div className="bg-black/35 border border-industrial-850 rounded p-2.5 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <img 
+                        src="https://upload.wikimedia.org/wikipedia/commons/f/f3/Logo-nequi.svg" 
+                        alt="Nequi" 
+                        className="h-3.5 object-contain" 
+                      />
+                      <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">
+                        Paga fácil con Nequi, PSE y Tarjetas
+                      </span>
+                    </div>
+                    <span className="text-[9px] text-emerald-400 font-mono font-bold uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">RÁPIDO</span>
+                  </div>
+
                   {/* Price Summary and Checkout CTA */}
                   <div className="border-t border-industrial-850 pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="text-center sm:text-left">

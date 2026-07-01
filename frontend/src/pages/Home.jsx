@@ -266,6 +266,10 @@ export default function Home() {
       a: "Totalmente. Nuestra plataforma cuenta con certificados de seguridad SSL de 256 bits para proteger tus datos de registro y pago. Adicionalmente, el sistema genera códigos QR únicos con identificadores UUID independientes para cada boleta. Cada entrada se valida en tiempo real en la puerta, haciendo imposible la clonación o reventa no autorizada."
     },
     {
+      q: "¿Cuáles son los métodos de pago aceptados?",
+      a: "Aceptamos pagos rápidos y 100% seguros con Nequi, cuentas de ahorro/corriente a través de PSE y Tarjetas de Crédito de cualquier franquicia (Visa, Mastercard, Amex) a través de la pasarela de pagos Efipay. Al completar el pago, tus boletas se generarán de inmediato en tu perfil."
+    },
+    {
       q: "¿Pueden ingresar menores de edad?",
       a: "NO. El evento es de carácter exclusivo para mayores de 18 años (+18). Al ingresar se exigirá la presentación del documento de identidad físico y original (cédula o pasaporte). No se admiten menores de edad. En caso de que un menor adquiera una boleta y se presente al evento, no se le permitirá el ingreso y NO se realizarán reembolsos de dinero bajo ningún motivo."
     },
@@ -360,6 +364,24 @@ export default function Home() {
                 : "VALOR PREVENTA: $25.000 COP • CUPO LIMITADO"
               }
             </p>
+
+            {/* Payment methods notice in Hero */}
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5 p-2 px-4 rounded-lg bg-industrial-950/40 border border-industrial-850/80 max-w-sm mx-auto">
+              <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">
+                Paga fácil con:
+              </span>
+              <div className="flex items-center gap-2.5">
+                <img 
+                  src="https://upload.wikimedia.org/wikipedia/commons/f/f3/Logo-nequi.svg" 
+                  alt="Nequi" 
+                  className="h-3.5 object-contain" 
+                />
+                <span className="text-[10px] text-gray-500 font-bold">•</span>
+                <span className="text-[10px] text-gray-400 font-black tracking-widest font-mono">PSE</span>
+                <span className="text-[10px] text-gray-500 font-bold">•</span>
+                <span className="text-[10px] text-gray-400 font-bold font-mono">TARJETAS</span>
+              </div>
+            </div>
           </div>
 
           {/* SPONSORS TICKER */}
