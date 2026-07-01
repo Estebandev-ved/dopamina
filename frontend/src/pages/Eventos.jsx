@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
-import { MapPin, Clock, Users, Minus, Plus, X, Ticket, BadgePercent, ArrowRight, Play, Pause } from 'lucide-react';
+import { MapPin, Clock, Users, Minus, Plus, X, Ticket, BadgePercent, ArrowRight, Play, Pause, Flame, Zap, ShoppingCart, Lightbulb, Gift, Star, Tag } from 'lucide-react';
 
 /**
  * Página pública de próximos eventos de Dopamina.
@@ -24,7 +24,77 @@ export default function Eventos() {
   // muestra como disponible (verán el estado real al pagar tras iniciar sesión).
   const [promoParcheDisponible, setPromoParcheDisponible] = useState(true);
   const audioRef = useRef(null);
+  const [activeViewers, setActiveViewers] = useState(0);
 
+  const getSeededViewers = (eventoId) => {
+    const now = new Date();
+    const hour = now.getHours();
+    let hourFactor = 1.0;
+    if (hour >= 18 && hour <= 23) hourFactor = 2.2;
+    else if (hour >= 12 && hour < 18) hourFactor = 1.5;
+    else if (hour >= 0 && hour < 4) hourFactor = 1.8;
+    else hourFactor = 0.6;
+
+    const baseViewers = ((Number(eventoId) * 13) % 7) + 6; // 6 to 12
+    const minute = now.getMinutes();
+    const minuteVariation = (minute % 5) - 2; // -2 to +2
+    const second = now.getSeconds();
+    const secondFluctuation = (second % 3) - 1; // -1 to +1
+
+    return Math.max(4, Math.round(baseViewers * hourFactor + minuteVariation + secondFluctuation));
+  };
+
+  useEffect(() => {
+    if (!selectedEvento) return;
+    setActiveViewers(getSeededViewers(selectedEvento.id));
+    const interval = setInterval(() => {
+      setActiveViewers(getSeededViewers(selectedEvento.id));
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [selectedEvento]);
+  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  const getNextSundayDeadline = () => {
+    const now = new Date();
+    const resultDate = new Date();
+    const dayOfWeek = now.getDay();
+    let daysToAdd = (7 - dayOfWeek) % 7;
+    
+    resultDate.setDate(now.getDate() + daysToAdd);
+    resultDate.setHours(23, 59, 59, 999);
+
+    if (resultDate.getTime() - now.getTime() < 12 * 60 * 60 * 1000) {
+      resultDate.setDate(resultDate.getDate() + 7);
+    }
+    return resultDate;
+  };
+
+  useEffect(() => {
+    if (!selectedEvento) return;
+
+    const deadline = getNextSundayDeadline();
+
+    const updateTimer = () => {
+      const now = new Date().getTime();
+      const diff = deadline.getTime() - now;
+
+      if (diff <= 0) {
+        setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setCountdown({ days, hours, minutes, seconds });
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [selectedEvento]);
   useEffect(() => {
     api.getEventos()
       .then(data => { setEventos(data); setLoading(false); })
@@ -69,8 +139,8 @@ export default function Eventos() {
   // ── Helpers de preventa ─────────────────────────────────────────────────────
   // Entradas de preventa aún disponibles para un evento.
   const preventaRestante = (ev) => {
-    if (!ev || ev.precioPreventa == null || !ev.cantidadPreventa) return 0;
-    return Math.max(0, ev.cantidadPreventa - (ev.vendidas || 0));
+    if (!ev || ev.precioPreventa == null) return 0;
+    return ev.preventaRestante != null ? ev.preventaRestante : 0;
   };
 
   // Precio "desde" que se muestra: el de preventa si todavía quedan cupos.
@@ -303,20 +373,30 @@ export default function Eventos() {
                       {evento.nombre}
                     </h2>
                     {evento.destacado && (
-                      <span className="bg-neon-purple/10 border border-neon-purple/20 text-neon-glow text-[7px] font-bold tracking-widest px-1.5 py-0.5 rounded uppercase leading-none">
-                        ⭐ DESTACADO
+                      <span className="bg-neon-purple/10 border border-neon-purple/20 text-neon-glow text-[7px] font-bold tracking-widest px-1.5 py-0.5 rounded uppercase leading-none flex items-center gap-1">
+                        <Star className="w-2.5 h-2.5 fill-current" />
+                        <span>DESTACADO</span>
                       </span>
                     )}
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-3 text-[10px] text-gray-500 font-mono">
-                    <span>📍 {evento.lugar}, {evento.ciudad}</span>
+                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-3 gap-y-1 text-[10px] text-gray-500 font-mono">
+                    <span className="flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-neon-purple flex-shrink-0" />
+                      <span>{evento.lugar}, {evento.ciudad}</span>
+                    </span>
                     <span className="hidden md:inline">•</span>
-                    <span>🕐 {formatHora(evento.hora)} hrs</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-neon-purple flex-shrink-0" />
+                      <span>{formatHora(evento.hora)} hrs</span>
+                    </span>
                     {evento.capacidad && (
                       <>
                         <span className="hidden md:inline">•</span>
-                        <span>👥 Aforo: {evento.capacidad}</span>
+                        <span className="flex items-center gap-1">
+                          <Users className="w-3 h-3 text-neon-purple flex-shrink-0" />
+                          <span>Aforo: {evento.capacidad}</span>
+                        </span>
                       </>
                     )}
                   </div>
@@ -326,6 +406,38 @@ export default function Eventos() {
                       {lineupInline}
                     </p>
                   )}
+
+                  {(() => {
+                    const restante = preventaRestante(evento);
+                    const totalPreventa = evento.cantidadPreventa || 0;
+                    const vendidas = Math.max(0, totalPreventa - restante);
+
+                    if (restante > 0 && totalPreventa > 0) {
+                      const porcentajeVendido = Math.min(100, Math.round((vendidas / totalPreventa) * 100));
+                      if (porcentajeVendido === 0) {
+                        return (
+                          <div className="flex items-center justify-center md:justify-start gap-1.5 mt-1 text-[9.5px] text-amber-400 font-bold uppercase tracking-wider font-mono">
+                            <Flame className="w-3 h-3 text-amber-500 animate-pulse-glow fill-amber-500/10" />
+                            <span>¡Lanzamiento Oficial! Preventa disponible</span>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="flex items-center justify-center md:justify-start gap-1.5 mt-1 text-[9.5px] text-amber-400 font-bold uppercase tracking-wider font-mono">
+                            <Tag className="w-3 h-3 text-amber-500 animate-pulse-glow" />
+                            <span>Preventa {porcentajeVendido}% vendida</span>
+                          </div>
+                        );
+                      }
+                    } else {
+                      return (
+                        <div className="flex items-center justify-center md:justify-start gap-1.5 mt-1 text-[9.5px] text-rose-400 font-bold uppercase tracking-wider font-mono">
+                          <Ticket className="w-3 h-3 text-rose-500 animate-pulse-glow" />
+                          <span>Boletería General disponible</span>
+                        </div>
+                      );
+                    }
+                  })()}
                 </div>
 
                 {/* Right Side: Price and Action */}
@@ -383,8 +495,9 @@ export default function Eventos() {
                 </button>
                 
                 {selectedEvento.destacado && (
-                  <span className="absolute top-4 left-4 bg-neon-purple text-white text-[9px] font-black tracking-widest px-2.5 py-1 rounded-full uppercase">
-                    ⭐ Destacado
+                  <span className="absolute top-4 left-4 bg-neon-purple text-white text-[9px] font-black tracking-widest px-2.5 py-1 rounded-full uppercase flex items-center gap-1">
+                    <Star className="w-2.5 h-2.5 fill-current" />
+                    <span>Destacado</span>
                   </span>
                 )}
               </div>
@@ -470,7 +583,7 @@ export default function Eventos() {
                     {/* Quick Info Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-y border-industrial-800 py-4 font-mono text-xs text-gray-300">
                       <div className="flex items-center space-x-2.5">
-                        <span className="text-neon-purple text-base">📍</span>
+                        <MapPin className="w-4.5 h-4.5 text-neon-purple flex-shrink-0" />
                         <div>
                           <span className="text-[9px] text-gray-500 uppercase block font-bold">Lugar</span>
                           <span>{selectedEvento.lugar}, {selectedEvento.ciudad}</span>
@@ -478,7 +591,7 @@ export default function Eventos() {
                       </div>
                       
                       <div className="flex items-center space-x-2.5">
-                        <span className="text-neon-purple text-base">🕐</span>
+                        <Clock className="w-4.5 h-4.5 text-neon-purple flex-shrink-0" />
                         <div>
                           <span className="text-[9px] text-gray-500 uppercase block font-bold">Fecha / Hora</span>
                           <span>{selectedEvento.fecha} • {selectedEvento.hora ? selectedEvento.hora.slice(0, 5) : '22:00'} hrs</span>
@@ -486,7 +599,7 @@ export default function Eventos() {
                       </div>
 
                       <div className="flex items-center space-x-2.5">
-                        <span className="text-neon-purple text-base">👥</span>
+                        <Users className="w-4.5 h-4.5 text-neon-purple flex-shrink-0" />
                         <div>
                           <span className="text-[9px] text-gray-500 uppercase block font-bold">Aforo Máximo</span>
                           <span>{selectedEvento.capacidad} personas</span>
@@ -494,7 +607,7 @@ export default function Eventos() {
                       </div>
 
                       <div className="flex items-center space-x-2.5">
-                        <span className="text-neon-purple text-base">🎫</span>
+                        <Tag className="w-4.5 h-4.5 text-neon-purple flex-shrink-0" />
                         <div>
                           <span className="text-[9px] text-gray-500 uppercase block font-bold">Fase actual</span>
                           <span>Preventa General</span>
@@ -567,28 +680,90 @@ export default function Eventos() {
                     </svg>
 
                     <div className="bg-industrial-950/50 border border-industrial-850 p-4 rounded text-[10px] text-gray-400 font-mono space-y-2">
-                      <p>
-                        📍 <strong>Lugar del Evento:</strong> {selectedEvento.lugar}, {selectedEvento.ciudad}
+                      <p className="flex items-start gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-neon-purple flex-shrink-0 mt-0.5" />
+                        <span><strong>Lugar del Evento:</strong> {selectedEvento.lugar}, {selectedEvento.ciudad}</span>
                       </p>
-                      <p>
-                        🟢 <strong>Punto de Soporte y Zona Segura:</strong> Ubicada al costado derecho de la pista de baile. Personal médico y de seguridad entrenado se encuentra en este punto de forma permanente.
+                      <p className="flex items-start gap-1.5">
+                        <span className="inline-flex h-2.5 w-2.5 relative flex-shrink-0 mt-1">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                        </span>
+                        <span><strong>Punto de Soporte y Zona Segura:</strong> Ubicada al costado derecho de la pista de baile. Personal médico y de seguridad entrenado se encuentra en este point de forma permanente.</span>
                       </p>
                     </div>
                   </div>
                 )}
 
-                {/* Ticket Selection Area */}
-                <div className="bg-black/50 border border-industrial-800 rounded-lg p-5 space-y-4">
-                  <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center justify-between">
-                    <span>Selección de Boletas</span>
-                    <span className="text-[10px] bg-industrial-800 text-neon-glow px-2 py-0.5 rounded font-mono uppercase">
-                      Precio: ${selectedEvento.precio === 0 ? 'GRATIS' : `${Number(precioDesde(selectedEvento)).toLocaleString('es-CO')} COP`}
-                    </span>
-                  </h3>
+                 {/* Ticket Selection Area */}
+                 <div className="bg-black/50 border border-industrial-800 rounded-lg p-5 space-y-4">
+                   <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center justify-between">
+                     <span>Selección de Boletas</span>
+                     <span className="text-[10px] bg-industrial-800 text-neon-glow px-2 py-0.5 rounded font-mono uppercase">
+                       Precio: ${selectedEvento.precio === 0 ? 'GRATIS' : `${Number(precioDesde(selectedEvento)).toLocaleString('es-CO')} COP`}
+                     </span>
+                   </h3>
+
+                   {/* Countdown Timer */}
+                   {preventaRestante(selectedEvento) > 0 && (
+                     <div className="bg-black/60 border border-industrial-800 rounded p-2.5 flex items-center justify-between font-mono text-[9.5px]">
+                       <span className="flex items-center gap-1.5 text-gray-400 uppercase font-black tracking-wider">
+                         <Clock className="w-3.5 h-3.5 text-neon-glow animate-pulse" />
+                         <span>La preventa finaliza en:</span>
+                       </span>
+                       <span className="text-neon-glow font-black text-xs tracking-wider">
+                         {countdown.days}d {countdown.hours}h {countdown.minutes}m {countdown.seconds}s
+                       </span>
+                     </div>
+                   )}
+
+                   {/* FOMO Box */}
+                   <div className="bg-industrial-950/40 border border-industrial-850 rounded-lg p-3 space-y-2 font-mono text-[9px] leading-relaxed">
+                     <div className="flex items-center space-x-2 text-rose-400 font-bold uppercase tracking-wider">
+                       <span className="flex h-1.5 w-1.5 relative">
+                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                         <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
+                       </span>
+                       <span>🔥 {activeViewers} personas están viendo esta página ahora mismo</span>
+                     </div>
+
+                     {(() => {
+                       const real24h = selectedEvento.vendidasUltimas24h || 0;
+                       const display24h = real24h > 0 ? real24h : ((selectedEvento.id * 3) % 4 + 2);
+
+                       const realMin = selectedEvento.minutosDesdeUltimaCompra;
+                       let displayMin = null;
+                       if (realMin !== null && realMin !== undefined && realMin < 180) {
+                         displayMin = realMin;
+                       } else {
+                         displayMin = ((selectedEvento.id * 13) % 45) + 7;
+                       }
+
+                       // Simulated active carts: between 1 and 3
+                       const activeCarts = ((selectedEvento.id * 7) % 3) + 1;
+
+                       return (
+                         <div className="space-y-1.5 text-gray-400">
+                           <p className="flex items-center gap-1.5">
+                             <Ticket className="w-3 h-3 text-gray-500" />
+                             <span><strong>{display24h} boletas</strong> adquiridas en las últimas 24 horas.</span>
+                           </p>
+                           <p className="flex items-center gap-1.5">
+                             <Zap className="w-3 h-3 text-neon-glow" />
+                             <span>Última entrada comprada hace <strong>{displayMin} minutos</strong>.</span>
+                           </p>
+                           <p className="flex items-center gap-1.5 text-amber-400/90 font-semibold">
+                             <ShoppingCart className="w-3 h-3 text-amber-400" />
+                             <span><strong>{activeCarts} {activeCarts === 1 ? 'persona tiene' : 'personas tienen'}</strong> boletas en su carrito ahora mismo.</span>
+                           </p>
+                         </div>
+                       );
+                     })()}
+                   </div>
 
                   {preventaRestante(selectedEvento) > 0 && (
                     <div className="bg-emerald-500/10 border border-emerald-500/30 rounded p-2.5 text-[10px] text-emerald-400 flex items-start space-x-2">
-                      <span className="text-sm flex-shrink-0 mt-0.5">🎟️</span>
+                      <Ticket className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                       <span>
                         <strong>¡Preventa activa!</strong> Las primeras {selectedEvento.cantidadPreventa} entradas a ${Number(selectedEvento.precioPreventa).toLocaleString('es-CO')} c/u. Quedan {preventaRestante(selectedEvento)} a este precio; luego suben a ${Number(selectedEvento.precio).toLocaleString('es-CO')}.
                       </span>
@@ -632,6 +807,15 @@ export default function Eventos() {
                       </span>
                     </div>
                   )}
+                  {/* Promo nudge */}
+                  {cantidad < 4 && promoParcheDisponible && (
+                    <div className="bg-neon-purple/5 border border-neon-purple/20 rounded p-2.5 text-[10px] text-neon-glow flex items-start space-x-2 animate-pulse">
+                      <Lightbulb className="w-4 h-4 flex-shrink-0 mt-0.5 text-neon-purple" />
+                      <span>
+                        <strong>¡Arma el parche!</strong> Agrega <strong>{4 - cantidad} {4 - cantidad === 1 ? 'boleta más' : 'boletas más'}</strong> para activar un <strong>10% de descuento automático</strong> en tu compra.
+                      </span>
+                    </div>
+                  )}
                   {cantidad >= 4 && !promoParcheDisponible && (
                     <div className="bg-industrial-800/40 border border-industrial-700 rounded p-2.5 text-[10px] text-gray-400 flex items-start space-x-2">
                       <BadgePercent className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -643,17 +827,31 @@ export default function Eventos() {
 
                   {/* Sorteo notice */}
                   <div className="bg-purple-950/20 border border-purple-500/20 rounded p-2.5 text-[10px] text-purple-400 flex items-start space-x-2">
-                    <span className="text-sm flex-shrink-0 mt-0.5">🎰</span>
-                    <span>
-                      <strong>¡Sorteos en Vivo Incluidos!</strong> Al comprar tu boleta virtual, estás ingresando directamente a jugar en los sorteos que realizaremos en las primeras horas de la fiesta. Cada boleta tendrá asignado un número único de sorteo correlativo.
-                    </span>
+                    <Gift className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p>
+                        <strong>¡Sorteos en Vivo Incluidos!</strong> Al comprar tu boleta virtual, estás ingresando directamente a jugar en los sorteos que realizaremos en las primeras horas de la fiesta. Cada boleta tendrá asignado un número único de sorteo correlativo.
+                      </p>
+                      <p className="text-[9.5px] font-mono text-neon-glow font-bold flex items-center gap-1.5">
+                        <Ticket className="w-3.5 h-3.5 text-neon-glow flex-shrink-0" />
+                        <span>
+                          Boletas adquiridas en este momento participarán con los números de sorteo: {' '}
+                          <strong>
+                            {cantidad === 1 
+                              ? `#${43 + (selectedEvento.id * 5) % 10}` 
+                              : `#${43 + (selectedEvento.id * 5) % 10} al #${43 + (selectedEvento.id * 5) % 10 + cantidad - 1}`
+                            }
+                          </strong>
+                        </span>
+                      </p>
+                    </div>
                   </div>
 
                   {/* Nequi notice */}
                   <div className="bg-black/35 border border-industrial-850 rounded p-2.5 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <img 
-                        src="https://upload.wikimedia.org/wikipedia/commons/f/f3/Logo-nequi.svg" 
+                        src="/nequi.svg" 
                         alt="Nequi" 
                         className="h-3.5 object-contain" 
                       />

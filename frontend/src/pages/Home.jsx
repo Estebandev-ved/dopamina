@@ -44,6 +44,31 @@ export default function Home() {
   const [sets, setSets] = useState([]);
   const [currentSetIdx, setCurrentSetIdx] = useState(0);
   const [showSetSelector, setShowSetSelector] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState(24);
+
+  // Live active users fluctuation
+  useEffect(() => {
+    const getSeededUsers = () => {
+      const now = new Date();
+      const minute = now.getMinutes();
+      const hour = now.getHours();
+      let mult = 1.0;
+      if (hour >= 18 && hour <= 23) mult = 2.4;
+      else if (hour >= 12 && hour < 18) mult = 1.6;
+      else if (hour >= 0 && hour < 4) mult = 1.9;
+      else mult = 0.7;
+
+      const base = ((minute % 7) * 4) + 22; // 22 to 46 base
+      const fluctuation = (now.getSeconds() % 6) - 3; // -3 to +2
+      return Math.round(base * mult + fluctuation);
+    };
+
+    setOnlineUsers(getSeededUsers());
+    const interval = setInterval(() => {
+      setOnlineUsers(getSeededUsers());
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
   const playerRef = useRef(null);
   const playerReadyRef = useRef(false);
   const containerRefPlayer = useRef(null);
@@ -365,6 +390,24 @@ export default function Home() {
               }
             </p>
 
+            {/* FOMO activity banner */}
+            {featuredEvent && (
+              <div className="flex items-center justify-center gap-3 text-[10px] font-mono text-gray-400 mt-2 bg-black/45 px-4 py-1.5 rounded-full border border-industrial-850 max-w-sm mx-auto shadow-neon-sm">
+                <span className="flex items-center gap-1.5 text-rose-400 font-bold uppercase tracking-wider">
+                  <span className="flex h-1.5 w-1.5 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
+                  </span>
+                  {onlineUsers} en línea
+                </span>
+                <span className="text-gray-600 font-bold">•</span>
+                <span className="flex items-center gap-1 text-gray-300 font-bold uppercase tracking-wider">
+                  <Flame className="w-3.5 h-3.5 text-rose-500 fill-rose-500/20" />
+                  <span>¡Boletería de lanzamiento activa!</span>
+                </span>
+              </div>
+            )}
+
             {/* Payment methods notice in Hero */}
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5 p-2 px-4 rounded-lg bg-industrial-950/40 border border-industrial-850/80 max-w-sm mx-auto">
               <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">
@@ -372,7 +415,7 @@ export default function Home() {
               </span>
               <div className="flex items-center gap-2.5">
                 <img 
-                  src="https://upload.wikimedia.org/wikipedia/commons/f/f3/Logo-nequi.svg" 
+                  src="/nequi.svg" 
                   alt="Nequi" 
                   className="h-3.5 object-contain" 
                 />

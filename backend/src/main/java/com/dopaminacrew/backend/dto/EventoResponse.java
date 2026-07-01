@@ -22,7 +22,9 @@ public class EventoResponse {
     private Double precio;
     private Double precioPreventa;
     private Integer cantidadPreventa;
-    private Integer vendidas;        // entradas ya vendidas (para calcular cupo de preventa)
+    private Integer preventaRestante; // Entradas de preventa restantes (oculta métrica global)
+    private Integer minutosDesdeUltimaCompra;
+    private Integer vendidasUltimas24h;
     private Integer capacidad;
     private String imagenUrl;
     private String lineup;

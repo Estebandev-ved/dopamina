@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -111,6 +112,19 @@ public class EventoServiceImpl {
     private EventoResponse toResponse(Evento e) {
         // Entradas ocupadas (pagadas + reservas vigentes): cifra usada para el cupo de preventa.
         int vendidas = compraRepository.contarEntradasOcupadas(e.getId());
+        int preventaRestante = 0;
+        if (e.getCantidadPreventa() != null && e.getCantidadPreventa() > 0) {
+            preventaRestante = Math.max(0, e.getCantidadPreventa() - vendidas);
+        }
+
+        LocalDateTime ultimaCompra = compraRepository.obtenerFechaUltimaCompra(e.getId());
+        Integer minutosDesdeUltima = null;
+        if (ultimaCompra != null) {
+            minutosDesdeUltima = (int) java.time.Duration.between(ultimaCompra, LocalDateTime.now()).toMinutes();
+        }
+
+        int vendidas24h = compraRepository.contarEntradasVendidasUltimas24h(e.getId(), LocalDateTime.now().minusDays(1));
+
         return new EventoResponse(
                 e.getId(),
                 e.getNombre(),
@@ -122,7 +136,9 @@ public class EventoServiceImpl {
                 e.getPrecio() != null ? e.getPrecio().doubleValue() : 0.0,
                 e.getPrecioPreventa() != null ? e.getPrecioPreventa().doubleValue() : null,
                 e.getCantidadPreventa(),
-                vendidas,
+                preventaRestante,
+                minutosDesdeUltima,
+                vendidas24h,
                 e.getCapacidad(),
                 e.getImagenUrl(),
                 e.getLineup(),

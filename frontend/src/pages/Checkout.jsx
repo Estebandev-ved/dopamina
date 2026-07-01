@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../services/api';
 import PageTransition from '../components/PageTransition';
-import { ShieldCheck, CreditCard, BadgePercent, Lock, ArrowRight, Minus, Plus, AlertCircle } from 'lucide-react';
+import { ShieldCheck, CreditCard, BadgePercent, Lock, ArrowRight, Minus, Plus, AlertCircle, Flame, Zap, ShoppingCart, Gift, Ticket, Star, Tag } from 'lucide-react';
 
 /**
  * Checkout page for ticket bookings.
@@ -76,12 +76,46 @@ export default function Checkout() {
       .catch(() => setPromoParcheDisponible(false));
   }, []);
 
+  const [activeViewers, setActiveViewers] = useState(0);
+
+  const getSeededViewers = (eventoId) => {
+    const now = new Date();
+    const hour = now.getHours();
+    let hourFactor = 1.0;
+    if (hour >= 18 && hour <= 23) hourFactor = 2.2;
+    else if (hour >= 12 && hour < 18) hourFactor = 1.5;
+    else if (hour >= 0 && hour < 4) hourFactor = 1.8;
+    else hourFactor = 0.6;
+
+    const baseViewers = ((Number(eventoId) * 13) % 7) + 6; // 6 to 12
+    const minute = now.getMinutes();
+    const minuteVariation = (minute % 5) - 2; // -2 to +2
+    const second = now.getSeconds();
+    const secondFluctuation = (second % 3) - 1; // -1 to +1
+
+    return Math.max(4, Math.round(baseViewers * hourFactor + minuteVariation + secondFluctuation));
+  };
+
+  useEffect(() => {
+    if (!selectedEvento) return;
+    setActiveViewers(getSeededViewers(selectedEvento.id));
+    const interval = setInterval(() => {
+      setActiveViewers(getSeededViewers(selectedEvento.id));
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [selectedEvento]);
+
   if (!currentUser || api.isTokenExpired()) {
     return null;
   }
   if (!selectedEvento) {
     return null;
   }
+
+  // Entradas de preventa aún disponibles (para mostrar aviso al usuario)
+  const preventaRestante = (selectedEvento && selectedEvento.precioPreventa != null)
+    ? (selectedEvento.preventaRestante != null ? selectedEvento.preventaRestante : 0)
+    : 0;
 
   // Subtotal con preventa: las primeras 'cantidadPreventa' entradas (descontando las
   // ya vendidas) van a 'precioPreventa'; el resto al precio regular. Refleja exactamente
@@ -91,9 +125,7 @@ export default function Checkout() {
     const precioRegular = selectedEvento.precio || 0;
     const pp = selectedEvento.precioPreventa;
     const cp = selectedEvento.cantidadPreventa;
-    const vendidas = selectedEvento.vendidas || 0;
     if (pp != null && cp != null && cp > 0) {
-      const preventaRestante = Math.max(0, cp - vendidas);
       const enPreventa = Math.min(cantidad, preventaRestante);
       const enRegular = cantidad - enPreventa;
       return enPreventa * pp + enRegular * precioRegular;
@@ -101,10 +133,6 @@ export default function Checkout() {
     return cantidad * precioRegular;
   };
   const subtotal = calcSubtotal();
-  // Entradas de preventa aún disponibles (para mostrar aviso al usuario)
-  const preventaRestante = (selectedEvento && selectedEvento.precioPreventa != null && selectedEvento.cantidadPreventa)
-    ? Math.max(0, selectedEvento.cantidadPreventa - (selectedEvento.vendidas || 0))
-    : 0;
   // Precio unitario a mostrar: preventa si aún quedan cupos, si no el regular.
   const precioUnitario = preventaRestante > 0 ? selectedEvento.precioPreventa : (selectedEvento?.precio || 0);
   // La promo de parche (10%) solo aplica si: no hay cupón, son 4+ boletas y el usuario no la ha usado.
@@ -267,7 +295,7 @@ export default function Checkout() {
 
                 {/* Sorteo notice */}
                 <div className="mt-3 bg-purple-950/10 border border-purple-500/20 rounded p-3 text-xs text-gray-300 flex items-start space-x-2.5">
-                  <span className="text-md flex-shrink-0 mt-0.5">🎰</span>
+                  <Gift className="w-4.5 h-4.5 text-purple-400 flex-shrink-0 mt-0.5" />
                   <div>
                     <span className="font-bold text-white">Sorteos de la Noche Incluidos:</span> Al completar tu compra, cada boleta virtual en tu perfil recibirá un número único de sorteo correlativo para participar en los sorteos en vivo que realizaremos durante las primeras horas de la fiesta.
                   </div>
@@ -307,11 +335,66 @@ export default function Checkout() {
               </div>
             </div>
 
-            {/* RIGHT COLUMN: PRICE BREAKDOWN & SUBMIT */}
-            <div className="space-y-6">
-              
-              {/* Price Summary */}
-              <div className="bg-industrial-900 border border-industrial-800 rounded-lg p-6 relative overflow-hidden">
+             {/* RIGHT COLUMN: PRICE BREAKDOWN & SUBMIT */}
+             <div className="space-y-6">
+ 
+               {/* FOMO Box */}
+               <div className="bg-industrial-900 border border-industrial-800 rounded-lg p-5 space-y-3">
+                 <h4 className="text-[10px] font-black text-white uppercase tracking-widest font-mono border-b border-industrial-800 pb-2 flex items-center justify-between">
+                   <span className="flex items-center gap-1.5">
+                     <Zap className="w-3.5 h-3.5 text-neon-glow" />
+                     <span>Compra Segura en Progreso</span>
+                   </span>
+                   <span className="text-[9px] bg-rose-500/10 border border-rose-500/20 text-rose-400 px-1.5 py-0.5 rounded font-mono uppercase animate-pulse">Alta Demanda</span>
+                 </h4>
+                 
+                 <div className="bg-industrial-950/40 border border-industrial-850 rounded-lg p-3.5 space-y-2 font-mono text-[10px] leading-relaxed">
+                   <div className="flex items-center space-x-2 text-rose-400 font-bold uppercase tracking-wider">
+                     <span className="flex h-1.5 w-1.5 relative">
+                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                       <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
+                     </span>
+                     <Flame className="w-3.5 h-3.5 text-rose-400 fill-rose-400/20" />
+                     <span>{activeViewers} personas están viendo esta página ahora mismo</span>
+                   </div>
+ 
+                   {(() => {
+                     const real24h = selectedEvento.vendidasUltimas24h || 0;
+                     const display24h = real24h > 0 ? real24h : ((selectedEvento.id * 3) % 4 + 2);
+ 
+                     const realMin = selectedEvento.minutosDesdeUltimaCompra;
+                     let displayMin = null;
+                     if (realMin !== null && realMin !== undefined && realMin < 180) {
+                       displayMin = realMin;
+                     } else {
+                       displayMin = ((selectedEvento.id * 13) % 45) + 7;
+                     }
+ 
+                     // Simulated active carts: between 1 and 3
+                     const activeCarts = ((selectedEvento.id * 7) % 3) + 1;
+ 
+                     return (
+                       <div className="space-y-1.5 text-gray-400">
+                         <p className="flex items-center gap-1.5">
+                           <Ticket className="w-3.5 h-3.5 text-gray-500" />
+                           <span><strong>{display24h} boletas</strong> adquiridas en las últimas 24 horas.</span>
+                         </p>
+                         <p className="flex items-center gap-1.5">
+                           <Zap className="w-3.5 h-3.5 text-neon-glow" />
+                           <span>Última entrada comprada hace <strong>{displayMin} minutos</strong>.</span>
+                         </p>
+                         <p className="flex items-center gap-1.5 text-amber-400/90 font-semibold">
+                           <ShoppingCart className="w-3.5 h-3.5 text-amber-400" />
+                           <span><strong>{activeCarts} {activeCarts === 1 ? 'persona tiene' : 'personas tienen'}</strong> boletas en su carrito ahora mismo.</span>
+                         </p>
+                       </div>
+                     );
+                   })()}
+                 </div>
+               </div>
+               
+               {/* Price Summary */}
+               <div className="bg-industrial-900 border border-industrial-800 rounded-lg p-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-24 h-24 bg-neon-purple/5 blur-xl pointer-events-none" />
                 
                 <h3 className="text-sm font-black text-white uppercase tracking-wider mb-6 pb-2 border-b border-industrial-800">
@@ -320,8 +403,9 @@ export default function Checkout() {
 
                 <div className="space-y-3 text-xs font-mono">
                   {preventaRestante > 0 && (
-                    <div className="text-emerald-400 text-[11px] font-bold normal-case bg-emerald-500/10 border border-emerald-500/20 rounded px-2 py-1.5">
-                      🎟️ Preventa activa: ${Number(selectedEvento.precioPreventa).toLocaleString('es-CO')} c/u — quedan {preventaRestante} entradas a este precio.
+                    <div className="text-emerald-400 text-[11px] font-bold normal-case bg-emerald-500/10 border border-emerald-500/20 rounded px-2 py-1.5 flex items-center gap-1.5">
+                      <Ticket className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Preventa activa: ${Number(selectedEvento.precioPreventa).toLocaleString('es-CO')} c/u — quedan {preventaRestante} entradas a este precio.</span>
                     </div>
                   )}
                   <div className="flex justify-between text-gray-400">
@@ -404,7 +488,7 @@ export default function Checkout() {
 
                   <div className="mt-4 flex items-center justify-center gap-2 p-2 rounded-lg bg-black/40 border border-industrial-800">
                     <img 
-                      src="https://upload.wikimedia.org/wikipedia/commons/f/f3/Logo-nequi.svg" 
+                      src="/nequi.svg" 
                       alt="Nequi" 
                       className="h-3.5 object-contain" 
                     />

@@ -66,12 +66,13 @@ public class CompraServiceImpl implements CompraService {
                 price = evento.getPrecio().doubleValue();
             }
 
-            // Limit event capacity to 1000 tickets.
+            // Limit event capacity dynamically.
             // 'sold' = entradas pagadas + pendientes con reserva vigente (ver repositorio).
             int sold = compraRepository.contarEntradasOcupadas(evento.getId());
+            int capacidad = evento.getCapacidad() != null ? evento.getCapacidad() : 1000;
 
-            if (sold + cantidad > 1000) {
-                int cuposRestantes = 1000 - sold;
+            if (sold + cantidad > capacidad) {
+                int cuposRestantes = capacidad - sold;
                 throw new RuntimeException("Error: Aforo completo del evento alcanzado. Solo quedan "
                         + (cuposRestantes > 0 ? cuposRestantes : 0) + " entradas disponibles.");
             }

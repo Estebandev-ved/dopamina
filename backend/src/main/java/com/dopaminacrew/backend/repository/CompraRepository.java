@@ -39,6 +39,13 @@ public interface CompraRepository extends JpaRepository<Compra, Long> {
 
     Compra findByEfipayPaymentId(String efipayPaymentId);
 
+    @Query("SELECT MAX(c.createdAt) FROM Compra c WHERE c.evento.id = :eventoId AND (c.estado = 'PAGADO' OR c.estado = 'REGALADA')")
+    LocalDateTime obtenerFechaUltimaCompra(@Param("eventoId") Long eventoId);
+
+    @Query("SELECT COALESCE(SUM(c.cantidad), 0) FROM Compra c WHERE c.evento.id = :eventoId "
+            + "AND (c.estado = 'PAGADO' OR c.estado = 'REGALADA') AND c.createdAt >= :hace24h")
+    int contarEntradasVendidasUltimas24h(@Param("eventoId") Long eventoId, @Param("hace24h") LocalDateTime hace24h);
+
     @Query("SELECT COUNT(c) FROM Compra c WHERE c.usuario.id = :usuarioId AND c.codigoCupon = :cupon")
     long countByUsuarioIdAndCodigoCupon(@Param("usuarioId") Long usuarioId, @Param("cupon") String cupon);
 
