@@ -126,6 +126,61 @@ public class DatabaseFixer implements CommandLineRunner {
             System.err.println("Error creando o sembrando la tabla cupones: " + e.getMessage());
         }
 
+        try {
+            jdbcTemplate.execute("ALTER TABLE cupones ADD COLUMN promotor_id BIGINT DEFAULT NULL;");
+            jdbcTemplate.execute("ALTER TABLE cupones ADD CONSTRAINT fk_cupones_promotor FOREIGN KEY (promotor_id) REFERENCES usuarios(id) ON DELETE SET NULL ON UPDATE CASCADE;");
+            System.out.println("✔ Columna promotor_id y FK agregadas a cupones.");
+        } catch (Exception e) {
+            System.out.println("Info: Columna promotor_id en cupones ya existe o no se pudo agregar: " + e.getMessage());
+        }
+
+        try {
+            jdbcTemplate.execute("ALTER TABLE compras ADD COLUMN cantidad_preventa INT DEFAULT 0;");
+            System.out.println("✔ Columna cantidad_preventa agregada a compras.");
+        } catch (Exception e) {
+            System.out.println("Info: Columna cantidad_preventa en compras ya existe o no se pudo agregar: " + e.getMessage());
+        }
+
+        try {
+            jdbcTemplate.execute("ALTER TABLE compras ADD COLUMN cantidad_regular INT DEFAULT 0;");
+            System.out.println("✔ Columna cantidad_regular agregada a compras.");
+        } catch (Exception e) {
+            System.out.println("Info: Columna cantidad_regular en compras ya existe o no se pudo agregar: " + e.getMessage());
+        }
+
+        try {
+            jdbcTemplate.execute("ALTER TABLE compras ADD COLUMN comision_promotor DECIMAL(10,2) DEFAULT 0.00;");
+            System.out.println("✔ Columna comision_promotor agregada a compras.");
+        } catch (Exception e) {
+            System.out.println("Info: Columna comision_promotor en compras ya existe o no se pudo agregar: " + e.getMessage());
+        }
+
+        // Datos bancarios para giros a promotores
+        try {
+            jdbcTemplate.execute("ALTER TABLE usuarios ADD COLUMN cuenta_bancaria VARCHAR(30) DEFAULT NULL;");
+            System.out.println("✔ Columna cuenta_bancaria agregada a usuarios.");
+        } catch (Exception e) {
+            System.out.println("Info: Columna cuenta_bancaria ya existe: " + e.getMessage());
+        }
+        try {
+            jdbcTemplate.execute("ALTER TABLE usuarios ADD COLUMN banco VARCHAR(80) DEFAULT NULL;");
+            System.out.println("✔ Columna banco agregada a usuarios.");
+        } catch (Exception e) {
+            System.out.println("Info: Columna banco ya existe: " + e.getMessage());
+        }
+        try {
+            jdbcTemplate.execute("ALTER TABLE usuarios ADD COLUMN titular_cuenta VARCHAR(100) DEFAULT NULL;");
+            System.out.println("✔ Columna titular_cuenta agregada a usuarios.");
+        } catch (Exception e) {
+            System.out.println("Info: Columna titular_cuenta ya existe: " + e.getMessage());
+        }
+        try {
+            jdbcTemplate.execute("ALTER TABLE usuarios ADD COLUMN tipo_cuenta VARCHAR(20) DEFAULT NULL;");
+            System.out.println("✔ Columna tipo_cuenta agregada a usuarios.");
+        } catch (Exception e) {
+            System.out.println("Info: Columna tipo_cuenta ya existe: " + e.getMessage());
+        }
+
         System.out.println("====== REPARACION DE BASE DE DATOS FINALIZADA ======");
     }
 }

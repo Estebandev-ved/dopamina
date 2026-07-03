@@ -43,6 +43,7 @@ const SIDEBAR_ITEMS = [
   { id: 'puerta', label: 'Puerta', icon: 'Q' },
   { id: 'sorteos', label: 'Sorteos', icon: 'T' },
   { id: 'cupones', label: 'Cupones', icon: 'K' },
+  { id: 'promotores', label: 'Promotores', icon: 'P' },
   { id: 'sugerencias', label: 'Sugerencias', icon: 'I' },
   { id: 'visitas', label: 'Visitas', icon: 'V' },
   { id: 'sets', label: 'Sets', icon: 'M' },
@@ -377,6 +378,7 @@ export default function AdminDashboard() {
   const [formEvento, setFormEvento] = useState({
     nombre: '', descripcion: '', fecha: '', hora: '', lugar: '',
     ciudad: 'Medellín', precio: 0, capacidad: 100, imagenUrl: '', lineup: '', activo: true, destacado: false,
+    precioPreventa: '', cantidadPreventa: '',
   });
 
   const [showArtistaForm, setShowArtistaForm] = useState(false);
@@ -429,9 +431,13 @@ export default function AdminDashboard() {
   // Estados para Cupones
   const [cupones, setCupones] = useState([]);
   const [loadingCupones, setLoadingCupones] = useState(false);
-  const [formCupon, setFormCupon] = useState({ codigo: '', descuentoPorcentaje: '', descripcion: '', activo: true, maxUsos: '', minBoletas: '' });
+  const [formCupon, setFormCupon] = useState({ codigo: '', descuentoPorcentaje: '', descripcion: '', activo: true, maxUsos: '', minBoletas: '', promotorId: '' });
   const [searchCupon, setSearchCupon] = useState('');
   const [selectedCuponReport, setSelectedCuponReport] = useState(null);
+
+  // Estados para Promotores (solo admin)
+  const [promotores, setPromotores] = useState([]);
+  const [loadingPromotores, setLoadingPromotores] = useState(false);
 
   // Estados para Sets Musicales
   const [sets, setSets] = useState([]);
@@ -499,6 +505,18 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  const fetchPromotores = useCallback(async () => {
+    setLoadingPromotores(true);
+    try {
+      const data = await api.adminGetPromotores();
+      setPromotores(data || []);
+    } catch (err) {
+      console.error('Error fetching promotores:', err);
+    } finally {
+      setLoadingPromotores(false);
+    }
+  }, []);
+
   const handleCreateCupon = async (e) => {
     e.preventDefault();
     if (!formCupon.codigo.trim()) return;
@@ -515,9 +533,10 @@ export default function AdminDashboard() {
         descripcion: formCupon.descripcion,
         activo: formCupon.activo,
         maxUsos: formCupon.maxUsos ? parseInt(formCupon.maxUsos) : 0,
-        minBoletas: formCupon.minBoletas ? parseInt(formCupon.minBoletas) : 1
+        minBoletas: formCupon.minBoletas ? parseInt(formCupon.minBoletas) : 1,
+        promotor: formCupon.promotorId ? { id: parseInt(formCupon.promotorId) } : null
       });
-      setFormCupon({ codigo: '', descuentoPorcentaje: '', descripcion: '', activo: true, maxUsos: '', minBoletas: '' });
+      setFormCupon({ codigo: '', descuentoPorcentaje: '', descripcion: '', activo: true, maxUsos: '', minBoletas: '', promotorId: '' });
       fetchCupones();
       fetchAll();
     } catch (err) {
@@ -705,7 +724,8 @@ export default function AdminDashboard() {
     if (activeTab === 'visitas') fetchVisitStats();
     if (activeTab === 'sets') fetchSets();
     if (activeTab === 'sugerencias') fetchSugerencias();
-  }, [activeTab, fetchVisitStats, fetchSets, fetchSugerencias]);
+    if (activeTab === 'promotores') fetchPromotores();
+  }, [activeTab, fetchVisitStats, fetchSets, fetchSugerencias, fetchPromotores]);
 
   // ── Derived chart data ──
   const comprasConEvento = useMemo(() => compras.filter(c => c.eventoNombre), [compras]);
@@ -835,7 +855,13 @@ export default function AdminDashboard() {
   const handleSubmitEvento = async (e) => {
     e.preventDefault();
     try {
-      const data = { ...formEvento, precio: parseFloat(formEvento.precio), capacidad: parseInt(formEvento.capacidad) };
+      const data = { 
+        ...formEvento, 
+        precio: parseFloat(formEvento.precio), 
+        capacidad: parseInt(formEvento.capacidad),
+        precioPreventa: formEvento.precioPreventa !== '' && formEvento.precioPreventa !== null ? parseFloat(formEvento.precioPreventa) : null,
+        cantidadPreventa: formEvento.cantidadPreventa !== '' && formEvento.cantidadPreventa !== null ? parseInt(formEvento.cantidadPreventa) : null
+      };
       if (editingEvento) {
         const updated = await api.adminActualizarEvento(editingEvento.id, data);
         setEventos(prev => prev.map(ev => ev.id === editingEvento.id ? updated : ev));
@@ -844,7 +870,7 @@ export default function AdminDashboard() {
         setEventos(prev => [...prev, created]);
       }
       setShowForm(false); setEditingEvento(null);
-      setFormEvento({ nombre: '', descripcion: '', fecha: '', hora: '', lugar: '', ciudad: 'Medellín', precio: 0, capacidad: 100, imagenUrl: '', lineup: '', activo: true, destacado: false });
+      setFormEvento({ nombre: '', descripcion: '', fecha: '', hora: '', lugar: '', ciudad: 'Medellín', precio: 0, capacidad: 100, imagenUrl: '', lineup: '', activo: true, destacado: false, precioPreventa: '', cantidadPreventa: '' });
     } catch (err) { setError('Error al guardar el evento: ' + (err.message || err)); }
   };
 
@@ -1067,11 +1093,19 @@ export default function AdminDashboard() {
               <input required style={inputStyle} value={formEvento.ciudad} onChange={e => setFormEvento({ ...formEvento, ciudad: e.target.value })} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>PRECIO (COP)</label>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>PRECIO REGULAR (COP)</label>
               <input type="number" style={inputStyle} value={formEvento.precio} onChange={e => setFormEvento({ ...formEvento, precio: e.target.value })} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>CAPACIDAD</label>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>PRECIO PREVENTA (COP - Opcional)</label>
+              <input type="number" style={inputStyle} value={formEvento.precioPreventa} onChange={e => setFormEvento({ ...formEvento, precioPreventa: e.target.value })} placeholder="Ej. 25000" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>BOLETAS PREVENTA (Opcional)</label>
+              <input type="number" style={inputStyle} value={formEvento.cantidadPreventa} onChange={e => setFormEvento({ ...formEvento, cantidadPreventa: e.target.value })} placeholder="Ej. 100" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>AFAORO / CAPACIDAD TOTAL</label>
               <input type="number" style={inputStyle} value={formEvento.capacidad} onChange={e => setFormEvento({ ...formEvento, capacidad: e.target.value })} />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
@@ -1101,7 +1135,7 @@ export default function AdminDashboard() {
       ) : (
         <Section icon="calendar" title={`Gestión de Eventos (${filteredEventos.length})`}
           extra={
-            <button onClick={() => { setEditingEvento(null); setFormEvento({ nombre: '', descripcion: '', fecha: '', hora: '', lugar: '', ciudad: 'Medellín', precio: 0, capacidad: 100, imagenUrl: '', lineup: '', activo: true, destacado: false }); setShowForm(true); }}
+            <button onClick={() => { setEditingEvento(null); setFormEvento({ nombre: '', descripcion: '', fecha: '', hora: '', lugar: '', ciudad: 'Medellín', precio: 0, capacidad: 100, imagenUrl: '', lineup: '', activo: true, destacado: false, precioPreventa: '', cantidadPreventa: '' }); setShowForm(true); }}
               style={{ ...btnPrimary, padding: '8px 18px' }}>
               + Nuevo Evento
             </button>
@@ -1133,7 +1167,7 @@ export default function AdminDashboard() {
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <button onClick={() => { setEditingEvento(e); setFormEvento({ nombre: e.nombre||'', descripcion: e.descripcion||'', fecha: e.fecha||'', hora: e.hora||'', lugar: e.lugar||'', ciudad: e.ciudad||'Medellín', precio: e.precio||0, capacidad: e.capacidad||100, imagenUrl: e.imagenUrl||'', lineup: e.lineup||'', activo: e.activo!==undefined?e.activo:true, destacado: e.destacado!==undefined?e.destacado:false }); setShowForm(true); }}
+                        <button onClick={() => { setEditingEvento(e); setFormEvento({ nombre: e.nombre||'', descripcion: e.descripcion||'', fecha: e.fecha||'', hora: e.hora||'', lugar: e.lugar||'', ciudad: e.ciudad||'Medellín', precio: e.precio||0, capacidad: e.capacidad||100, imagenUrl: e.imagenUrl||'', lineup: e.lineup||'', activo: e.activo!==undefined?e.activo:true, destacado: e.destacado!==undefined?e.destacado:false, precioPreventa: e.precioPreventa!==null&&e.precioPreventa!==undefined?e.precioPreventa:'', cantidadPreventa: e.cantidadPreventa!==null&&e.cantidadPreventa!==undefined?e.cantidadPreventa:'' }); setShowForm(true); }}
                           style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${theme.border}`, color: theme.textSec, borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}>Editar</button>
                         <button onClick={() => handleDeleteEvento(e.id)} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: theme.danger, borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}>Eliminar</button>
                       </div>
@@ -1348,14 +1382,15 @@ export default function AdminDashboard() {
                             }}
                           >
                             <option value="ROLE_USER">USER</option>
+                            <option value="ROLE_PROMOTER">PROMOTOR</option>
                             <option value="ROLE_SUBADMIN">SUBADMIN</option>
                             <option value="ROLE_ADMIN">ADMIN</option>
                           </select>
                         );
                       } else {
                         return (
-                          <span style={badgeStyle(u.rol === 'ROLE_ADMIN' ? theme.warning : u.rol === 'ROLE_SUBADMIN' ? theme.accent : theme.info)}>
-                            {u.rol === 'ROLE_ADMIN' ? 'ADMIN' : u.rol === 'ROLE_SUBADMIN' ? 'SUBADMIN' : 'USER'}
+                          <span style={badgeStyle(u.rol === 'ROLE_ADMIN' ? theme.warning : u.rol === 'ROLE_SUBADMIN' ? theme.accent : (u.rol === 'ROLE_PROMOTER' ? theme.success : theme.info))}>
+                            {u.rol === 'ROLE_ADMIN' ? 'ADMIN' : u.rol === 'ROLE_SUBADMIN' ? 'SUBADMIN' : (u.rol === 'ROLE_PROMOTER' ? 'PROMOTOR' : 'USER')}
                           </span>
                         );
                       }
@@ -2202,6 +2237,77 @@ export default function AdminDashboard() {
     );
   };
 
+  const renderPromotores = () => {
+    const totalComision = promotores.reduce((acc, p) => acc + (p.totalComisionAcumulada || 0), 0);
+    const totalUsos = promotores.reduce((acc, p) => acc + (p.usosActuales || 0), 0);
+
+    return (
+      <motion.div key="promotores" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+        {/* KPIs */}
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+          {[
+            { label: 'Total Promotores', value: promotores.length, color: theme.accentLight },
+            { label: 'Boletas Vendidas (total)', value: totalUsos, color: theme.success },
+            { label: 'Comisiones Totales', value: `$${totalComision.toLocaleString('es-CO')} COP`, color: '#f59e0b' },
+          ].map(kpi => (
+            <div key={kpi.label} style={{ flex: '1 1 180px', background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '18px 22px' }}>
+              <div style={{ fontSize: '0.7rem', color: theme.textMuted, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', marginBottom: '8px' }}>{kpi.label}</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 900, color: kpi.color }}>{kpi.value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Tabla de promotores */}
+        <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '14px', padding: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h3 style={{ color: theme.text, fontSize: '1rem', fontWeight: 800, margin: 0, textTransform: 'uppercase', letterSpacing: '1px' }}>Red de Promotores</h3>
+            <button onClick={fetchPromotores} style={{ background: 'rgba(177,78,255,0.1)', border: `1px solid ${theme.border}`, color: theme.accentLight, padding: '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}>↻ Actualizar</button>
+          </div>
+
+          {loadingPromotores ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: theme.textMuted }}>Cargando promotores...</div>
+          ) : promotores.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: theme.textMuted }}>No hay promotores con cupones asignados aún.</div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    {['Promotor', 'Email', 'Código Cupón', 'Usos', 'Prev. Vendidas', 'Reg. Vendidas', 'Ventas Generadas', 'Comisión (10%)', 'Estado Cupón'].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {promotores.map(p => (
+                    <tr key={p.id}>
+                      <td style={{ ...tdStyle, fontWeight: 700, color: theme.text }}>{p.promotorNombre}</td>
+                      <td style={{ ...tdStyle, fontSize: '0.78rem', color: theme.textMuted }}>{p.promotorEmail}</td>
+                      <td style={{ ...tdStyle, fontFamily: 'monospace', fontWeight: 800, color: theme.accentLight }}>{p.codigo}</td>
+                      <td style={{ ...tdStyle, fontWeight: 700, textAlign: 'center' }}>{p.usosActuales || 0}</td>
+                      <td style={{ ...tdStyle, textAlign: 'center', color: theme.success }}>{p.totalPreventa || 0}</td>
+                      <td style={{ ...tdStyle, textAlign: 'center', color: theme.info || theme.accentLight }}>{p.totalRegular || 0}</td>
+                      <td style={{ ...tdStyle, fontWeight: 700, color: theme.warning }}>
+                        ${((p.totalPreventa || 0) * 25000 + (p.totalRegular || 0) * 35000).toLocaleString('es-CO')}
+                      </td>
+                      <td style={{ ...tdStyle, fontWeight: 900, color: theme.success }}>
+                        ${(p.totalComisionAcumulada || 0).toLocaleString('es-CO')}
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={badgeStyle(p.activo ? theme.success : theme.danger)}>
+                          {p.activo ? 'ACTIVO' : 'INACTIVO'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    );
+  };
+
   const renderCupones = () => {
     const filteredCupones = cupones.filter(c => 
       c.codigo?.toLowerCase().includes(searchCupon.toLowerCase()) || 
@@ -2270,6 +2376,20 @@ export default function AdminDashboard() {
                 onChange={e => setFormCupon(prev => ({ ...prev, minBoletas: e.target.value }))} 
               />
 
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>Promotor Asociado</label>
+              <select
+                style={{ ...inputStyle, background: 'rgba(0,0,0,0.6)', border: `1px solid ${theme.border}`, cursor: 'pointer' }}
+                value={formCupon.promotorId}
+                onChange={e => setFormCupon(prev => ({ ...prev, promotorId: e.target.value }))}
+              >
+                <option value="">Ninguno (Cupón general)</option>
+                {usuarios.filter(u => u.rol === 'ROLE_PROMOTER').map(u => (
+                  <option key={u.id} value={u.id}>
+                    {u.nombre} ({u.email})
+                  </option>
+                ))}
+              </select>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
                 <input 
                   type="checkbox" 
@@ -2306,13 +2426,23 @@ export default function AdminDashboard() {
                 <table style={tableStyle}>
                   <thead>
                     <tr>
-                      {['Código', 'Descuento', 'Descripción', 'Usos', 'Estado', 'Creado', 'Acciones'].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                      {['Código', 'Promotor', 'Descuento', 'Descripción', 'Usos', 'Estado', 'Creado', 'Acciones'].map(h => <th key={h} style={thStyle}>{h}</th>)}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredCupones.map(c => (
                       <tr key={c.id}>
                         <td style={{ ...tdStyle, fontWeight: 800, color: theme.accentLight, fontFamily: 'monospace' }}>{c.codigo}</td>
+                        <td style={tdStyle}>
+                          {c.promotorNombre ? (
+                            <div>
+                              <div style={{ fontWeight: 700, color: theme.text, fontSize: '0.8rem' }}>{c.promotorNombre}</div>
+                              <div style={{ fontSize: '0.68rem', color: theme.textMuted }}>{c.promotorEmail}</div>
+                            </div>
+                          ) : (
+                            <span style={{ color: theme.textMuted, fontSize: '0.78rem' }}>General</span>
+                          )}
+                        </td>
                         <td style={{ ...tdStyle, fontWeight: 700, color: theme.text }}>{c.descuentoPorcentaje}%</td>
                         <td style={tdStyle}>{c.descripcion || '—'}</td>
                         <td style={tdStyle}>
@@ -2434,6 +2564,20 @@ export default function AdminDashboard() {
                   &times;
                 </button>
               </div>
+
+              {selectedCuponReport.promotorNombre && (
+                <div style={{ background: 'rgba(177,78,255,0.03)', padding: '14px', borderRadius: '10px', border: `1px dashed rgba(177,78,255,0.2)`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px', marginBottom: '14px' }}>
+                  <div>
+                    <span style={{ display: 'block', fontSize: '0.65rem', color: theme.accentLight, textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Promotor Vinculado</span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 700, color: theme.text }}>{selectedCuponReport.promotorNombre}</span>
+                    <span style={{ fontSize: '0.75rem', color: theme.textMuted, marginLeft: '6px' }}>({selectedCuponReport.promotorEmail})</span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ display: 'block', fontSize: '0.65rem', color: theme.success, textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Comisiones Acumuladas</span>
+                    <span style={{ fontSize: '1.1rem', fontWeight: 900, color: theme.success }}>${(selectedCuponReport.totalComisionAcumulada || 0).toLocaleString('es-CO')} COP</span>
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                 <div style={{ flex: '1 1 120px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: `1px solid ${theme.border}`, textAlign: 'center' }}>
@@ -3043,6 +3187,7 @@ export default function AdminDashboard() {
           {activeTab === 'regalos' && api.getUser()?.rol === 'ROLE_ADMIN' && renderRegalos()}
           {activeTab === 'sorteos' && renderSorteos()}
           {activeTab === 'cupones' && api.getUser()?.rol === 'ROLE_ADMIN' && renderCupones()}
+          {activeTab === 'promotores' && api.getUser()?.rol === 'ROLE_ADMIN' && renderPromotores()}
           {activeTab === 'visitas' && renderVisitas()}
           {activeTab === 'sets' && renderSets()}
           {activeTab === 'sugerencias' && renderSugerencias()}

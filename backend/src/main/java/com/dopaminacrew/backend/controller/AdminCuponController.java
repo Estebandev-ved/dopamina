@@ -30,6 +30,9 @@ public class AdminCuponController {
     @Autowired
     private CompraRepository compraRepository;
 
+    @Autowired
+    private com.dopaminacrew.backend.repository.UserRepository userRepository;
+
     /** DTO para detallar el uso de un cupón por un usuario. */
     public static class UsoUsuario {
         public Long usuarioId;
@@ -50,6 +53,12 @@ public class AdminCuponController {
         public Integer maxUsos;
         public Integer minBoletas;
         public long usosActuales;
+        public Long promotorId;
+        public String promotorNombre;
+        public String promotorEmail;
+        public Double totalComisionAcumulada;
+        public int totalPreventa;
+        public int totalRegular;
         public List<UsoUsuario> usuarios;
     }
 
@@ -78,11 +87,31 @@ public class AdminCuponController {
             r.maxUsos = cupon.getMaxUsos();
             r.minBoletas = cupon.getMinBoletas();
 
+            if (cupon.getPromotor() != null) {
+                r.promotorId = cupon.getPromotor().getId();
+                r.promotorNombre = cupon.getPromotor().getNombre();
+                r.promotorEmail = cupon.getPromotor().getEmail();
+            }
+
             // Buscar compras que usaron este cupón
             List<Compra> compras = compraRepository.findUsagesByCodigoCupon(cupon.getCodigo());
-            r.usosActuales = compras.stream()
+            List<Compra> comprasExitosas = compras.stream()
                 .filter(c -> "PAGADO".equals(c.getEstado()) || "REGALADA".equals(c.getEstado()))
-                .count();
+                .collect(java.util.stream.Collectors.toList());
+
+            r.usosActuales = comprasExitosas.size();
+
+            r.totalComisionAcumulada = comprasExitosas.stream()
+                .mapToDouble(c -> c.getComisionPromotor() != null ? c.getComisionPromotor() : 0.0)
+                .sum();
+
+            r.totalPreventa = comprasExitosas.stream()
+                .mapToInt(c -> c.getCantidadPreventa() != null ? c.getCantidadPreventa() : 0)
+                .sum();
+
+            r.totalRegular = comprasExitosas.stream()
+                .mapToInt(c -> c.getCantidadRegular() != null ? c.getCantidadRegular() : 0)
+                .sum();
 
             List<UsoUsuario> usuariosLista = new ArrayList<>();
             for (Compra c : compras) {
@@ -117,6 +146,14 @@ public class AdminCuponController {
         Optional<Cupon> existing = cuponRepository.findByCodigoIgnoreCase(codigoNormalized);
         if (existing.isPresent()) {
             return ResponseEntity.badRequest().body(new MessageResponse("Error: Ya existe un cupón con el código '" + codigoNormalized + "'."));
+        }
+
+        if (nuevoCupon.getPromotor() != null && nuevoCupon.getPromotor().getId() != null) {
+            com.dopaminacrew.backend.model.User promotor = userRepository.findById(nuevoCupon.getPromotor().getId())
+                    .orElseThrow(() -> new RuntimeException("Error: Promotor no encontrado."));
+            nuevoCupon.setPromotor(promotor);
+        } else {
+            nuevoCupon.setPromotor(null);
         }
 
         nuevoCupon.setCodigo(codigoNormalized);

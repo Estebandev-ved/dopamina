@@ -42,4 +42,18 @@ public class User {
 
     @Column(nullable = false)
     private Boolean banned = false;
+
+    // ── Datos bancarios para giros a promotores ──────────────────────────────
+    // Security Note: Solo se almacena info de cuenta, no datos sensibles de tarjetas.
+    @Column(name = "cuenta_bancaria", length = 30)
+    private String cuentaBancaria;
+
+    @Column(name = "banco", length = 80)
+    private String banco;
+
+    @Column(name = "titular_cuenta", length = 100)
+    private String titularCuenta;
+
+    @Column(name = "tipo_cuenta", length = 20)
+    private String tipoCuenta; // "AHORROS" o "CORRIENTE"
 }

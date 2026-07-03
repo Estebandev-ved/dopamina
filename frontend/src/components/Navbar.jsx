@@ -252,7 +252,7 @@ export default function Navbar() {
                   )}
                   <span className="font-semibold max-w-[100px] truncate">{currentUser.nombre}</span>
                   <span className="text-[10px] bg-industrial-800 text-neon-glow px-1.5 py-0.5 rounded font-mono uppercase">
-                    {currentUser.rol === 'ROLE_ADMIN' ? 'Admin' : 'Crew'}
+                    {currentUser.rol === 'ROLE_ADMIN' ? 'Admin' : (currentUser.rol === 'ROLE_PROMOTER' ? 'Promotor' : 'Crew')}
                   </span>
                   <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -283,6 +283,17 @@ export default function Navbar() {
                         <Ticket className="w-4 h-4 text-neon-purple" />
                         <span>Mis Boletas</span>
                       </Link>
+
+                      {currentUser.rol === 'ROLE_PROMOTER' && (
+                        <Link
+                          to="/promotor"
+                          onClick={() => setDropdownOpen(false)}
+                          className="flex items-center space-x-2.5 px-4 py-2 text-xs font-bold text-neon-glow hover:text-white hover:bg-neon-purple/10 transition-colors"
+                        >
+                          <Award className="w-4 h-4 text-neon-purple" style={{ color: 'var(--color-neon)' }} />
+                          <span>Panel Promotor</span>
+                        </Link>
+                      )}
 
                       {currentUser.rol === 'ROLE_ADMIN' && (
                         <Link
@@ -413,6 +424,17 @@ export default function Navbar() {
                 MIS BOLETAS
               </Link>
             )}
+            {currentUser && currentUser.rol === 'ROLE_PROMOTER' && (
+              <Link
+                to="/promotor"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center space-x-2 text-sm font-black tracking-widest py-2 text-neon-glow border-b border-neon-purple/20"
+                style={{ borderBottomColor: 'var(--color-neon-shadow-sm)', color: 'var(--color-neon-light)' }}
+              >
+                <Award className="w-4 h-4 text-neon-purple" style={{ color: 'var(--color-neon)' }} />
+                <span>⚡ PANEL PROMOTOR</span>
+              </Link>
+            )}
             {currentUser && currentUser.rol === 'ROLE_ADMIN' && (
               <Link
                 to="/admin"
@@ -451,7 +473,7 @@ export default function Navbar() {
                   <User className="w-4 h-4 text-neon-glow" />
                   <span>{currentUser.nombre}</span>
                   <span className="text-[10px] bg-industrial-900 border border-neon-purple/30 text-neon-glow px-2 py-0.5 rounded font-mono uppercase">
-                    {currentUser.rol === 'ROLE_ADMIN' ? 'Admin' : 'Crew'}
+                    {currentUser.rol === 'ROLE_ADMIN' ? 'Admin' : (currentUser.rol === 'ROLE_PROMOTER' ? 'Promotor' : 'Crew')}
                   </span>
                 </div>
                 <button

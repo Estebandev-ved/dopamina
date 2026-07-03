@@ -60,6 +60,15 @@ public class Compra {
     @Column(name = "efipay_status", length = 50)
     private String efipayStatus;
 
+    @Column(name = "cantidad_preventa")
+    private Integer cantidadPreventa = 0;
+
+    @Column(name = "cantidad_regular")
+    private Integer cantidadRegular = 0;
+
+    @Column(name = "comision_promotor")
+    private Double comisionPromotor = 0.0;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

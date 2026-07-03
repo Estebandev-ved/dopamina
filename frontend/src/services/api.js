@@ -452,6 +452,31 @@ class ApiService {
   adminEnviarCorreo(to, subject, body) {
     return this.post('/api/admin/enviar-correo', { to, subject, body });
   }
+
+  // ── Promotores (ROLE_PROMOTER) ───────────────────────────────────────────
+  promotorGetStats() {
+    return this.get('/api/promotor/stats');
+  }
+
+  promotorGetVentas() {
+    return this.get('/api/promotor/ventas');
+  }
+
+  promotorGetCuenta() {
+    return this.get('/api/promotor/cuenta');
+  }
+
+  promotorSaveCuenta(data) {
+    return this.request('/api/promotor/cuenta', { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  // ── Admin: reporte de todos los promotores ────────────────────────────────
+  adminGetPromotores() {
+    return this.get('/api/admin/cupones/reporte').then(cupones =>
+      // Filtramos solo cupones con promotor vinculado y los agrupamos por promotor
+      (cupones || []).filter(c => c.promotorNombre)
+    );
+  }
 }
 
 export const api = new ApiService();

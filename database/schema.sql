@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS `roles` (
 -- Insert default system roles
 INSERT INTO `roles` (`nombre`) VALUES ('ROLE_USER') ON DUPLICATE KEY UPDATE `nombre`=`nombre`;
 INSERT INTO `roles` (`nombre`) VALUES ('ROLE_ADMIN') ON DUPLICATE KEY UPDATE `nombre`=`nombre`;
+INSERT INTO `roles` (`nombre`) VALUES ('ROLE_PROMOTER') ON DUPLICATE KEY UPDATE `nombre`=`nombre`;
 
 -- 2. Create Users Table (usuarios)
 CREATE TABLE IF NOT EXISTS `usuarios` (
@@ -44,6 +45,9 @@ CREATE TABLE IF NOT EXISTS `compras` (
     `efipay_payment_id` VARCHAR(100) DEFAULT NULL,
     `efipay_status` VARCHAR(50) DEFAULT NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `cantidad_preventa` INT DEFAULT 0,
+    `cantidad_regular` INT DEFAULT 0,
+    `comision_promotor` DECIMAL(10, 2) DEFAULT 0.00,
     FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (`evento_id`) REFERENCES `eventos` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -80,7 +84,9 @@ CREATE TABLE IF NOT EXISTS `cupones` (
     `descuento_porcentaje` DOUBLE NOT NULL,
     `activo` BOOLEAN NOT NULL DEFAULT TRUE,
     `descripcion` VARCHAR(255),
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    `promotor_id` BIGINT DEFAULT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`promotor_id`) REFERENCES `usuarios` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Seed default coupons

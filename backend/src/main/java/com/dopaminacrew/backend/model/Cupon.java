@@ -38,6 +38,10 @@ public class Cupon {
     @Column(name = "min_boletas")
     private Integer minBoletas = 1; // Mínimo de boletas requeridas (por defecto 1)
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "promotor_id")
+    private User promotor;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

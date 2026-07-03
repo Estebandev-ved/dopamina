@@ -94,7 +94,7 @@ public class AdminSeguridadController {
         try {
             roleName = RoleName.valueOf(nuevoRolStr.trim().toUpperCase());
         } catch (IllegalArgumentException ex) {
-            return ResponseEntity.badRequest().body(new MessageResponse("El rol especificado no es válido. Roles válidos: ROLE_USER, ROLE_ADMIN, ROLE_SUBADMIN"));
+            return ResponseEntity.badRequest().body(new MessageResponse("El rol especificado no es válido. Roles válidos: ROLE_USER, ROLE_ADMIN, ROLE_SUBADMIN, ROLE_PROMOTER"));
         }
 
         Role role = roleRepository.findByNombre(roleName)

@@ -55,6 +55,11 @@ export default function Checkout() {
       }
     }
 
+    if (!targetCoupon) {
+      // Check if there is a referral coupon saved in localStorage
+      targetCoupon = localStorage.getItem('dopamina_referral_cupon');
+    }
+
     if (targetCoupon) {
       setCouponCode(targetCoupon);
       api.publicValidarCupon(targetCoupon, cantidad)
@@ -67,7 +72,7 @@ export default function Checkout() {
         })
         .catch(err => console.log('Error al autoaplicar cupón sorpresa:', err));
     }
-  }, [location.state]);
+  }, [location.state, cantidad]);
 
   // Consultar si el usuario todavía tiene disponible la promo de 4+ boletas
   useEffect(() => {
@@ -172,6 +177,9 @@ export default function Checkout() {
   const handlePurchase = async () => {
     setLoading(true);
     setErrorMsg('');
+
+    // Clear the referral coupon from storage so it doesn't auto-apply to future purchases
+    localStorage.removeItem('dopamina_referral_cupon');
 
     sessionStorage.setItem('dopamina_checkout_state', JSON.stringify({
       evento: selectedEvento,

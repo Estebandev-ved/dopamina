@@ -56,6 +56,8 @@ public class CompraServiceImpl implements CompraService {
         Evento evento = null;
         double price = DEFAULT_TICKET_PRICE;
         double subtotal;
+        int enPreventa = 0;
+        int enRegular = cantidad;
 
         if (request.getEventoId() != null) {
             evento = eventoRepository.findById(request.getEventoId())
@@ -87,8 +89,8 @@ public class CompraServiceImpl implements CompraService {
                 double precioPreventa = evento.getPrecioPreventa().doubleValue();
                 int cupoPreventa = evento.getCantidadPreventa();
                 int preventaRestante = Math.max(0, cupoPreventa - sold);
-                int enPreventa = Math.min(cantidad, preventaRestante);
-                int enRegular = cantidad - enPreventa;
+                enPreventa = Math.min(cantidad, preventaRestante);
+                enRegular = cantidad - enPreventa;
                 subtotal = (enPreventa * precioPreventa) + (enRegular * price);
             } else {
                 subtotal = cantidad * price;
@@ -98,6 +100,7 @@ public class CompraServiceImpl implements CompraService {
         }
 
         double descuento = 0.0;
+        double comisionPromotor = 0.0;
         boolean promoParcheAplicada = false;
         String couponUsed = request.getCodigoCupon() != null ? request.getCodigoCupon().trim().toUpperCase() : "";
 
@@ -129,6 +132,16 @@ public class CompraServiceImpl implements CompraService {
             }
             
             descuento = subtotal * (cupon.getDescuentoPorcentaje() / 100.0);
+
+            // Calcular comision de promotor si el cupón está asignado a uno
+            if (cupon.getPromotor() != null) {
+                if (evento != null && evento.getPrecioPreventa() != null) {
+                    double precioPreventa = evento.getPrecioPreventa().doubleValue();
+                    comisionPromotor = (enPreventa * precioPreventa * 0.10) + (enRegular * price * 0.10);
+                } else {
+                    comisionPromotor = subtotal * 0.10;
+                }
+            }
         } else if (cantidad >= 4 && !compraRepository.usuarioYaUsoPromoParche(user.getId())) {
             // Descuento automático del 10% por cantidad (promo parche), sin cupón.
             // Es de un solo uso por usuario: una vez consumida queda deshabilitada.
@@ -147,6 +160,9 @@ public class CompraServiceImpl implements CompraService {
         compra.setTotal(total);
         compra.setCodigoCupon(couponUsed.isEmpty() ? null : couponUsed.toUpperCase());
         compra.setPromoParcheAplicada(promoParcheAplicada);
+        compra.setCantidadPreventa(enPreventa);
+        compra.setCantidadRegular(enRegular);
+        compra.setComisionPromotor(comisionPromotor);
         compra.setEstado("PENDIENTE"); // Pending payment via Efipay
 
         // Generate a unique purchase reference QR code

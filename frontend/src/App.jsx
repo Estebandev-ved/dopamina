@@ -16,6 +16,7 @@ import Eventos from './pages/Eventos';
 import Artistas from './pages/Artistas';
 import PagoResultado from './pages/PagoResultado';
 import AdminDashboard from './pages/AdminDashboard';
+import PromoterDashboard from './pages/PromoterDashboard';
 import { api } from './services/api';
 import usePageTracking from './services/usePageTracking';
 import ChatbotWidget from './components/ChatbotWidget';
@@ -49,6 +50,17 @@ const AdminRoute = ({ children }) => {
   return children;
 };
 
+const PromoterRoute = ({ children }) => {
+  const user = api.getUser();
+  if (!user) return <Navigate to="/login" replace />;
+  if (api.isTokenExpired()) {
+    api.clearAuth();
+    return <Navigate to="/login" replace />;
+  }
+  if (user.rol !== 'ROLE_PROMOTER') return <Navigate to="/" replace />;
+  return children;
+};
+
 /**
  * Core Application Layout.
  * The /admin route renders WITHOUT Navbar/Footer (full-screen panel).
@@ -59,6 +71,15 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const location = useLocation();
   usePageTracking();
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const cuponParam = params.get('cupon');
+    if (cuponParam) {
+      localStorage.setItem('dopamina_referral_cupon', cuponParam.trim().toUpperCase());
+      console.log('Referral coupon saved:', cuponParam.trim().toUpperCase());
+    }
+  }, [location.search]);
 
   React.useEffect(() => {
     const theme = localStorage.getItem('neon-theme') || 'violet';
@@ -122,6 +143,7 @@ export default function App() {
                   <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
                   <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                   <Route path="/perfil" element={<ProtectedRoute><Perfil /></ProtectedRoute>} />
+                  <Route path="/promotor" element={<PromoterRoute><PromoterDashboard /></PromoterRoute>} />
                   <Route path="/eventos" element={<Eventos />} />
                   <Route path="/artistas" element={<Artistas />} />
                   <Route path="/pago-resultado" element={<PagoResultado />} />

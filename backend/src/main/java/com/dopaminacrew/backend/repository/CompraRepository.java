@@ -81,4 +81,7 @@ public interface CompraRepository extends JpaRepository<Compra, Long> {
 
     @Query("SELECT c FROM Compra c JOIN FETCH c.usuario WHERE c.codigoCupon = :cupon ORDER BY c.createdAt DESC")
     List<Compra> findUsagesByCodigoCupon(@Param("cupon") String cupon);
+
+    @Query("SELECT c FROM Compra c JOIN FETCH c.usuario WHERE c.codigoCupon IN :cupones ORDER BY c.createdAt DESC")
+    List<Compra> findUsagesByCodigoCuponIn(@Param("cupones") List<String> cupones);
 }
