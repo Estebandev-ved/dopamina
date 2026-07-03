@@ -2274,7 +2274,7 @@ export default function AdminDashboard() {
               <table style={tableStyle}>
                 <thead>
                   <tr>
-                    {['Promotor', 'Email', 'Código Cupón', 'Usos', 'Prev. Vendidas', 'Reg. Vendidas', 'Ventas Generadas', 'Comisión (10%)', 'Estado Cupón'].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                    {['Promotor', 'Email', 'Datos de Pago', 'Código Cupón', 'Usos', 'Prev. Vendidas', 'Reg. Vendidas', 'Ventas Generadas', 'Comisión (10%)', 'Estado Cupón'].map(h => <th key={h} style={thStyle}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -2282,6 +2282,25 @@ export default function AdminDashboard() {
                     <tr key={p.id}>
                       <td style={{ ...tdStyle, fontWeight: 700, color: theme.text }}>{p.promotorNombre}</td>
                       <td style={{ ...tdStyle, fontSize: '0.78rem', color: theme.textMuted }}>{p.promotorEmail}</td>
+                      <td style={{ ...tdStyle, fontSize: '0.78rem' }}>
+                        {p.promotorCuentaBancaria ? (
+                          <div>
+                            <div style={{ fontWeight: 700, color: theme.text }}>
+                              🏦 {p.promotorBanco} <span style={{ color: theme.textMuted, fontSize: '0.7rem', fontWeight: 500 }}>({p.promotorTipoCuenta})</span>
+                            </div>
+                            <div style={{ fontFamily: 'monospace', color: theme.accentLight, fontWeight: 700, marginTop: '2px' }}>
+                              {p.promotorCuentaBancaria}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: theme.textMuted, marginTop: '2px' }}>
+                              Titular: {p.promotorTitularCuenta}
+                            </div>
+                          </div>
+                        ) : (
+                          <span style={{ color: theme.danger, fontSize: '0.75rem', fontStyle: 'italic' }}>
+                            ⚠️ Sin registrar
+                          </span>
+                        )}
+                      </td>
                       <td style={{ ...tdStyle, fontFamily: 'monospace', fontWeight: 800, color: theme.accentLight }}>{p.codigo}</td>
                       <td style={{ ...tdStyle, fontWeight: 700, textAlign: 'center' }}>{p.usosActuales || 0}</td>
                       <td style={{ ...tdStyle, textAlign: 'center', color: theme.success }}>{p.totalPreventa || 0}</td>

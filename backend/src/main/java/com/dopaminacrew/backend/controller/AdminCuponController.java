@@ -56,6 +56,10 @@ public class AdminCuponController {
         public Long promotorId;
         public String promotorNombre;
         public String promotorEmail;
+        public String promotorCuentaBancaria;
+        public String promotorBanco;
+        public String promotorTitularCuenta;
+        public String promotorTipoCuenta;
         public Double totalComisionAcumulada;
         public int totalPreventa;
         public int totalRegular;
@@ -91,6 +95,10 @@ public class AdminCuponController {
                 r.promotorId = cupon.getPromotor().getId();
                 r.promotorNombre = cupon.getPromotor().getNombre();
                 r.promotorEmail = cupon.getPromotor().getEmail();
+                r.promotorCuentaBancaria = cupon.getPromotor().getCuentaBancaria();
+                r.promotorBanco = cupon.getPromotor().getBanco();
+                r.promotorTitularCuenta = cupon.getPromotor().getTitularCuenta();
+                r.promotorTipoCuenta = cupon.getPromotor().getTipoCuenta();
             }
 
             // Buscar compras que usaron este cupón
