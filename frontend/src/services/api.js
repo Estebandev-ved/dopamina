@@ -477,6 +477,19 @@ class ApiService {
       (cupones || []).filter(c => c.promotorNombre)
     );
   }
+
+  // ── Campañas y Retos ────────────────────────────────────────────────────────
+  adminEnviarCampana(subject, message, target) {
+    return this.post('/api/admin/campanas/enviar', { subject, message, target });
+  }
+
+  adminActualizarReto(message) {
+    return this.post('/api/admin/campanas/reto', { message });
+  }
+
+  promotorGetRetoActivo() {
+    return this.get('/api/promotor/reto-activo');
+  }
 }
 
 export const api = new ApiService();

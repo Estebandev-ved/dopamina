@@ -25,18 +25,21 @@ export default function PromoterDashboard() {
   const [bankSaving, setBankSaving] = useState(false);
   const [bankError, setBankError] = useState('');
   const [bankSuccess, setBankSuccess] = useState(false);
+  const [retoActivo, setRetoActivo] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [statsData, ventasData, cuentaData] = await Promise.all([
+        const [statsData, ventasData, cuentaData, retoData] = await Promise.all([
           api.promotorGetStats(),
           api.promotorGetVentas(),
-          api.promotorGetCuenta().catch(() => ({ registrada: false }))
+          api.promotorGetCuenta().catch(() => ({ registrada: false })),
+          api.promotorGetRetoActivo().catch(() => ({ message: '' }))
         ]);
         setStats(statsData);
         setVentas(ventasData);
+        setRetoActivo(retoData?.message || '');
         // Si no tiene cuenta registrada, mostrar el modal
         if (!cuentaData.registrada) {
           setShowBankModal(true);
@@ -216,6 +219,24 @@ export default function PromoterDashboard() {
               </div>
             )}
           </div>
+
+          {/* Active Challenge / Incentive Banner */}
+          {retoActivo && (
+            <div className="bg-gradient-to-r from-[var(--color-neon)]/20 via-[var(--color-neon)]/5 to-transparent border border-[var(--color-neon)]/30 rounded-xl p-5 mb-8 flex items-start gap-4 shadow-neon-sm relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--color-neon)]/5 blur-2xl pointer-events-none" />
+              <div className="flex-shrink-0 bg-[var(--color-neon)]/20 border border-[var(--color-neon)]/40 p-2.5 rounded-lg text-[var(--color-neon)] animate-pulse">
+                <Award className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <span className="text-[10px] font-black text-[var(--color-neon)] tracking-widest uppercase block">
+                  🔥 RETO / BONO ACTIVO HOY
+                </span>
+                <p className="text-sm font-semibold text-white leading-relaxed">
+                  {retoActivo}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Metrics Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">

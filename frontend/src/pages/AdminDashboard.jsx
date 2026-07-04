@@ -44,6 +44,7 @@ const SIDEBAR_ITEMS = [
   { id: 'sorteos', label: 'Sorteos', icon: 'T' },
   { id: 'cupones', label: 'Cupones', icon: 'K' },
   { id: 'promotores', label: 'Promotores', icon: 'P' },
+  { id: 'campanas', label: 'Campañas', icon: 'N' },
   { id: 'sugerencias', label: 'Sugerencias', icon: 'I' },
   { id: 'visitas', label: 'Visitas', icon: 'V' },
   { id: 'sets', label: 'Sets', icon: 'M' },
@@ -325,6 +326,16 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+
+  // Campañas states
+  const [campanaTarget, setCampanaTarget] = useState('CLIENTES');
+  const [campanaSubject, setCampanaSubject] = useState('');
+  const [campanaMessage, setCampanaMessage] = useState('');
+  const [campanaStatus, setCampanaStatus] = useState({ success: '', error: '' });
+  const [campanaLoading, setCampanaLoading] = useState(false);
+  const [retoMessage, setRetoMessage] = useState('');
+  const [retoLoading, setRetoLoading] = useState(false);
+  const [retoStatus, setRetoStatus] = useState({ success: '', error: '' });
 
   useEffect(() => {
     const handleResize = () => {
@@ -661,6 +672,15 @@ export default function AdminDashboard() {
     if (!user || (user.rol !== 'ROLE_ADMIN' && user.rol !== 'ROLE_SUBADMIN')) navigate('/');
   }, [navigate]);
 
+  const fetchRetoActivo = useCallback(async () => {
+    try {
+      const res = await api.promotorGetRetoActivo();
+      setRetoMessage(res?.message || '');
+    } catch (err) {
+      console.error('Error fetching active challenge:', err);
+    }
+  }, []);
+
   const fetchAll = useCallback(async () => {
     try {
       setRefreshing(true);
@@ -725,7 +745,8 @@ export default function AdminDashboard() {
     if (activeTab === 'sets') fetchSets();
     if (activeTab === 'sugerencias') fetchSugerencias();
     if (activeTab === 'promotores') fetchPromotores();
-  }, [activeTab, fetchVisitStats, fetchSets, fetchSugerencias, fetchPromotores]);
+    if (activeTab === 'campanas') fetchRetoActivo();
+  }, [activeTab, fetchVisitStats, fetchSets, fetchSugerencias, fetchPromotores, fetchRetoActivo]);
 
   // ── Derived chart data ──
   const comprasConEvento = useMemo(() => compras.filter(c => c.eventoNombre), [compras]);
@@ -1906,6 +1927,169 @@ export default function AdminDashboard() {
             </table>
           </div>
         </Section>
+      </motion.div>
+    );
+  };
+
+  const handleSendCampana = async (e) => {
+    e.preventDefault();
+    if (!campanaSubject.trim() || !campanaMessage.trim()) {
+      setCampanaStatus({ success: '', error: 'Por favor complete todos los campos de la campaña.' });
+      return;
+    }
+    setCampanaLoading(true);
+    setCampanaStatus({ success: '', error: '' });
+    try {
+      const res = await api.adminEnviarCampana(campanaSubject.trim(), campanaMessage.trim(), campanaTarget);
+      setCampanaStatus({ success: res.message || 'Campaña enviada con éxito.', error: '' });
+      setCampanaSubject('');
+      setCampanaMessage('');
+    } catch (err) {
+      setCampanaStatus({ success: '', error: err.message || 'Error al enviar la campaña.' });
+    } finally {
+      setCampanaLoading(false);
+    }
+  };
+
+  const handleSaveReto = async (e) => {
+    e.preventDefault();
+    setRetoLoading(true);
+    setRetoStatus({ success: '', error: '' });
+    try {
+      const res = await api.adminActualizarReto(retoMessage);
+      setRetoStatus({ success: res.message || 'Reto de promotores actualizado con éxito.', error: '' });
+    } catch (err) {
+      setRetoStatus({ success: '', error: err.message || 'Error al actualizar el reto.' });
+    } finally {
+      setRetoLoading(false);
+    }
+  };
+
+  const renderCampanas = () => {
+    return (
+      <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '24px', alignItems: 'start' }}>
+          
+          {/* Column 1: Email Campaign (FOMO) */}
+          <Section icon="gift" title="Campaña Masiva de Email (FOMO)">
+            <form onSubmit={handleSendCampana} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <p style={{ color: theme.textSec, fontSize: '0.82rem', marginBottom: '16px', lineHeight: 1.4 }}>
+                Envía correos personalizados masivos utilizando la pasarela de Resend. Úsalos para notificar sobre preventas agotándose o nuevos lanzamientos.
+              </p>
+
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: theme.textSec, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Destinatarios
+              </label>
+              <select 
+                value={campanaTarget} 
+                onChange={e => setCampanaTarget(e.target.value)} 
+                style={{ ...inputStyle, marginBottom: '12px' }}
+              >
+                <option value="CLIENTES">Todos los Clientes (Compradores Registrados)</option>
+                <option value="PROMOTORES">Todos los Promotores Activos</option>
+              </select>
+
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: theme.textSec, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Asunto del Correo
+              </label>
+              <input 
+                type="text" 
+                placeholder="Ej: ¡Últimas 9 entradas en preventa para Dopamina Crew! 🔥" 
+                value={campanaSubject} 
+                onChange={e => setCampanaSubject(e.target.value)} 
+                style={{ ...inputStyle, marginBottom: '12px' }}
+                required
+              />
+
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: theme.textSec, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Mensaje de la Campaña
+              </label>
+              <textarea 
+                rows="6" 
+                placeholder="Escribe el contenido del correo aquí. El sistema lo enviará con la plantilla oscura premium de Dopamina Crew." 
+                value={campanaMessage} 
+                onChange={e => setCampanaMessage(e.target.value)} 
+                style={{ ...inputStyle, minHeight: '120px', resize: 'vertical', fontFamily: 'inherit', marginBottom: '12px' }}
+                required
+              />
+
+              {campanaStatus.success && (
+                <div style={{ color: theme.success, fontSize: '0.8rem', fontWeight: 650, background: 'rgba(74,222,128,0.1)', padding: '10px', borderRadius: '8px', border: `1px solid ${theme.success}33` }}>
+                  ✓ {campanaStatus.success}
+                </div>
+              )}
+              {campanaStatus.error && (
+                <div style={{ color: theme.danger, fontSize: '0.8rem', fontWeight: 650, background: 'rgba(239,68,68,0.1)', padding: '10px', borderRadius: '8px', border: `1px solid ${theme.danger}33` }}>
+                  ⚠️ {campanaStatus.error}
+                </div>
+              )}
+
+              <button 
+                type="submit" 
+                disabled={campanaLoading}
+                style={{ ...btnPrimary, marginTop: '8px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              >
+                {campanaLoading ? (
+                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} style={{ width: '14px', height: '14px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%' }} />
+                ) : '🚀 Enviar Campaña Masiva'}
+              </button>
+            </form>
+          </Section>
+
+          {/* Column 2: Promoter Incentives (Reto / Bono) */}
+          <Section icon="users" title="Incentivo Activo para Promotores">
+            <form onSubmit={handleSaveReto} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <p style={{ color: theme.textSec, fontSize: '0.82rem', marginBottom: '16px', lineHeight: 1.4 }}>
+                Publica un banner informativo en el panel de control de los promotores. Ideal para motivarlos a vender con bonos del día o metas de ventas específicas.
+              </p>
+
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: theme.textSec, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Mensaje de Reto / Bono del Día
+              </label>
+              <textarea 
+                rows="4" 
+                placeholder="Ej: 🔥 RETO DEL DÍA: ¡Vende 10 boletas antes de medianoche y llévate un bono de $20.000 COP extra!" 
+                value={retoMessage} 
+                onChange={e => setRetoMessage(e.target.value)} 
+                style={{ ...inputStyle, minHeight: '90px', resize: 'vertical', fontFamily: 'inherit', marginBottom: '12px' }}
+              />
+
+              <div style={{ padding: '12px', background: 'rgba(177, 78, 255, 0.05)', borderRadius: '8px', border: `1px solid ${theme.border}`, marginBottom: '12px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: theme.accentLight, display: 'block', marginBottom: '4px' }}>Vista previa del Banner en el Dashboard de Promotor:</span>
+                {retoMessage.trim() ? (
+                  <div style={{ background: 'linear-gradient(135deg, rgba(177, 78, 255, 0.15), rgba(153, 64, 224, 0.05))', border: `1px solid ${theme.accent}44`, borderRadius: '6px', padding: '10px 14px', color: theme.text, fontSize: '0.78rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ animation: 'pulse 1.5s infinite', fontSize: '1rem' }}>🔥</span>
+                    <span>{retoMessage}</span>
+                  </div>
+                ) : (
+                  <div style={{ color: theme.textMuted, fontSize: '0.78rem', fontStyle: 'italic', padding: '8px 0' }}>Sin reto activo actualmente.</div>
+                )}
+              </div>
+
+              {retoStatus.success && (
+                <div style={{ color: theme.success, fontSize: '0.8rem', fontWeight: 650, background: 'rgba(74,222,128,0.1)', padding: '10px', borderRadius: '8px', border: `1px solid ${theme.success}33` }}>
+                  ✓ {retoStatus.success}
+                </div>
+              )}
+              {retoStatus.error && (
+                <div style={{ color: theme.danger, fontSize: '0.8rem', fontWeight: 650, background: 'rgba(239,68,68,0.1)', padding: '10px', borderRadius: '8px', border: `1px solid ${theme.danger}33` }}>
+                  ⚠️ {retoStatus.error}
+                </div>
+              )}
+
+              <button 
+                type="submit" 
+                disabled={retoLoading}
+                style={{ ...btnPrimary, marginTop: '8px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              >
+                {retoLoading ? (
+                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} style={{ width: '14px', height: '14px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%' }} />
+                ) : '💾 Actualizar Reto'}
+              </button>
+            </form>
+          </Section>
+
+        </div>
       </motion.div>
     );
   };
@@ -3116,7 +3300,7 @@ export default function AdminDashboard() {
         <nav style={{ flex: 1, padding: '12px', display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto' }}>
           {(() => {
             const userObj = api.getUser();
-            const restrictedTabs = ['usuarios', 'regalos', 'cupones', 'seguridad'];
+            const restrictedTabs = ['usuarios', 'regalos', 'cupones', 'seguridad', 'campanas'];
             const filteredItems = userObj?.rol === 'ROLE_SUBADMIN' 
               ? SIDEBAR_ITEMS.filter(item => !restrictedTabs.includes(item.id)) 
               : SIDEBAR_ITEMS;
@@ -3207,6 +3391,7 @@ export default function AdminDashboard() {
           {activeTab === 'sorteos' && renderSorteos()}
           {activeTab === 'cupones' && api.getUser()?.rol === 'ROLE_ADMIN' && renderCupones()}
           {activeTab === 'promotores' && api.getUser()?.rol === 'ROLE_ADMIN' && renderPromotores()}
+          {activeTab === 'campanas' && api.getUser()?.rol === 'ROLE_ADMIN' && renderCampanas()}
           {activeTab === 'visitas' && renderVisitas()}
           {activeTab === 'sets' && renderSets()}
           {activeTab === 'sugerencias' && renderSugerencias()}
