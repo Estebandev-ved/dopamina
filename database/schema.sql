@@ -141,4 +141,17 @@ CREATE TABLE IF NOT EXISTS `sets_musicales` (
 CREATE INDEX idx_sets_genero ON `sets_musicales` (`genero`);
 CREATE INDEX idx_sets_activo ON `sets_musicales` (`activo`);
 
+-- 10. Create Promotor_Bonos Table
+CREATE TABLE IF NOT EXISTS `promotor_bonos` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `promotor_id` BIGINT NOT NULL,
+    `fecha` DATE NOT NULL,
+    `cantidad_requerida` INT NOT NULL,
+    `valor_bono` DECIMAL(10, 2) NOT NULL,
+    `pagado` BOOLEAN NOT NULL DEFAULT FALSE,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`promotor_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
 

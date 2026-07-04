@@ -35,6 +35,9 @@ public class PromotorController {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private com.dopaminacrew.backend.repository.PromotorBonoRepository promotorBonoRepository;
+
     // DTO para registro de cuenta bancaria
     public static class CuentaBancariaRequest {
         public String cuentaBancaria;
@@ -105,7 +108,14 @@ public class PromotorController {
         stats.totalPreventa = comprasExitosas.stream().mapToInt(c -> c.getCantidadPreventa() != null ? c.getCantidadPreventa() : 0).sum();
         stats.totalRegular = comprasExitosas.stream().mapToInt(c -> c.getCantidadRegular() != null ? c.getCantidadRegular() : 0).sum();
         stats.totalBoletas = stats.totalPreventa + stats.totalRegular;
-        stats.totalComision = comprasExitosas.stream().mapToDouble(c -> c.getComisionPromotor() != null ? c.getComisionPromotor() : 0.0).sum();
+        
+        double totalComisionCompras = comprasExitosas.stream().mapToDouble(c -> c.getComisionPromotor() != null ? c.getComisionPromotor() : 0.0).sum();
+        double totalBonosPasados = promotorBonoRepository.findByPromotorId(currentUser.getId()).stream()
+                .filter(b -> b.getFecha() != null && b.getFecha().isBefore(java.time.LocalDate.now()))
+                .mapToDouble(b -> b.getValorBono() != null ? b.getValorBono() : 0.0)
+                .sum();
+        stats.totalComision = totalComisionCompras + totalBonosPasados;
+        
         stats.totalVentasFacturado = comprasExitosas.stream().mapToDouble(Compra::getTotal).sum();
 
         return ResponseEntity.ok(stats);
@@ -190,5 +200,46 @@ public class PromotorController {
         userRepository.save(user);
 
         return ResponseEntity.ok(Map.of("mensaje", "Datos bancarios guardados correctamente."));
+    }
+
+    @GetMapping("/ranking")
+    public ResponseEntity<?> getRanking() {
+        List<Cupon> cupones = cuponRepository.findAll();
+        Map<User, Integer> ventasPorPromotor = new HashMap<>();
+
+        for (Cupon cupon : cupones) {
+            if (cupon.getPromotor() == null) continue;
+            
+            List<Compra> compras = compraRepository.findUsagesByCodigoCupon(cupon.getCodigo());
+            int totalBoletas = compras.stream()
+                .filter(c -> "PAGADO".equals(c.getEstado()) || "REGALADA".equals(c.getEstado()))
+                .mapToInt(c -> c.getCantidad() != null ? c.getCantidad() : 0)
+                .sum();
+                
+            User promotor = cupon.getPromotor();
+            ventasPorPromotor.put(promotor, ventasPorPromotor.getOrDefault(promotor, 0) + totalBoletas);
+        }
+
+        // Convert and sort
+        List<Map<String, Object>> ranking = ventasPorPromotor.entrySet().stream()
+            .map(entry -> {
+                User promotor = entry.getKey();
+                String nombreCompleto = promotor.getNombre() != null ? promotor.getNombre().trim() : "Promotor";
+                String[] parts = nombreCompleto.split("\\s+");
+                String nombreFormateado = parts[0];
+                if (parts.length > 1 && !parts[1].isEmpty()) {
+                    nombreFormateado += " " + parts[1].substring(0, 1).toUpperCase() + ".";
+                }
+                
+                Map<String, Object> item = new HashMap<>();
+                item.put("nombre", nombreFormateado);
+                item.put("boletas", entry.getValue());
+                return item;
+            })
+            .sorted((a, b) -> Integer.compare((Integer) b.get("boletas"), (Integer) a.get("boletas")))
+            .limit(5)
+            .collect(Collectors.toList());
+
+        return ResponseEntity.ok(ranking);
     }
 }

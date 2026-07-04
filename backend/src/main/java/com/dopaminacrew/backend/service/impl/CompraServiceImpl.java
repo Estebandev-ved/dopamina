@@ -17,6 +17,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
+import com.dopaminacrew.backend.model.PromotorBono;
+import com.dopaminacrew.backend.repository.PromotorBonoRepository;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.stream.Collectors;
 
 /**
  * Service implementation managing ticket bookings, pricing phases, and individual tickets.
@@ -43,6 +49,9 @@ public class CompraServiceImpl implements CompraService {
 
     @Autowired
     private EmailService emailService;
+
+    @Autowired
+    private PromotorBonoRepository promotorBonoRepository;
 
     @Override
     @Transactional
@@ -135,12 +144,7 @@ public class CompraServiceImpl implements CompraService {
 
             // Calcular comision de promotor si el cupón está asignado a uno
             if (cupon.getPromotor() != null) {
-                if (evento != null && evento.getPrecioPreventa() != null) {
-                    double precioPreventa = evento.getPrecioPreventa().doubleValue();
-                    comisionPromotor = (enPreventa * precioPreventa * 0.10) + (enRegular * price * 0.10);
-                } else {
-                    comisionPromotor = subtotal * 0.10;
-                }
+                comisionPromotor = (enPreventa * 2375.0) + (enRegular * 3325.0);
             }
         } else if (cantidad >= 4 && !compraRepository.usuarioYaUsoPromoParche(user.getId())) {
             // Descuento automático del 10% por cantidad (promo parche), sin cupón.
@@ -195,6 +199,9 @@ public class CompraServiceImpl implements CompraService {
         compra.setEstado("PAGADO");
         compraRepository.save(compra);
 
+        // Evaluar bonos del reto de promotores
+        evaluarYRegistrarBonosPromotor(compra);
+
         long existingCount = boletaRepository.countByCompraId(compraId);
         int nextSorteo = 1;
         if (compra.getEvento() != null) {
@@ -224,5 +231,76 @@ public class CompraServiceImpl implements CompraService {
     @Override
     public boolean isPromoParcheDisponible(Long userId) {
         return !compraRepository.usuarioYaUsoPromoParche(userId);
+    }
+
+    private void evaluarYRegistrarBonosPromotor(Compra compra) {
+        String codigo = compra.getCodigoCupon();
+        if (codigo == null || codigo.isBlank()) return;
+
+        java.util.Optional<com.dopaminacrew.backend.model.Cupon> cuponOpt = cuponRepository.findByCodigoIgnoreCase(codigo.trim().toUpperCase());
+        if (cuponOpt.isEmpty()) return;
+
+        com.dopaminacrew.backend.model.Cupon cupon = cuponOpt.get();
+        if (cupon.getPromotor() == null) return;
+
+        User promotor = cupon.getPromotor();
+
+        // 1. Cargar el reto activo desde active_challenge.json
+        java.nio.file.Path path = java.nio.file.Paths.get("active_challenge.json");
+        if (!java.nio.file.Files.exists(path)) return;
+
+        try {
+            String jsonStr = java.nio.file.Files.readString(path).trim();
+            if (jsonStr.isEmpty()) return;
+
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode rootNode = mapper.readTree(jsonStr);
+            com.fasterxml.jackson.databind.JsonNode metasNode = rootNode.get("metas");
+            if (metasNode == null || !metasNode.isArray()) return;
+
+            // 2. Calcular las ventas de hoy para el promotor
+            LocalDate hoy = LocalDate.now();
+            LocalDateTime inicioDia = hoy.atStartOfDay();
+            LocalDateTime finDia = hoy.atTime(LocalTime.MAX);
+
+            List<com.dopaminacrew.backend.model.Cupon> cuponesPromotor = cuponRepository.findByPromotorId(promotor.getId());
+            if (cuponesPromotor.isEmpty()) return;
+
+            List<String> codigos = cuponesPromotor.stream().map(com.dopaminacrew.backend.model.Cupon::getCodigo).collect(Collectors.toList());
+            List<Compra> compras = compraRepository.findUsagesByCodigoCuponIn(codigos);
+            long progresoHoy = compras.stream()
+                    .filter(c -> ("PAGADO".equals(c.getEstado()) || "REGALADA".equals(c.getEstado()))
+                            && c.getCreatedAt() != null
+                            && c.getCreatedAt().isAfter(inicioDia)
+                            && c.getCreatedAt().isBefore(finDia))
+                    .mapToInt(c -> c.getCantidad() != null ? c.getCantidad() : 0)
+                    .sum();
+
+            // 3. Evaluar cada meta
+            for (com.fasterxml.jackson.databind.JsonNode metaNode : metasNode) {
+                int cantidad = metaNode.get("cantidad").asInt();
+                double bono = metaNode.get("bono").asDouble();
+
+                if (progresoHoy >= cantidad) {
+                    // Si no está registrado el bono para hoy, lo creamos
+                    boolean existe = promotorBonoRepository.existsByPromotorIdAndFechaAndCantidadRequerida(promotor.getId(), hoy, cantidad);
+                    if (!existe) {
+                        PromotorBono nuevoBono = new PromotorBono();
+                        nuevoBono.setPromotor(promotor);
+                        nuevoBono.setFecha(hoy);
+                        nuevoBono.setCantidadRequerida(cantidad);
+                        nuevoBono.setValorBono(bono);
+                        nuevoBono.setPagado(false);
+                        nuevoBono.setCreatedAt(LocalDateTime.now());
+                        promotorBonoRepository.save(nuevoBono);
+                        System.out.println("¡Bono automático registrado para promotor " + promotor.getNombre() + 
+                                " - Meta " + cantidad + " boletas - Bono: $" + bono + "!");
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            System.err.println("Error al evaluar bonos de promotor: " + e.getMessage());
+        }
     }
 }

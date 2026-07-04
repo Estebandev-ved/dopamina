@@ -333,9 +333,24 @@ export default function AdminDashboard() {
   const [campanaMessage, setCampanaMessage] = useState('');
   const [campanaStatus, setCampanaStatus] = useState({ success: '', error: '' });
   const [campanaLoading, setCampanaLoading] = useState(false);
-  const [retoMessage, setRetoMessage] = useState('');
+  const [retoDescription, setRetoDescription] = useState('');
+  const [retoMetas, setRetoMetas] = useState([]);
   const [retoLoading, setRetoLoading] = useState(false);
   const [retoStatus, setRetoStatus] = useState({ success: '', error: '' });
+
+  const handleAddMeta = () => {
+    setRetoMetas([...retoMetas, { cantidad: 5, bono: 10000 }]);
+  };
+
+  const handleRemoveMeta = (index) => {
+    setRetoMetas(retoMetas.filter((_, i) => i !== index));
+  };
+
+  const handleMetaChange = (index, field, value) => {
+    const updated = [...retoMetas];
+    updated[index][field] = parseInt(value) || 0;
+    setRetoMetas(updated);
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -675,7 +690,19 @@ export default function AdminDashboard() {
   const fetchRetoActivo = useCallback(async () => {
     try {
       const res = await api.promotorGetRetoActivo();
-      setRetoMessage(res?.message || '');
+      if (res?.challengeJson) {
+        try {
+          const obj = JSON.parse(res.challengeJson);
+          setRetoDescription(obj.descripcion || '');
+          setRetoMetas(obj.metas || []);
+        } catch (e) {
+          setRetoDescription(res.challengeJson);
+          setRetoMetas([]);
+        }
+      } else {
+        setRetoDescription('');
+        setRetoMetas([]);
+      }
     } catch (err) {
       console.error('Error fetching active challenge:', err);
     }
@@ -1956,7 +1983,11 @@ export default function AdminDashboard() {
     setRetoLoading(true);
     setRetoStatus({ success: '', error: '' });
     try {
-      const res = await api.adminActualizarReto(retoMessage);
+      const challengeObj = {
+        descripcion: retoDescription.trim(),
+        metas: retoMetas.filter(m => m.cantidad > 0 && m.bono > 0)
+      };
+      const res = await api.adminActualizarReto(JSON.stringify(challengeObj));
       setRetoStatus({ success: res.message || 'Reto de promotores actualizado con éxito.', error: '' });
     } catch (err) {
       setRetoStatus({ success: '', error: err.message || 'Error al actualizar el reto.' });
@@ -2037,29 +2068,109 @@ export default function AdminDashboard() {
           </Section>
 
           {/* Column 2: Promoter Incentives (Reto / Bono) */}
-          <Section icon="users" title="Incentivo Activo para Promotores">
+          <Section icon="users" title="Incentivo Activo para Promotores (Didi-style)">
             <form onSubmit={handleSaveReto} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <p style={{ color: theme.textSec, fontSize: '0.82rem', marginBottom: '16px', lineHeight: 1.4 }}>
-                Publica un banner informativo en el panel de control de los promotores. Ideal para motivarlos a vender con bonos del día o metas de ventas específicas.
+                Publica un reto con metas acumulativas (Didi-style) para que los promotores visualicen su barra de progreso y desbloqueen bonos en tiempo real.
               </p>
 
               <label style={{ fontSize: '0.75rem', fontWeight: 700, color: theme.textSec, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Mensaje de Reto / Bono del Día
+                Descripción del Reto
               </label>
-              <textarea 
-                rows="4" 
-                placeholder="Ej: 🔥 RETO DEL DÍA: ¡Vende 10 boletas antes de medianoche y llévate un bono de $20.000 COP extra!" 
-                value={retoMessage} 
-                onChange={e => setRetoMessage(e.target.value)} 
-                style={{ ...inputStyle, minHeight: '90px', resize: 'vertical', fontFamily: 'inherit', marginBottom: '12px' }}
+              <input 
+                type="text"
+                placeholder="Ej: ¡Completa los retos de ventas hoy y gana comisiones extra!" 
+                value={retoDescription} 
+                onChange={e => setRetoDescription(e.target.value)} 
+                style={{ ...inputStyle, marginBottom: '12px' }}
+                required
               />
 
-              <div style={{ padding: '12px', background: 'rgba(177, 78, 255, 0.05)', borderRadius: '8px', border: `1px solid ${theme.border}`, marginBottom: '12px' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: theme.accentLight, display: 'block', marginBottom: '4px' }}>Vista previa del Banner en el Dashboard de Promotor:</span>
-                {retoMessage.trim() ? (
-                  <div style={{ background: 'linear-gradient(135deg, rgba(177, 78, 255, 0.15), rgba(153, 64, 224, 0.05))', border: `1px solid ${theme.accent}44`, borderRadius: '6px', padding: '10px 14px', color: theme.text, fontSize: '0.78rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ animation: 'pulse 1.5s infinite', fontSize: '1rem' }}>🔥</span>
-                    <span>{retoMessage}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: theme.textSec, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Metas / Hitos de Ventas
+                </label>
+                <button 
+                  type="button" 
+                  onClick={handleAddMeta}
+                  style={{ padding: '4px 10px', borderRadius: '6px', border: 'none', background: 'rgba(177,78,255,0.12)', color: theme.accentLight, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700 }}
+                >
+                  + Agregar Meta
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                {retoMetas.map((meta, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: '0.65rem', color: theme.textMuted, display: 'block', marginBottom: '2px', fontWeight: 700 }}>Boletas</span>
+                      <input 
+                        type="number" 
+                        min="1" 
+                        value={meta.cantidad} 
+                        onChange={e => handleMetaChange(idx, 'cantidad', e.target.value)}
+                        style={{ ...inputStyle, marginBottom: 0, padding: '8px 12px' }} 
+                        placeholder="Ej: 5"
+                      />
+                    </div>
+                    <div style={{ flex: 1.5 }}>
+                      <span style={{ fontSize: '0.65rem', color: theme.textMuted, display: 'block', marginBottom: '2px', fontWeight: 700 }}>Bono Extra (COP)</span>
+                      <input 
+                        type="number" 
+                        min="0" 
+                        value={meta.bono} 
+                        onChange={e => handleMetaChange(idx, 'bono', e.target.value)}
+                        style={{ ...inputStyle, marginBottom: 0, padding: '8px 12px' }} 
+                        placeholder="Ej: 10000"
+                      />
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => handleRemoveMeta(idx)}
+                      style={{ padding: '8px 10px', borderRadius: '6px', border: 'none', background: 'rgba(239,68,68,0.1)', color: theme.danger, cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, marginTop: '16px' }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                {retoMetas.length === 0 && (
+                  <p style={{ color: theme.textMuted, fontSize: '0.78rem', fontStyle: 'italic', textAlign: 'center', padding: '10px 0' }}>Sin metas agregadas. Agrega al menos una para activar el reto.</p>
+                )}
+              </div>
+
+              {/* Didi-style Preview for Admin */}
+              <div style={{ padding: '16px', background: 'rgba(177, 78, 255, 0.05)', borderRadius: '12px', border: `1px solid ${theme.border}`, marginBottom: '12px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: theme.accentLight, display: 'block', marginBottom: '8px' }}>Vista previa del Reto (Asumiendo 7 boletas vendidas):</span>
+                {retoDescription.trim() ? (
+                  <div style={{ background: 'linear-gradient(135deg, rgba(177, 78, 255, 0.15), rgba(153, 64, 224, 0.05))', border: `1px solid ${theme.accent}44`, borderRadius: '10px', padding: '14px', color: theme.text }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>{retoDescription}</span>
+                    </div>
+                    {retoMetas.length > 0 && (
+                      <div style={{ marginTop: '16px', padding: '10px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
+                        {(() => {
+                          const metasSorted = [...retoMetas].sort((a, b) => a.cantidad - b.cantidad);
+                          const maxMeta = metasSorted[metasSorted.length - 1].cantidad || 10;
+                          const progresoMock = 7;
+                          const percent = Math.min(100, (progresoMock / maxMeta) * 100);
+                          return (
+                            <div style={{ position: 'relative', width: '100%', height: '8px', background: '#222', borderRadius: '4px', marginTop: '10px', marginBottom: '32px' }}>
+                              <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', background: 'linear-gradient(90deg, #ff007f, #7928ca)', boxShadow: '0 0 10px rgba(255, 0, 127, 0.5)', borderRadius: '4px', width: `${percent}%` }} />
+                              {metasSorted.map((meta, idx) => {
+                                const isCompleted = progresoMock >= meta.cantidad;
+                                const leftVal = (meta.cantidad / maxMeta) * 100;
+                                return (
+                                  <div key={idx} style={{ position: 'absolute', left: `${leftVal}%`, top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: isCompleted ? '#4ade80' : '#111', border: '2px solid #333' }} />
+                                    <span style={{ fontSize: '8px', color: '#9A9A9A', marginTop: '4px', whiteSpace: 'nowrap', fontWeight: 'bold' }}>{meta.cantidad} bols. (+${(meta.bono/1000).toFixed(0)}k)</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div style={{ color: theme.textMuted, fontSize: '0.78rem', fontStyle: 'italic', padding: '8px 0' }}>Sin reto activo actualmente.</div>

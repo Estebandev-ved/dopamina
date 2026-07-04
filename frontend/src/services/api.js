@@ -490,6 +490,10 @@ class ApiService {
   promotorGetRetoActivo() {
     return this.get('/api/promotor/reto-activo');
   }
+
+  promotorGetRanking() {
+    return this.get('/api/promotor/ranking');
+  }
 }
 
 export const api = new ApiService();

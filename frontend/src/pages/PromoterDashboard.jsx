@@ -25,21 +25,86 @@ export default function PromoterDashboard() {
   const [bankSaving, setBankSaving] = useState(false);
   const [bankError, setBankError] = useState('');
   const [bankSuccess, setBankSuccess] = useState(false);
-  const [retoActivo, setRetoActivo] = useState('');
+  const [retoActivo, setRetoActivo] = useState(null);
+  const [progresoHoy, setProgresoHoy] = useState(0);
+  const [bonosGanadosHoy, setBonosGanadosHoy] = useState([]);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [timeLeft, setTimeLeft] = useState('');
+  const [simulatedTickets, setSimulatedTickets] = useState(0);
+  const [ranking, setRanking] = useState([]);
+  const [simulatedTicketType, setSimulatedTicketType] = useState('PREVENTA');
+
+  // Reloj de cuenta regresiva
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      const midnight = new Date();
+      midnight.setHours(23, 59, 59, 999);
+      const diff = midnight - now;
+      if (diff <= 0) {
+        setTimeLeft('00:00:00');
+        clearInterval(timer);
+      } else {
+        const hours = String(Math.floor((diff / (1000 * 60 * 60)) % 24)).padStart(2, '0');
+        const minutes = String(Math.floor((diff / (1000 * 60)) % 60)).padStart(2, '0');
+        const seconds = String(Math.floor((diff / 1000) % 60)).padStart(2, '0');
+        setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Rango / Insignia según ventas totales históricas
+  const promoterTier = useMemo(() => {
+    const totalBoletas = stats?.totalBoletas || 0;
+    if (totalBoletas >= 50) return { nombre: 'Élite', style: 'shadow-[0_0_10px_rgba(236,72,153,0.3)] border-pink-500 text-pink-500 bg-pink-500/5' };
+    if (totalBoletas >= 25) return { nombre: 'Oro', style: 'shadow-[0_0_10px_rgba(245,158,11,0.3)] border-amber-500 text-amber-500 bg-amber-500/5' };
+    if (totalBoletas >= 10) return { nombre: 'Plata', style: 'shadow-[0_0_10px_rgba(148,163,184,0.2)] border-slate-400 text-slate-400 bg-slate-400/5' };
+    return { nombre: 'Bronce', style: 'border-amber-700 text-amber-700 bg-amber-700/5' };
+  }, [stats]);
+
+  const comisionBaseEstimada = simulatedTicketType === 'PREVENTA' ? 2375 : 3325;
+  const simulatedComisionBase = simulatedTickets * comisionBaseEstimada;
+
+  const simulatedBono = useMemo(() => {
+    if (!retoActivo || !retoActivo.metas || retoActivo.metas.length === 0) return 0;
+    const metasSorted = [...retoActivo.metas].sort((a, b) => a.cantidad - b.cantidad);
+    let activeBono = 0;
+    for (const m of metasSorted) {
+      if (simulatedTickets >= m.cantidad) {
+        activeBono = m.bono;
+      }
+    }
+    return activeBono;
+  }, [retoActivo, simulatedTickets]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [statsData, ventasData, cuentaData, retoData] = await Promise.all([
+        const [statsData, ventasData, cuentaData, retoData, rankingData] = await Promise.all([
           api.promotorGetStats(),
           api.promotorGetVentas(),
           api.promotorGetCuenta().catch(() => ({ registrada: false })),
-          api.promotorGetRetoActivo().catch(() => ({ message: '' }))
+          api.promotorGetRetoActivo().catch(() => ({ challengeJson: '', progresoHoy: 0, bonosGanadosHoy: [] })),
+          api.promotorGetRanking().catch(() => [])
         ]);
         setStats(statsData);
         setVentas(ventasData);
-        setRetoActivo(retoData?.message || '');
+        setRanking(rankingData);
+        
+        let challenge = null;
+        if (retoData?.challengeJson) {
+          try {
+            challenge = JSON.parse(retoData.challengeJson);
+          } catch (e) {
+            challenge = { descripcion: retoData.challengeJson, metas: [] };
+          }
+        }
+        setRetoActivo(challenge);
+        setProgresoHoy(retoData?.progresoHoy || 0);
+        setBonosGanadosHoy(retoData?.bonosGanadosHoy || []);
+
         // Si no tiene cuenta registrada, mostrar el modal
         if (!cuentaData.registrada) {
           setShowBankModal(true);
@@ -192,6 +257,9 @@ export default function PromoterDashboard() {
               </h1>
               <p className="text-gray-400 text-xs sm:text-sm mt-1">
                 Bienvenido, <strong className="text-white">{currentUser?.nombre}</strong>. Aquí tienes el control de tus ventas y comisiones.
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ml-2 ${promoterTier.style}`}>
+                  Rango {promoterTier.nombre}
+                </span>
               </p>
             </div>
             
@@ -222,19 +290,118 @@ export default function PromoterDashboard() {
 
           {/* Active Challenge / Incentive Banner */}
           {retoActivo && (
-            <div className="bg-gradient-to-r from-[var(--color-neon)]/20 via-[var(--color-neon)]/5 to-transparent border border-[var(--color-neon)]/30 rounded-xl p-5 mb-8 flex items-start gap-4 shadow-neon-sm relative overflow-hidden">
+            <div className="bg-gradient-to-r from-[var(--color-neon)]/20 via-[var(--color-neon)]/5 to-transparent border border-[var(--color-neon)]/30 rounded-xl p-5 mb-8 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-6 shadow-neon-sm relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--color-neon)]/5 blur-2xl pointer-events-none" />
-              <div className="flex-shrink-0 bg-[var(--color-neon)]/20 border border-[var(--color-neon)]/40 p-2.5 rounded-lg text-[var(--color-neon)] animate-pulse">
-                <Award className="w-6 h-6" />
+              
+              <div className="flex-grow flex items-start gap-4">
+                <div className="flex-shrink-0 bg-[var(--color-neon)]/25 border border-[var(--color-neon)]/40 p-2.5 rounded-lg text-[var(--color-neon)] animate-pulse">
+                  <Award className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black text-[var(--color-neon)] tracking-widest uppercase block">
+                    RETO / BONO ACTIVO HOY
+                  </span>
+                  <p className="text-sm font-semibold text-white leading-relaxed">
+                    {retoActivo.descripcion}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
+                    <p className="text-[11px] text-gray-400">
+                      Llevas <strong className="text-white font-mono">{progresoHoy} boletas</strong> vendidas hoy.
+                    </p>
+                    {timeLeft && (
+                      <span className="text-[10px] font-mono text-[var(--color-neon)] bg-[var(--color-neon)]/10 px-2 py-0.5 rounded border border-[var(--color-neon)]/20">
+                        Cierra en: {timeLeft}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1">
-                <span className="text-[10px] font-black text-[var(--color-neon)] tracking-widest uppercase block">
-                  🔥 RETO / BONO ACTIVO HOY
-                </span>
-                <p className="text-sm font-semibold text-white leading-relaxed">
-                  {retoActivo}
-                </p>
-              </div>
+
+              {/* Progress Bar (Didi-style) */}
+              {retoActivo.metas && retoActivo.metas.length > 0 && (
+                <div className="w-full md:w-[450px] bg-black/40 border border-industrial-800/80 rounded-xl p-5 pt-3 pb-8">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block font-mono">Progreso del Reto</span>
+                    <button 
+                      onClick={() => setShowTermsModal(true)}
+                      className="text-[9px] text-[var(--color-neon)] hover:underline font-bold bg-transparent border-none cursor-pointer p-0"
+                    >
+                      Términos y Condiciones
+                    </button>
+                  </div>
+                  {(() => {
+                    const metasSorted = [...retoActivo.metas].sort((a, b) => a.cantidad - b.cantidad);
+                    const maxMeta = metasSorted[metasSorted.length - 1].cantidad || 10;
+                    const percent = Math.min(100, (progresoHoy / maxMeta) * 100);
+                    
+                    // Calcular el total de bono acumulado hoy
+                    const totalBonoGanado = bonosGanadosHoy.reduce((acc, curr) => acc + curr.valorBono, 0);
+
+                    // Siguiente meta
+                    const proximaMeta = metasSorted.find(m => progresoHoy < m.cantidad);
+                    
+                    return (
+                      <div>
+                        {/* Bar container */}
+                        <div className="relative w-full h-2.5 bg-industrial-900 rounded-full mt-4 mb-10">
+                          <div 
+                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#ff007f] to-[#7928ca] rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(255,0,127,0.5)]" 
+                            style={{ width: `${percent}%` }}
+                          />
+                          {metasSorted.map((meta, index) => {
+                            const isCompleted = progresoHoy >= meta.cantidad;
+                            const positionPercent = (meta.cantidad / maxMeta) * 100;
+                            return (
+                              <div 
+                                key={index}
+                                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex flex-col items-center"
+                                style={{ left: `${positionPercent}%` }}
+                              >
+                                {/* Milestone indicator dot */}
+                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[9px] font-black transition-all ${
+                                  isCompleted 
+                                    ? 'bg-emerald-500 border-emerald-400 text-white shadow-[0_0_10px_rgba(16,185,129,0.5)]' 
+                                    : 'bg-black border-industrial-800 text-gray-500'
+                                }`}>
+                                  {isCompleted ? '✓' : index + 1}
+                                </div>
+                                
+                                {/* Milestone labels */}
+                                <div className="text-[9px] font-bold mt-2 text-center absolute top-5 whitespace-nowrap">
+                                  <span className="block text-gray-300 font-mono">{meta.cantidad} bols.</span>
+                                  <span className={`block font-mono ${isCompleted ? 'text-emerald-400' : 'text-gray-500'}`}>
+                                    +${(meta.bono / 1000).toFixed(0)}k
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Motivational Footer */}
+                        <div className="flex justify-between items-center text-[10px] border-t border-industrial-850 pt-3 mt-4" style={{ marginTop: '16px' }}>
+                          <div className="text-gray-400">
+                            {proximaMeta ? (
+                              <span>Te faltan <strong className="text-white font-mono">{proximaMeta.cantidad - progresoHoy}</strong> boletas para el bono de <strong>${proximaMeta.bono.toLocaleString('es-CO')}</strong></span>
+                            ) : (
+                              <span className="text-emerald-400 font-bold">¡Has completado todos los retos de hoy!</span>
+                            )}
+                          </div>
+                          {totalBonoGanado > 0 && (
+                            <div className="flex flex-col items-end">
+                              <div className="bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded text-emerald-400 font-mono font-bold">
+                                Bono ganado: +${totalBonoGanado.toLocaleString('es-CO')} COP
+                              </div>
+                              <span className="text-[8px] text-gray-500 mt-1 font-mono text-right">Se sumará a tu saldo a las 12:00 de la noche (medianoche)</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
             </div>
           )}
 
@@ -427,6 +594,135 @@ export default function PromoterDashboard() {
                     <span className="font-bold text-white">{entry.value} ud</span>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Gamification Tools: Earnings Simulator & Leaderboard */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+            {/* 1. Earnings Simulator Card */}
+            <div className="bg-[#10101A]/40 backdrop-blur-md border border-industrial-800 rounded-xl p-6 flex flex-col justify-between">
+              <div>
+                <h3 className="text-base font-bold text-white mb-2">Simulador de Ganancias</h3>
+                <p className="text-xs text-gray-500 mb-6">Descubre cuánto ganarías según las boletas que vendas hoy</p>
+                
+                <div className="space-y-6">
+                  {/* Ticket Type Selector */}
+                  <div>
+                    <span className="text-[10px] text-gray-500 font-mono block uppercase mb-1.5">Tipo de Boleta</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSimulatedTicketType('PREVENTA')}
+                        className={`flex-1 py-1.5 rounded text-xs font-bold transition-all border ${
+                          simulatedTicketType === 'PREVENTA'
+                            ? 'bg-[var(--color-neon)]/15 border-[var(--color-neon)]/30 text-white font-black'
+                            : 'bg-black/30 border-industrial-800 text-gray-500 hover:text-gray-300'
+                        }`}
+                      >
+                        Preventa ($2.375 COP)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSimulatedTicketType('FULL')}
+                        className={`flex-1 py-1.5 rounded text-xs font-bold transition-all border ${
+                          simulatedTicketType === 'FULL'
+                            ? 'bg-[var(--color-neon)]/15 border-[var(--color-neon)]/30 text-white font-black'
+                            : 'bg-black/30 border-industrial-800 text-gray-500 hover:text-gray-300'
+                        }`}
+                      >
+                        Boleta Full ($3.325 COP)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Slider Control */}
+                  <div>
+                    <div className="flex justify-between items-center text-xs font-mono mb-2">
+                      <span className="text-gray-400">Boletas Simuladas:</span>
+                      <span className="text-white font-bold">{simulatedTickets} ud</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="50" 
+                      value={simulatedTickets} 
+                      onChange={e => setSimulatedTickets(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-industrial-900 rounded-lg appearance-none cursor-pointer accent-[var(--color-neon)]"
+                    />
+                    <div className="flex justify-between text-[10px] text-gray-500 font-mono mt-1">
+                      <span>0</span>
+                      <span>25</span>
+                      <span>50</span>
+                    </div>
+                  </div>
+
+                  {/* Calculations Breakdown */}
+                  <div className="bg-black/30 border border-industrial-800/80 rounded-xl p-4 space-y-2 text-xs font-mono">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Comisión Base (${comisionBaseEstimada.toLocaleString('es-CO')}/ud):</span>
+                      <span className="text-white">${simulatedComisionBase.toLocaleString('es-CO')}</span>
+                    </div>
+                    {retoActivo && retoActivo.metas && retoActivo.metas.length > 0 && (
+                      <div className="flex justify-between border-b border-industrial-850 pb-2 mb-2">
+                        <span className="text-gray-400">Bono por Retos del Día:</span>
+                        <span className={simulatedBono > 0 ? "text-emerald-400" : "text-gray-500"}>
+                          {simulatedBono > 0 ? `+$${simulatedBono.toLocaleString('es-CO')}` : '$0'}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm font-bold pt-1">
+                      <span className="text-gray-300">Total Estimado:</span>
+                      <span className="text-[var(--color-neon)]">${(simulatedComisionBase + simulatedBono).toLocaleString('es-CO')} COP</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Leaderboard Card */}
+            <div className="bg-[#10101A]/40 backdrop-blur-md border border-industrial-800 rounded-xl p-6 flex flex-col justify-between">
+              <div>
+                <h3 className="text-base font-bold text-white mb-2">Tabla de Clasificación</h3>
+                <p className="text-xs text-gray-500 mb-6">Top 5 promotores con más ventas registradas en el evento</p>
+                
+                <div className="space-y-3">
+                  {ranking && ranking.length > 0 ? (
+                    ranking.map((item, index) => {
+                      const isMe = currentUser && currentUser.nombre && (
+                        currentUser.nombre.toLowerCase().startsWith(item.nombre.split(' ')[0].toLowerCase())
+                      );
+                      let rankBadge = '';
+                      if (index === 0) rankBadge = '🥇';
+                      else if (index === 1) rankBadge = '🥈';
+                      else if (index === 2) rankBadge = '🥉';
+                      else rankBadge = `#${index + 1}`;
+
+                      return (
+                        <div 
+                          key={index}
+                          className={`flex items-center justify-between p-3 rounded-lg border text-xs font-mono transition-all ${
+                            isMe 
+                              ? 'bg-[var(--color-neon)]/10 border-[var(--color-neon)]/30' 
+                              : 'bg-black/20 border-industrial-850'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-base font-bold w-6 text-center">{rankBadge}</span>
+                            <span className={isMe ? 'text-white font-bold' : 'text-gray-300'}>
+                              {item.nombre} {isMe && <span className="text-[8px] bg-[var(--color-neon)]/20 text-[var(--color-neon)] px-1.5 py-0.5 rounded font-black ml-1">TÚ</span>}
+                            </span>
+                          </div>
+                          <span className="font-bold text-white">{item.boletas} boletas</span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-8 text-xs text-gray-500 font-mono">
+                      Cargando clasificación de promotores...
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -736,6 +1032,67 @@ export default function PromoterDashboard() {
                 {bankSaving ? 'Guardando...' : 'Guardar Datos de Pago'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal de Términos y Condiciones del Reto */}
+      {showTermsModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px'
+        }}>
+          <div style={{
+            background: 'linear-gradient(145deg, #0d0d14, #13131f)',
+            border: '1px solid rgba(177,78,255,0.3)',
+            borderRadius: '20px', padding: '36px', maxWidth: '500px', width: '100%',
+            boxShadow: '0 0 60px rgba(177,78,255,0.15)',
+            position: 'relative'
+          }}>
+            <button 
+              onClick={() => setShowTermsModal(false)}
+              style={{
+                position: 'absolute', top: '16px', right: '16px',
+                background: 'transparent', border: 'none', color: '#9b8eb0',
+                fontSize: '1.2rem', cursor: 'pointer', outline: 'none'
+              }}
+            >
+              ✕
+            </button>
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <h2 style={{ color: '#e2d4ff', fontSize: '1.2rem', fontWeight: 900, letterSpacing: '1px', margin: '0 0 8px', textTransform: 'uppercase' }}>
+                Términos y Condiciones del Reto
+              </h2>
+              <p style={{ color: '#9b8eb0', fontSize: '0.8rem', margin: 0 }}>
+                Reglas oficiales para los bonos de ventas
+              </p>
+            </div>
+            <div style={{ color: '#d2c4f0', fontSize: '0.82rem', lineHeight: '1.6', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '300px', overflowY: 'auto', paddingRight: '8px' }}>
+              <p>
+                <strong>1. Vigencia Diaria:</strong> Los retos son estrictamente diarios. El progreso acumulado se calcula desde las 00:00:00 hasta las 23:59:59 de cada día.
+              </p>
+              <p>
+                <strong>2. Ventas Válidas:</strong> Se contabilizan únicamente boletas de compras con estado "PAGADO" (exitosas en pasarela) que hayan aplicado tu código de descuento. Las reservas pendientes no suman al progreso.
+              </p>
+              <p>
+                <strong>3. Consolidación a Medianoche:</strong> Los bonos obtenidos durante el día se liquidan al cierre de la jornada (12:00 de la noche). En ese momento, se añaden a tu saldo de comisiones acumuladas.
+              </p>
+              <p>
+                <strong>4. Transparencia:</strong> Dopamina Crew se reserva el derecho de auditar las compras. El uso indebido de cupones, auto-compras directas con fines especulativos o cancelaciones posteriores anularán el bono correspondiente.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowTermsModal(false)}
+              style={{
+                width: '100%', marginTop: '24px',
+                background: 'linear-gradient(135deg, #b14eff, #7c3aed)',
+                border: 'none', borderRadius: '10px', padding: '12px',
+                color: '#fff', fontSize: '0.85rem', fontWeight: 800,
+                cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '1px'
+              }}
+            >
+              Entendido
+            </button>
           </div>
         </div>
       )}

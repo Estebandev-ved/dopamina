@@ -33,6 +33,9 @@ public class AdminCuponController {
     @Autowired
     private com.dopaminacrew.backend.repository.UserRepository userRepository;
 
+    @Autowired
+    private com.dopaminacrew.backend.repository.PromotorBonoRepository promotorBonoRepository;
+
     /** DTO para detallar el uso de un cupón por un usuario. */
     public static class UsoUsuario {
         public Long usuarioId;
@@ -113,6 +116,14 @@ public class AdminCuponController {
             r.totalComisionAcumulada = comprasExitosas.stream()
                 .mapToDouble(c -> c.getComisionPromotor() != null ? c.getComisionPromotor() : 0.0)
                 .sum();
+
+            if (cupon.getPromotor() != null) {
+                double totalBonosPasados = promotorBonoRepository.findByPromotorId(cupon.getPromotor().getId()).stream()
+                    .filter(b -> b.getFecha() != null && b.getFecha().isBefore(java.time.LocalDate.now()))
+                    .mapToDouble(b -> b.getValorBono() != null ? b.getValorBono() : 0.0)
+                    .sum();
+                r.totalComisionAcumulada += totalBonosPasados;
+            }
 
             r.totalPreventa = comprasExitosas.stream()
                 .mapToInt(c -> c.getCantidadPreventa() != null ? c.getCantidadPreventa() : 0)
