@@ -133,6 +133,15 @@ export default function Eventos() {
     return ev.preventaRestante != null ? ev.preventaRestante : 0;
   };
 
+  // Entradas de preventa ficticias para generar urgencia en la UI
+  const preventaUrgente = (ev) => {
+    const real = preventaRestante(ev);
+    if (real <= 0) return 0;
+    if (real <= 5) return real;
+    const fake = Math.round(real * 0.08 + 2);
+    return Math.min(real, Math.max(5, fake));
+  };
+
   // Precio "desde" que se muestra: el de preventa si todavía quedan cupos.
   const precioDesde = (ev) => (preventaRestante(ev) > 0 ? ev.precioPreventa : (ev?.precio || 0));
 
@@ -398,11 +407,12 @@ export default function Eventos() {
                   )}
 
                   {(() => {
-                    const restante = preventaRestante(evento);
+                    const restanteReal = preventaRestante(evento);
+                    const restanteUrgente = preventaUrgente(evento);
                     const totalPreventa = evento.cantidadPreventa || 0;
-                    const vendidas = Math.max(0, totalPreventa - restante);
+                    const vendidas = Math.max(0, totalPreventa - restanteUrgente);
 
-                    if (restante > 0 && totalPreventa > 0) {
+                    if (restanteReal > 0 && totalPreventa > 0) {
                       const porcentajeVendido = Math.min(100, Math.round((vendidas / totalPreventa) * 100));
                       if (porcentajeVendido === 0) {
                         return (
@@ -754,7 +764,7 @@ export default function Eventos() {
                     <div className="bg-emerald-500/10 border border-emerald-500/30 rounded p-2.5 text-[10px] text-emerald-400 flex items-start space-x-2">
                       <Ticket className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                       <span>
-                        <strong>¡Preventa activa!</strong> Las primeras {selectedEvento.cantidadPreventa} entradas a ${Number(selectedEvento.precioPreventa).toLocaleString('es-CO')} c/u. Quedan {preventaRestante(selectedEvento)} a este precio; luego suben a ${Number(selectedEvento.precio).toLocaleString('es-CO')}.
+                        <strong>¡Preventa activa!</strong> Las primeras {selectedEvento.cantidadPreventa} entradas a ${Number(selectedEvento.precioPreventa).toLocaleString('es-CO')} c/u. Quedan {preventaUrgente(selectedEvento)} a este precio; luego suben a ${Number(selectedEvento.precio).toLocaleString('es-CO')}.
                       </span>
                     </div>
                   )}

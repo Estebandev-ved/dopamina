@@ -63,6 +63,7 @@ public class AdminCuponController {
         public Double totalComisionAcumulada;
         public int totalPreventa;
         public int totalRegular;
+        public Double totalVentasGeneradas;
         public List<UsoUsuario> usuarios;
     }
 
@@ -119,6 +120,10 @@ public class AdminCuponController {
 
             r.totalRegular = comprasExitosas.stream()
                 .mapToInt(c -> c.getCantidadRegular() != null ? c.getCantidadRegular() : 0)
+                .sum();
+
+            r.totalVentasGeneradas = comprasExitosas.stream()
+                .mapToDouble(c -> c.getSubtotal() != null ? c.getSubtotal() : 0.0)
                 .sum();
 
             List<UsoUsuario> usuariosLista = new ArrayList<>();

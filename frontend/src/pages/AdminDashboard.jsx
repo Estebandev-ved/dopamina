@@ -2306,7 +2306,7 @@ export default function AdminDashboard() {
                       <td style={{ ...tdStyle, textAlign: 'center', color: theme.success }}>{p.totalPreventa || 0}</td>
                       <td style={{ ...tdStyle, textAlign: 'center', color: theme.info || theme.accentLight }}>{p.totalRegular || 0}</td>
                       <td style={{ ...tdStyle, fontWeight: 700, color: theme.warning }}>
-                        ${((p.totalPreventa || 0) * 25000 + (p.totalRegular || 0) * 35000).toLocaleString('es-CO')}
+                        ${(p.totalVentasGeneradas || 0).toLocaleString('es-CO')}
                       </td>
                       <td style={{ ...tdStyle, fontWeight: 900, color: theme.success }}>
                         ${(p.totalComisionAcumulada || 0).toLocaleString('es-CO')}

@@ -112,6 +112,14 @@ export default function Checkout() {
     ? (selectedEvento.preventaRestante != null ? selectedEvento.preventaRestante : 0)
     : 0;
 
+  // Entradas de preventa ficticias para generar urgencia en la UI (sin afectar cálculos)
+  const preventaRestanteUrgente = (() => {
+    if (preventaRestante <= 0) return 0;
+    if (preventaRestante <= 5) return preventaRestante;
+    const fake = Math.round(preventaRestante * 0.08 + 2);
+    return Math.min(preventaRestante, Math.max(5, fake));
+  })();
+
   // Subtotal con preventa: las primeras 'cantidadPreventa' entradas (descontando las
   // ya vendidas) van a 'precioPreventa'; el resto al precio regular. Refleja exactamente
   // lo que calcula el backend, así el total mostrado coincide con el cobro de la pasarela.
@@ -397,7 +405,7 @@ export default function Checkout() {
                   {preventaRestante > 0 && (
                     <div className="text-emerald-400 text-[11px] font-bold normal-case bg-emerald-500/10 border border-emerald-500/20 rounded px-2 py-1.5 flex items-center gap-1.5">
                       <Ticket className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Preventa activa: ${Number(selectedEvento.precioPreventa).toLocaleString('es-CO')} c/u — quedan {preventaRestante} entradas a este precio.</span>
+                      <span>Preventa activa: ${Number(selectedEvento.precioPreventa).toLocaleString('es-CO')} c/u — quedan {preventaRestanteUrgente} entradas a este precio.</span>
                     </div>
                   )}
                   <div className="flex justify-between text-gray-400">
