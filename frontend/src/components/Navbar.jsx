@@ -174,7 +174,7 @@ export default function Navbar() {
           </div>
 
           {/* Desktop Navigation Links */}
-          <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
+          <div className="hidden lg:flex items-center space-x-6 xl:space-x-8">
             <Link
               to="/"
               className={`text-sm font-semibold tracking-wider transition-colors duration-200 ${
@@ -217,16 +217,19 @@ export default function Navbar() {
             </Link>
             <Link
               to="/arcade"
-              className={`text-sm font-semibold tracking-wider transition-colors duration-200 ${
+              className={`text-sm font-semibold tracking-wider transition-colors duration-200 flex items-center gap-1.5 ${
                 isActive('/arcade') ? 'text-neon-glow' : 'text-gray-400 hover:text-white'
               }`}
             >
-              ARCADE 🕹️
+              <span>ARCADE</span>
+              <svg className="w-4 h-4 fill-current animate-pulse text-neon-purple" viewBox="0 0 24 24" style={{ color: 'var(--color-neon)' }}>
+                <path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2Zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2Zm4.5 3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5Zm4-3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5Z"/>
+              </svg>
             </Link>
           </div>
 
           {/* User Auth Info / Actions */}
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden lg:flex items-center space-x-4">
             {/* Neon Customizer */}
             <div className="flex items-center space-x-2 mr-2 bg-industrial-900 border border-industrial-800 rounded-full px-2.5 py-1 select-none">
               <span className="text-[10px] tracking-wider text-gray-500 font-bold uppercase mr-1">NEÓN:</span>
@@ -350,7 +353,7 @@ export default function Navbar() {
           </div>
 
           {/* Mobile Menu Button */}
-          <div className="flex md:hidden">
+          <div className="flex lg:hidden">
             <button
               onClick={() => setIsOpen(!isOpen)}
               className="text-gray-400 hover:text-white focus:outline-none"
@@ -363,7 +366,7 @@ export default function Navbar() {
 
       {/* Mobile Drawer */}
       {isOpen && (
-        <div className="md:hidden bg-black/95 border-b border-industrial-800 px-4 pt-2 pb-6 space-y-4">
+        <div className="lg:hidden bg-black/95 border-b border-industrial-800 px-4 pt-2 pb-6 space-y-4">
           <div className="flex flex-col space-y-3">
             <Link
               to="/"
@@ -413,11 +416,14 @@ export default function Navbar() {
             <Link
               to="/arcade"
               onClick={() => setIsOpen(false)}
-              className={`text-sm font-bold tracking-widest py-2 ${
+              className={`text-sm font-bold tracking-widest py-2 flex items-center gap-2 ${
                 isActive('/arcade') ? 'text-neon-glow' : 'text-gray-400'
               }`}
             >
-              ARCADE 🕹️
+              <span>ARCADE</span>
+              <svg className="w-4 h-4 fill-current text-neon-purple" viewBox="0 0 24 24" style={{ color: 'var(--color-neon)' }}>
+                <path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2Zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2Zm4.5 3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5Zm4-3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5Z"/>
+              </svg>
             </Link>
             {currentUser && (
               <Link

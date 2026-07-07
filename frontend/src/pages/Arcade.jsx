@@ -3,7 +3,7 @@ import { Trophy, Play, Square, RefreshCw, Volume2, VolumeX, Copy, Check, Info, A
 import PageTransition from '../components/PageTransition';
 
 export default function Arcade() {
-  const [activeTab, setActiveTab] = useState('catch'); // 'catch' or 'beatmaker'
+  const [activeTab, setActiveTab] = useState('catch'); // 'catch','runner','beatmaker','snake','beattap','sequence'
 
   return (
     <PageTransition>
@@ -28,42 +28,42 @@ export default function Arcade() {
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex justify-center mb-8 gap-4">
-            <button
-              onClick={() => setActiveTab('catch')}
-              className={`px-6 py-3 font-mono font-bold uppercase tracking-wider text-xs border rounded transition-all duration-300 cursor-pointer ${
-                activeTab === 'catch'
-                  ? 'bg-neon-purple text-white border-neon-purple shadow-neon-sm'
-                  : 'bg-industrial-950/40 text-gray-400 border-industrial-800 hover:text-white hover:border-neon-purple/50'
-              }`}
-              style={{ 
-                backgroundColor: activeTab === 'catch' ? 'var(--color-neon)' : '',
-                borderColor: activeTab === 'catch' ? 'var(--color-neon)' : '',
-                boxShadow: activeTab === 'catch' ? '0 0 10px var(--color-neon-shadow-md)' : ''
-              }}
-            >
-              🕹️ Dopamine Catch
-            </button>
-            <button
-              onClick={() => setActiveTab('beatmaker')}
-              className={`px-6 py-3 font-mono font-bold uppercase tracking-wider text-xs border rounded transition-all duration-300 cursor-pointer ${
-                activeTab === 'beatmaker'
-                  ? 'bg-neon-purple text-white border-neon-purple shadow-neon-sm'
-                  : 'bg-industrial-950/40 text-gray-400 border-industrial-800 hover:text-white hover:border-neon-purple/50'
-              }`}
-              style={{ 
-                backgroundColor: activeTab === 'beatmaker' ? 'var(--color-neon)' : '',
-                borderColor: activeTab === 'beatmaker' ? 'var(--color-neon)' : '',
-                boxShadow: activeTab === 'beatmaker' ? '0 0 10px var(--color-neon-shadow-md)' : ''
-              }}
-            >
-              🎛️ Techno Beatmaker
-            </button>
+          <div className="flex flex-wrap justify-center mb-8 gap-3">
+            {[
+              { key: 'catch',    label: '🕹️ Dopamine Catch' },
+              { key: 'runner',   label: '🏃 Rave Runner' },
+              { key: 'snake',    label: '🐍 Neon Snake' },
+              { key: 'beattap',  label: '🎯 Beat Tap' },
+              { key: 'sequence', label: '🧠 Sequence Sync' },
+              { key: 'beatmaker',label: '🎛️ Techno Beatmaker' },
+            ].map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`px-4 py-2.5 font-mono font-bold uppercase tracking-wider text-xs border rounded transition-all duration-300 cursor-pointer ${
+                  activeTab === key
+                    ? 'text-white'
+                    : 'bg-industrial-950/40 text-gray-400 border-industrial-800 hover:text-white hover:border-neon-purple/50'
+                }`}
+                style={{
+                  backgroundColor: activeTab === key ? 'var(--color-neon)' : '',
+                  borderColor: activeTab === key ? 'var(--color-neon)' : '',
+                  boxShadow: activeTab === key ? '0 0 10px var(--color-neon-shadow-md)' : ''
+                }}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
           {/* Tab Contents */}
           <div className="bg-industrial-900 border border-industrial-800 rounded-lg p-5 sm:p-8 relative">
-            {activeTab === 'catch' ? <DopamineCatchGame /> : <TechnoBeatmaker />}
+            {activeTab === 'catch'    && <DopamineCatchGame />}
+            {activeTab === 'runner'   && <RaveRunnerGame />}
+            {activeTab === 'beatmaker'&& <TechnoBeatmaker />}
+            {activeTab === 'snake'    && <NeonSnakeGame />}
+            {activeTab === 'beattap'  && <BeatTapGame />}
+            {activeTab === 'sequence' && <SequenceSyncGame />}
           </div>
 
         </div>
@@ -1128,6 +1128,987 @@ function TechnoBeatmaker() {
         )}
       </div>
 
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   GAME 3: RAVE RUNNER (MOBILE ENDLESS RUNNER)
+   ───────────────────────────────────────────────────────────────────────────── */
+function RaveRunnerGame() {
+  const canvasRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const [score, setScore] = useState(0);
+  const [gameState, setGameState] = useState('idle'); // 'idle', 'playing', 'won', 'lost'
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  const stateRef = useRef({
+    score: 0,
+    gameState: 'idle',
+    soundEnabled: true,
+    playerY: 0,
+    playerVy: 0,
+    playerSize: 18,
+    gravity: 0.6,
+    jumpForce: -10,
+    isJumping: false,
+    groundY: 0,
+    obstacles: [],
+    spawnTimer: 0,
+    speed: 5.5,
+    rotation: 0,
+    bgFlash: 0,
+    animationId: null
+  });
+
+  useEffect(() => {
+    stateRef.current.gameState = gameState;
+  }, [gameState]);
+
+  useEffect(() => {
+    stateRef.current.soundEnabled = soundEnabled;
+  }, [soundEnabled]);
+
+  const playSound = (type) => {
+    if (!stateRef.current.soundEnabled) return;
+    try {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+
+      if (type === 'jump') {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(150, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(700, ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.12);
+      } else if (type === 'crash') {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(180, ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(30, ctx.currentTime + 0.35);
+        gain.gain.setValueAtTime(0.22, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.35);
+      } else if (type === 'win') {
+        const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, index) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + index * 0.08);
+          gain.gain.setValueAtTime(0.12, ctx.currentTime + index * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + index * 0.08 + 0.4);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + index * 0.08);
+          osc.stop(ctx.currentTime + index * 0.08 + 0.45);
+        });
+      }
+    } catch (e) {
+      console.warn('Audio synthesis failed:', e);
+    }
+  };
+
+  const jump = () => {
+    if (stateRef.current.gameState !== 'playing') return;
+    if (!stateRef.current.isJumping) {
+      stateRef.current.playerVy = stateRef.current.jumpForce;
+      stateRef.current.isJumping = true;
+      playSound('jump');
+    }
+  };
+
+  // Keyboard jump handler
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        jump();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const startGame = () => {
+    setScore(0);
+    setGameState('playing');
+    setCopied(false);
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    stateRef.current.score = 0;
+    stateRef.current.groundY = canvas.height - 80;
+    stateRef.current.playerY = stateRef.current.groundY - stateRef.current.playerSize;
+    stateRef.current.playerVy = 0;
+    stateRef.current.isJumping = false;
+    stateRef.current.obstacles = [];
+    stateRef.current.spawnTimer = 0;
+    stateRef.current.speed = 5.5;
+    stateRef.current.rotation = 0;
+    stateRef.current.bgFlash = 0;
+
+    if (stateRef.current.animationId) {
+      cancelAnimationFrame(stateRef.current.animationId);
+    }
+
+    stateRef.current.animationId = requestAnimationFrame(gameLoop);
+  };
+
+  const gameLoop = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || stateRef.current.gameState !== 'playing') return;
+
+    const ctx = canvas.getContext('2d');
+    const state = stateRef.current;
+
+    // Clear background with ambient strobe flash
+    ctx.fillStyle = state.bgFlash > 0 ? `rgba(177, 78, 255, ${state.bgFlash * 0.05})` : '#060609';
+    if (state.bgFlash > 0) state.bgFlash -= 0.05;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Fade ambient grids
+    ctx.strokeStyle = 'rgba(177, 78, 255, 0.04)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < canvas.width; x += 40) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+
+    // Move player (rolling vinyl)
+    state.playerVy += state.gravity;
+    state.playerY += state.playerVy;
+
+    // Constrain to ground
+    const onGroundY = state.groundY - state.playerSize;
+    if (state.playerY >= onGroundY) {
+      state.playerY = onGroundY;
+      state.playerVy = 0;
+      state.isJumping = false;
+    }
+
+    // Rotation angle
+    state.rotation += 0.08 * (state.speed / 5.5);
+
+    // Draw Ground (Equalizer glowing baseline)
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = 'var(--color-neon)';
+    ctx.strokeStyle = 'var(--color-neon)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(0, state.groundY);
+    ctx.lineTo(canvas.width, state.groundY);
+    ctx.stroke();
+
+    // Ambient equalizer waves below ground
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(177, 78, 255, 0.08)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = 0; x < canvas.width; x += 10) {
+      const h = Math.sin(x * 0.05 + state.rotation) * 15;
+      if (x === 0) ctx.moveTo(x, state.groundY + 10 + h);
+      else ctx.lineTo(x, state.groundY + 10 + h);
+    }
+    ctx.stroke();
+
+    // Draw Player (Rotating Glowing Vinyl disc)
+    const px = 100;
+    const py = state.playerY;
+    const size = state.playerSize;
+
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(state.rotation);
+    
+    // Vinyl body
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = 'var(--color-neon)';
+    ctx.fillStyle = '#111116';
+    ctx.beginPath();
+    ctx.arc(0, 0, size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'var(--color-neon)';
+    ctx.stroke();
+
+    // Grooves inside vinyl
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(177, 78, 255, 0.25)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.7, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.5, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Center sticker
+    ctx.fillStyle = '#00D8FF'; // Cyan center sticker
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Sticker label marker
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, -size * 0.3, 2, size * 0.6);
+
+    // Spindle hole
+    ctx.fillStyle = '#060609';
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+
+    // Difficulty increases speed
+    state.speed = 5.5 + (state.score / 250);
+
+    // Distance/Score tick
+    state.score += 0.15;
+    const currentIntScore = Math.floor(state.score);
+    setScore(currentIntScore);
+
+    // Spawn obstacles
+    state.spawnTimer++;
+    const randomSpawnRate = 75 + Math.random() * 60 - (state.speed * 2);
+    if (state.spawnTimer >= randomSpawnRate) {
+      state.spawnTimer = 0;
+
+      const isDouble = Math.random() < 0.25 && state.score > 25;
+      const w = 24;
+      const h = isDouble ? 42 : 24;
+
+      state.obstacles.push({
+        x: canvas.width,
+        y: state.groundY - h,
+        width: w,
+        height: h,
+        color: isDouble ? '#FF3E3E' : '#FF6B00',
+        isDouble
+      });
+    }
+
+    // Update and draw obstacles
+    const obsList = state.obstacles;
+    for (let i = obsList.length - 1; i >= 0; i--) {
+      const obs = obsList[i];
+      obs.x -= state.speed;
+
+      // Draw obstacle (Speaker)
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = obs.color;
+      ctx.fillStyle = '#101016';
+      ctx.strokeStyle = obs.color;
+      ctx.lineWidth = 2;
+
+      // Outer speaker cabinet
+      ctx.beginPath();
+      ctx.roundRect(obs.x, obs.y, obs.width, obs.height, 3);
+      ctx.fill();
+      ctx.stroke();
+
+      // Speaker cones inside
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = obs.color;
+      if (obs.isDouble) {
+        // Double stack - draw two circles
+        ctx.beginPath();
+        ctx.arc(obs.x + obs.width / 2, obs.y + obs.height * 0.28, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(obs.x + obs.width / 2, obs.y + obs.height * 0.72, 7, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Single speaker
+        ctx.beginPath();
+        ctx.arc(obs.x + obs.width / 2, obs.y + obs.height / 2, 7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Check collision
+      const padX = 4;
+      const padY = 2;
+      const collided = (
+        px + size - padX >= obs.x &&
+        px - size + padX <= obs.x + obs.width &&
+        py + size - padY >= obs.y &&
+        py - size + padY <= obs.y + obs.height
+      );
+
+      if (collided) {
+        setGameState('lost');
+        playSound('crash');
+        cancelAnimationFrame(state.animationId);
+        return;
+      }
+
+      // Evaporate out of screen
+      if (obs.x + obs.width < 0) {
+        obsList.splice(i, 1);
+        // Small flash when clearing obstacle
+        state.bgFlash = 0.5;
+      }
+    }
+
+    // Win condition check
+    if (currentIntScore >= 100) {
+      setGameState('won');
+      playSound('win');
+      cancelAnimationFrame(state.animationId);
+      return;
+    }
+
+    state.animationId = requestAnimationFrame(gameLoop);
+  };
+
+  const copyCoupon = () => {
+    navigator.clipboard.writeText('DOPA-ARCADE-10');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="flex flex-col items-center">
+      {/* Game controls and score header */}
+      <div className="w-full flex flex-wrap justify-between items-center bg-black/40 border border-industrial-800/80 rounded-lg p-4 mb-6 gap-4">
+        
+        {/* Score & Goal */}
+        <div className="flex items-center gap-6">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-mono text-gray-500 uppercase">DISTANCIA</span>
+            <span className="text-xl font-black text-neon-glow font-mono" style={{ textShadow: '0 0 6px var(--color-neon)' }}>
+              {score}m <span className="text-xs text-gray-500">/ 100m</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Instructions Quick Box */}
+        <div className="hidden md:flex items-center gap-3 text-xs text-gray-400 bg-industrial-950/50 px-4 py-2 border border-industrial-800/40 rounded font-mono">
+          <Info className="w-4 h-4 text-neon-purple" style={{ color: 'var(--color-neon)' }} />
+          <span>Controles: Pulsa <kbd className="bg-industrial-800 px-1.5 py-0.5 rounded text-white text-[10px]">Espacio</kbd> / <kbd className="bg-industrial-800 px-1.5 py-0.5 rounded text-white text-[10px]">↑</kbd> o toca la pantalla</span>
+        </div>
+
+        {/* Audio Toggle / Restart */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className="w-10 h-10 border border-industrial-800 rounded bg-industrial-950/40 flex items-center justify-center text-gray-400 hover:text-white cursor-pointer transition-colors"
+          >
+            {soundEnabled ? <Volume2 className="w-4 h-4 text-neon-purple" style={{ color: 'var(--color-neon)' }} /> : <VolumeX className="w-4 h-4" />}
+          </button>
+
+          {gameState !== 'playing' ? (
+            <button
+              onClick={startGame}
+              className="px-4 py-2 font-mono font-bold uppercase tracking-wider text-xs bg-neon-purple border border-neon-purple text-white rounded cursor-pointer shadow-neon-sm hover:bg-neon-light transition-all flex items-center gap-2"
+              style={{ backgroundColor: 'var(--color-neon)', borderColor: 'var(--color-neon)', boxShadow: '0 0 10px var(--color-neon-shadow-sm)' }}
+            >
+              <Play className="w-3.5 h-3.5 fill-current" /> Jugar
+            </button>
+          ) : (
+            <button
+              onClick={() => setGameState('idle')}
+              className="px-4 py-2 font-mono font-bold uppercase tracking-wider text-xs border border-red-500/40 bg-red-950/10 text-red-400 rounded cursor-pointer hover:bg-red-500 hover:text-white transition-all flex items-center gap-2"
+            >
+              <Square className="w-3.5 h-3.5 fill-current" /> Detener
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main Game Screen Board */}
+      <div 
+        onClick={jump}
+        onTouchStart={jump}
+        className="relative border border-industrial-800/80 rounded-lg overflow-hidden w-full max-w-[800px] aspect-[4/3] sm:aspect-[16/10] bg-[#060609] cursor-pointer"
+      >
+        
+        {/* Canvas Element */}
+        <canvas 
+          ref={canvasRef} 
+          width={800} 
+          height={500} 
+          className="w-full h-full block" 
+        />
+
+        {/* Overlay States */}
+        {gameState === 'idle' && (
+          <div className="absolute inset-0 bg-black/85 backdrop-blur-sm flex flex-col justify-center items-center text-center p-6 z-10 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+            <span className="text-4xl mb-4 animate-bounce">🏃</span>
+            <h3 className="text-xl font-black text-white uppercase tracking-wider mb-2">Rave Runner</h3>
+            <p className="text-xs text-gray-400 max-w-sm mb-6 leading-relaxed">
+              Salta sobre los altavoces de la bodega. Toca cualquier parte del Canvas (o presiona la tecla de Espacio) para saltar. ¡Alcanza los 100 metros para reclamar tu premio!
+            </p>
+            <button
+              onClick={startGame}
+              className="px-8 py-3 font-mono font-black uppercase tracking-widest text-xs bg-neon-purple text-white border border-neon-purple rounded cursor-pointer shadow-neon-md transition-all hover:scale-105"
+              style={{ backgroundColor: 'var(--color-neon)', borderColor: 'var(--color-neon)', boxShadow: '0 0 15px var(--color-neon-shadow-lg)' }}
+            >
+              EMPEZAR CARRERA
+            </button>
+          </div>
+        )}
+
+        {gameState === 'lost' && (
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex flex-col justify-center items-center text-center p-6 z-10" onClick={(e) => e.stopPropagation()}>
+            <span className="text-4xl mb-4">💥</span>
+            <h3 className="text-xl font-black text-red-500 uppercase tracking-wider mb-2">¡Chocaste con el Bafle!</h3>
+            <p className="text-xs text-gray-500 max-w-sm mb-6">
+              Has tropezado en el almacén. El sonido se detuvo abruptamente. ¡Vuelve a intentarlo!
+            </p>
+            <button
+              onClick={startGame}
+              className="px-6 py-2.5 font-mono font-bold uppercase tracking-wider text-xs border border-red-500 bg-red-950/20 text-red-400 rounded cursor-pointer hover:bg-red-500 hover:text-white transition-all flex items-center gap-2"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> VOLVER A CORRER
+            </button>
+          </div>
+        )}
+
+        {gameState === 'won' && (
+          <div className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col justify-center items-center text-center p-8 z-10 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+            <Award className="w-14 h-14 text-green-400 mb-3 animate-pulse" style={{ filter: 'drop-shadow(0 0 8px rgba(74,222,128,0.4))' }} />
+            <h3 className="text-2xl font-black text-white uppercase tracking-wider mb-1">¡Sobreviviste al Rave!</h3>
+            <p className="text-[10px] font-mono text-green-400 uppercase tracking-widest mb-6">LOGRO DESBLOQUEADO: UNSTOPPABLE RUNNER</p>
+            
+            {/* Reward Coupon Card */}
+            <div className="bg-industrial-950/80 border border-green-500/30 rounded-lg p-5 w-full max-w-xs mb-8 flex flex-col items-center shadow-lg relative">
+              <span className="text-[9px] font-mono text-gray-500 uppercase mb-1">CUPÓN DE 10% DE DESCUENTO</span>
+              <div className="text-lg font-black text-white tracking-widest font-mono select-all bg-black/60 px-4 py-2 border border-industrial-800 rounded">
+                DOPA-ARCADE-10
+              </div>
+              <button
+                onClick={copyCoupon}
+                className="mt-3.5 flex items-center gap-1.5 text-[10px] font-mono text-gray-400 hover:text-green-400 transition-colors uppercase"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-green-400" /> Copiado con éxito
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" /> Copiar Código
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                onClick={startGame}
+                className="px-5 py-2.5 font-mono font-bold uppercase tracking-wider text-xs border border-industrial-800 text-gray-400 hover:text-white rounded cursor-pointer transition-colors"
+              >
+                Volver a Correr
+              </button>
+              <a
+                href="/eventos"
+                className="px-6 py-2.5 font-mono font-black uppercase tracking-wider text-xs bg-green-500 text-black rounded cursor-pointer shadow-[0_0_10px_rgba(74,222,128,0.45)] hover:bg-green-400 transition-all flex items-center gap-1.5"
+              >
+                Adquirir Boleta
+              </a>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 text-[10px] text-gray-500 font-mono flex items-center gap-1">
+        <span>Toca cualquier parte de la pantalla negra para saltar los bafles</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   GAME 4: NEON SNAKE (CANVAS SNAKE + D-PAD MÓVIL)
+   ───────────────────────────────────────────────────────────────────────────── */
+function NeonSnakeGame() {
+  const canvasRef = useRef(null);
+  const [score, setScore] = useState(0);
+  const [highScore, setHighScore] = useState(0);
+  const [gameState, setGameState] = useState('idle');
+  const audioCtxRef = useRef(null);
+  const stateRef = useRef({
+    snake: [],
+    food: { x: 0, y: 0 },
+    dir: { x: 1, y: 0 },
+    nextDir: { x: 1, y: 0 },
+    score: 0,
+    gameState: 'idle',
+    cellSize: 20,
+    cols: 20,
+    rows: 20,
+    tickInterval: null,
+    foodHue: 0,
+  });
+
+  const playTone = (freq, type = 'sine', dur = 0.08) => {
+    try {
+      if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') ctx.resume();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime + dur);
+    } catch (e) { /* silent */ }
+  };
+
+  const drawCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const s = stateRef.current;
+    const { cellSize, cols, rows } = s;
+    ctx.fillStyle = '#07070d';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(180,80,255,0.07)';
+    for (let x = 0; x < cols; x++) for (let y = 0; y < rows; y++) {
+      ctx.beginPath();
+      ctx.arc(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    s.foodHue = (s.foodHue + 2) % 360;
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = `hsl(${s.foodHue},100%,65%)`;
+    ctx.fillStyle = `hsl(${s.foodHue},100%,65%)`;
+    ctx.beginPath();
+    ctx.arc(s.food.x * cellSize + cellSize / 2, s.food.y * cellSize + cellSize / 2, cellSize / 2.4, 0, Math.PI * 2);
+    ctx.fill();
+    s.snake.forEach((seg, i) => {
+      const ratio = i / s.snake.length;
+      ctx.shadowBlur = i === 0 ? 14 : 6;
+      ctx.shadowColor = 'rgba(177,78,255,0.8)';
+      ctx.fillStyle = i === 0 ? 'hsl(270,85%,75%)' : `hsl(270,70%,${55 + 15 * ratio}%)`;
+      const pad = i === 0 ? 1 : 2;
+      ctx.beginPath();
+      ctx.roundRect(seg.x * cellSize + pad, seg.y * cellSize + pad, cellSize - pad * 2, cellSize - pad * 2, 3);
+      ctx.fill();
+    });
+    ctx.shadowBlur = 0;
+  };
+
+  const spawnFood = () => {
+    const s = stateRef.current;
+    let pos;
+    do { pos = { x: Math.floor(Math.random() * s.cols), y: Math.floor(Math.random() * s.rows) }; }
+    while (s.snake.some(seg => seg.x === pos.x && seg.y === pos.y));
+    s.food = pos;
+  };
+
+  const tick = () => {
+    const s = stateRef.current;
+    if (s.gameState !== 'playing') return;
+    s.dir = s.nextDir;
+    const head = s.snake[0];
+    const newHead = { x: (head.x + s.dir.x + s.cols) % s.cols, y: (head.y + s.dir.y + s.rows) % s.rows };
+    if (s.snake.some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
+      s.gameState = 'lost'; setGameState('lost'); clearInterval(s.tickInterval);
+      playTone(80, 'sawtooth', 0.4); return;
+    }
+    s.snake.unshift(newHead);
+    if (newHead.x === s.food.x && newHead.y === s.food.y) {
+      s.score += 10; setScore(s.score); setHighScore(prev => Math.max(prev, s.score));
+      spawnFood(); playTone(600 + s.score * 3, 'sine', 0.1);
+      if (s.score % 50 === 0 && s.score > 0) {
+        clearInterval(s.tickInterval);
+        s.tickInterval = setInterval(tick, Math.max(60, 150 - s.score * 0.4));
+      }
+    } else { s.snake.pop(); }
+    drawCanvas();
+  };
+
+  const startGame = () => {
+    const s = stateRef.current;
+    clearInterval(s.tickInterval);
+    s.snake = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
+    s.dir = { x: 1, y: 0 }; s.nextDir = { x: 1, y: 0 }; s.score = 0; s.gameState = 'playing';
+    setScore(0); setGameState('playing'); spawnFood(); drawCanvas();
+    s.tickInterval = setInterval(tick, 150);
+  };
+
+  const changeDir = (dx, dy) => {
+    const s = stateRef.current;
+    if (s.gameState !== 'playing') return;
+    if (dx !== 0 && s.dir.x !== 0) return;
+    if (dy !== 0 && s.dir.y !== 0) return;
+    s.nextDir = { x: dx, y: dy };
+  };
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+      if (e.key === 'ArrowUp'    || e.key === 'w') changeDir(0, -1);
+      if (e.key === 'ArrowDown'  || e.key === 's') changeDir(0,  1);
+      if (e.key === 'ArrowLeft'  || e.key === 'a') changeDir(-1, 0);
+      if (e.key === 'ArrowRight' || e.key === 'd') changeDir( 1, 0);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('keydown', onKey); clearInterval(stateRef.current.tickInterval); };
+  }, []);
+
+  const touchStart = useRef(null);
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div className="w-full flex justify-between items-center bg-black/40 border border-industrial-800 rounded-lg px-5 py-3">
+        <div><div className="text-[10px] font-mono text-gray-500 uppercase">Puntaje</div><div className="text-2xl font-black text-white font-mono">{score}</div></div>
+        <div><div className="text-[10px] font-mono text-gray-500 uppercase">Récord</div><div className="text-2xl font-black font-mono" style={{ color: 'var(--color-neon)' }}>{highScore}</div></div>
+        <button onClick={startGame} className="px-5 py-2 font-mono font-bold uppercase text-xs border rounded cursor-pointer flex items-center gap-1.5 text-black" style={{ backgroundColor: 'var(--color-neon)', borderColor: 'var(--color-neon)' }}>
+          <Play className="w-3.5 h-3.5 fill-current" /> {gameState === 'idle' ? 'Jugar' : 'Reiniciar'}
+        </button>
+      </div>
+
+      <div
+        className="relative w-full max-w-[420px]"
+        onTouchStart={(e) => { touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }}
+        onTouchEnd={(e) => {
+          if (!touchStart.current) return;
+          const dx = e.changedTouches[0].clientX - touchStart.current.x;
+          const dy = e.changedTouches[0].clientY - touchStart.current.y;
+          if (Math.abs(dx) > Math.abs(dy)) { dx > 20 ? changeDir(1, 0) : changeDir(-1, 0); }
+          else { dy > 20 ? changeDir(0, 1) : changeDir(0, -1); }
+          touchStart.current = null;
+        }}
+      >
+        <canvas ref={canvasRef} width={400} height={400} className="w-full border border-industrial-800 rounded-lg" style={{ imageRendering: 'pixelated' }} />
+        {(gameState === 'idle' || gameState === 'lost') && (
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg gap-4">
+            <span className="text-4xl">{gameState === 'lost' ? '💀' : '🐍'}</span>
+            <h3 className="text-lg font-black text-white uppercase tracking-widest">{gameState === 'lost' ? '¡Chocaste!' : 'Neon Snake'}</h3>
+            {gameState === 'idle' && <p className="text-xs text-gray-400 text-center max-w-[220px]">Desliza en pantalla o usa WASD/flechas. ¡Come los orbes sin chocar contra ti mismo!</p>}
+            {gameState === 'lost' && <p className="text-xs text-gray-400">Puntuación: <span className="text-white font-bold">{score}</span></p>}
+            <button onClick={startGame} className="px-6 py-2 font-mono font-bold uppercase text-xs text-black rounded cursor-pointer" style={{ backgroundColor: 'var(--color-neon)' }}>
+              {gameState === 'lost' ? 'Volver a Jugar' : 'Empezar'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 w-36 mt-1">
+        <div />
+        <button onPointerDown={() => changeDir(0, -1)} className="h-12 bg-industrial-900 border border-industrial-700 rounded-lg text-white text-xl flex items-center justify-center cursor-pointer select-none active:opacity-60">↑</button>
+        <div />
+        <button onPointerDown={() => changeDir(-1, 0)} className="h-12 bg-industrial-900 border border-industrial-700 rounded-lg text-white text-xl flex items-center justify-center cursor-pointer select-none active:opacity-60">←</button>
+        <button onPointerDown={() => changeDir(0, 1)}  className="h-12 bg-industrial-900 border border-industrial-700 rounded-lg text-white text-xl flex items-center justify-center cursor-pointer select-none active:opacity-60">↓</button>
+        <button onPointerDown={() => changeDir(1, 0)}  className="h-12 bg-industrial-900 border border-industrial-700 rounded-lg text-white text-xl flex items-center justify-center cursor-pointer select-none active:opacity-60">→</button>
+      </div>
+      <p className="text-[10px] text-gray-600 font-mono">Teclado: WASD / Flechas &bull; Táctil: Desliza o D-Pad</p>
+    </div>
+  );
+}
+
+
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   GAME 5: BEAT TAP – CÍRCULOS RÍTMICOS (MOBILE-FIRST)
+   ───────────────────────────────────────────────────────────────────────────── */
+function BeatTapGame() {
+  const [circles, setCircles] = useState([]);
+  const [score, setScore] = useState(0);
+  const [combo, setCombo] = useState(0);
+  const [maxCombo, setMaxCombo] = useState(0);
+  const [missed, setMissed] = useState(0);
+  const [gameState, setGameState] = useState('idle');
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [lastFeedback, setLastFeedback] = useState(null);
+  const audioCtxRef = useRef(null);
+  const idRef = useRef(0);
+  const timersRef = useRef([]);
+  const refs = useRef({ score: 0, combo: 0, missed: 0, maxCombo: 0, tLeft: 30 });
+
+  const COLORS = [
+    { bg: '#b14eff', shadow: 'rgba(177,78,255,0.6)' },
+    { bg: '#00D8FF', shadow: 'rgba(0,216,255,0.5)'  },
+    { bg: '#FF6B00', shadow: 'rgba(255,107,0,0.5)'  },
+    { bg: '#FF3E8A', shadow: 'rgba(255,62,138,0.5)' },
+    { bg: '#A0FF50', shadow: 'rgba(160,255,80,0.5)' },
+  ];
+
+  const playTone = (freq) => {
+    try {
+      if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') ctx.resume();
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.type = 'sine'; osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime + 0.15);
+    } catch (e) { /* silent */ }
+  };
+
+  const stopAll = () => { timersRef.current.forEach(id => { try { clearInterval(id); clearTimeout(id); } catch(e){} }); timersRef.current = []; };
+
+  const startGame = () => {
+    stopAll();
+    const r = refs.current;
+    r.score = 0; r.combo = 0; r.missed = 0; r.maxCombo = 0; r.tLeft = 30; idRef.current = 0;
+    setScore(0); setCombo(0); setMissed(0); setMaxCombo(0); setTimeLeft(30); setCircles([]); setGameState('playing');
+
+    let t = 30;
+    const timer = setInterval(() => {
+      t--; r.tLeft = t; setTimeLeft(t);
+      if (t <= 0) { clearInterval(timer); stopAll(); setGameState('done'); }
+    }, 1000);
+    timersRef.current.push(timer);
+
+    const scheduleSpawn = () => {
+      if (r.tLeft <= 0) return;
+      const id = idRef.current++;
+      const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+      const size = 52 + Math.random() * 28;
+      const duration = 1800 + Math.random() * 700;
+      setCircles(prev => [...prev, { id, x: 8 + Math.random() * 84, y: 10 + Math.random() * 80, size, color, born: Date.now(), duration }]);
+      const remove = setTimeout(() => {
+        setCircles(prev => {
+          const still = prev.find(c => c.id === id);
+          if (still) { r.combo = 0; r.missed++; setCombo(0); setMissed(r.missed); playTone(120); }
+          return prev.filter(c => c.id !== id);
+        });
+      }, duration);
+      timersRef.current.push(remove);
+      const next = setTimeout(scheduleSpawn, 600 + Math.random() * 400);
+      timersRef.current.push(next);
+    };
+    const first = setTimeout(scheduleSpawn, 300);
+    timersRef.current.push(first);
+  };
+
+  const tapCircle = (id, born, duration) => {
+    const ratio = Math.min(1, (Date.now() - born) / duration);
+    const quality = ratio < 0.35 ? 'perfect' : ratio < 0.65 ? 'good' : 'ok';
+    const pts = quality === 'perfect' ? 30 : quality === 'good' ? 20 : 10;
+    refs.current.combo++;
+    const earned = pts * Math.min(refs.current.combo, 5);
+    refs.current.score += earned;
+    refs.current.maxCombo = Math.max(refs.current.maxCombo, refs.current.combo);
+    setScore(refs.current.score); setCombo(refs.current.combo); setMaxCombo(refs.current.maxCombo);
+    playTone(quality === 'perfect' ? 880 : quality === 'good' ? 660 : 440);
+    setLastFeedback({ quality, earned, ts: Date.now() });
+    setTimeout(() => setLastFeedback(null), 600);
+    setCircles(prev => prev.filter(c => c.id !== id));
+  };
+
+  useEffect(() => () => stopAll(), []);
+
+  const QLABELS = { perfect: '✦ PERFECT', good: '✓ GOOD', ok: 'OK' };
+  const QCOLORS = { perfect: '#FFD700', good: '#4ADE80', ok: '#60A5FA' };
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div className="w-full flex justify-between items-center bg-black/40 border border-industrial-800 rounded-lg px-5 py-3 flex-wrap gap-3">
+        <div><div className="text-[10px] font-mono text-gray-500">PUNTOS</div><div className="text-2xl font-black text-white font-mono">{score}</div></div>
+        <div><div className="text-[10px] font-mono text-gray-500">COMBO</div><div className="text-2xl font-black font-mono" style={{ color: combo > 3 ? '#b14eff' : '#fff' }}>x{combo}</div></div>
+        <div><div className="text-[10px] font-mono text-gray-500">TIEMPO</div><div className={`text-2xl font-black font-mono ${timeLeft <= 5 ? 'text-red-500 animate-pulse' : 'text-white'}`}>{timeLeft}s</div></div>
+        <div><div className="text-[10px] font-mono text-gray-500">PERDIDOS</div><div className="text-2xl font-black text-red-400 font-mono">{missed}</div></div>
+      </div>
+
+      <div className="relative w-full max-w-[500px] aspect-[4/3] rounded-lg overflow-hidden border border-industrial-800/80 bg-[#07070d]" style={{ touchAction: 'none' }}>
+        <div className="absolute inset-0 pointer-events-none opacity-10" style={{ backgroundImage: 'radial-gradient(circle, rgba(180,60,255,0.4) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+
+        {lastFeedback && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 text-sm font-black font-mono uppercase tracking-wider pointer-events-none z-20" style={{ color: QCOLORS[lastFeedback.quality] }}>
+            {QLABELS[lastFeedback.quality]} <span className="text-white">+{lastFeedback.earned}</span>
+          </div>
+        )}
+
+        {circles.map((c) => {
+          const progress = Math.min(1, (Date.now() - c.born) / c.duration);
+          return (
+            <button
+              key={c.id}
+              onPointerDown={() => tapCircle(c.id, c.born, c.duration)}
+              className="absolute rounded-full cursor-pointer flex items-center justify-center font-black text-black select-none"
+              style={{
+                left: `${c.x}%`, top: `${c.y}%`,
+                width: c.size, height: c.size,
+                transform: 'translate(-50%,-50%)',
+                background: c.color.bg,
+                boxShadow: `0 0 20px ${c.color.shadow},0 0 40px ${c.color.shadow}`,
+                outline: `3px solid rgba(255,255,255,${0.6 - progress * 0.5})`,
+                outlineOffset: `${Math.max(0, 6 - progress * 5)}px`,
+                opacity: progress > 0.85 ? Math.max(0, 1 - (progress - 0.85) * 6) : 1,
+                fontSize: c.size * 0.32,
+              }}
+            >✦</button>
+          );
+        })}
+
+        {gameState === 'idle' && (
+          <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center gap-4 text-center p-6">
+            <span className="text-5xl">🎯</span>
+            <h3 className="text-xl font-black text-white uppercase tracking-widest">Beat Tap</h3>
+            <p className="text-xs text-gray-400 max-w-xs">Toca los círculos antes de que se esfumen. ¡Los combos multiplican tus puntos hasta x5! 30 segundos.</p>
+            <button onClick={startGame} className="px-8 py-3 font-mono font-black uppercase text-xs text-black rounded cursor-pointer" style={{ backgroundColor: '#b14eff' }}>¡Empezar!</button>
+          </div>
+        )}
+        {gameState === 'done' && (
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center gap-3 text-center p-6">
+            <Trophy className="w-12 h-12 text-yellow-400" />
+            <h3 className="text-xl font-black text-white uppercase">¡Tiempo!</h3>
+            <div className="grid grid-cols-3 gap-6 my-2">
+              <div><div className="text-2xl font-black text-white">{score}</div><div className="text-[10px] text-gray-500 uppercase font-mono">Pts</div></div>
+              <div><div className="text-2xl font-black" style={{ color: '#b14eff' }}>x{maxCombo}</div><div className="text-[10px] text-gray-500 uppercase font-mono">Max Combo</div></div>
+              <div><div className="text-2xl font-black text-red-400">{missed}</div><div className="text-[10px] text-gray-500 uppercase font-mono">Perdidos</div></div>
+            </div>
+            <button onClick={startGame} className="px-6 py-2.5 font-mono font-bold uppercase text-xs text-black rounded cursor-pointer" style={{ backgroundColor: '#b14eff' }}>Jugar de Nuevo</button>
+          </div>
+        )}
+      </div>
+      <p className="text-[10px] text-gray-600 font-mono">Toca los círculos antes de que desaparezcan. ¡Combos x5!</p>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   GAME 6: SEQUENCE SYNC – SIMON SAYS (MEMORIA DE COLORES)
+
+   ───────────────────────────────────────────────────────────────────────────── */
+function SequenceSyncGame() {
+  const PADS = [
+    { id: 0, label: 'KICK',   color: '#FF3E3E', glow: 'rgba(255,62,62,0.7)'   },
+    { id: 1, label: 'SNARE',  color: '#FF9F1C', glow: 'rgba(255,159,28,0.7)'  },
+    { id: 2, label: 'HI-HAT', color: '#b14eff', glow: 'rgba(177,78,255,0.7)'  },
+    { id: 3, label: 'BASS',   color: '#00D8FF', glow: 'rgba(0,216,255,0.7)'   },
+  ];
+  const FREQS = [130, 196, 330, 523];
+
+  const [sequence, setSequence] = useState([]);
+  const [playerSeq, setPlayerSeq] = useState([]);
+  const [activePad, setActivePad] = useState(null);
+  const [phase, setPhase] = useState('idle');
+  const [round, setRound] = useState(0);
+  const [score, setScore] = useState(0);
+  const [highScore, setHighScore] = useState(0);
+  const audioCtxRef = useRef(null);
+
+  const playPad = (padId) => {
+    try {
+      if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') ctx.resume();
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.type = padId < 2 ? 'triangle' : 'sine';
+      osc.frequency.setValueAtTime(FREQS[padId], ctx.currentTime);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime + 0.3);
+    } catch (e) { /* silent */ }
+  };
+
+  const flash = (padId, ms = 400) => { setActivePad(padId); playPad(padId); setTimeout(() => setActivePad(null), ms); };
+
+  const showSequence = (seq) => {
+    setPhase('showing');
+    seq.forEach((padId, i) => setTimeout(() => flash(padId, 380), 600 + i * 700));
+    setTimeout(() => setPhase('player'), 600 + seq.length * 700 + 200);
+  };
+
+  const startGame = () => {
+    const seq = [Math.floor(Math.random() * 4)];
+    setSequence(seq); setPlayerSeq([]); setRound(1); setScore(0);
+    showSequence(seq);
+  };
+
+  const handlePadPress = (padId) => {
+    if (phase !== 'player') return;
+    flash(padId, 300);
+    const newSeq = [...playerSeq, padId];
+    const idx = newSeq.length - 1;
+    if (newSeq[idx] !== sequence[idx]) {
+      setPhase('fail');
+      setHighScore(prev => Math.max(prev, score));
+      return;
+    }
+    if (newSeq.length === sequence.length) {
+      const newScore = score + round * 10;
+      setScore(newScore);
+      setPlayerSeq([]);
+      if (sequence.length >= 12) { setPhase('win'); setHighScore(prev => Math.max(prev, newScore)); return; }
+      setTimeout(() => {
+        const nextSeq = [...sequence, Math.floor(Math.random() * 4)];
+        setSequence(nextSeq); setRound(r => r + 1); showSequence(nextSeq);
+      }, 800);
+    } else { setPlayerSeq(newSeq); }
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-5 max-w-sm mx-auto">
+      <div className="w-full flex justify-between items-center bg-black/40 border border-industrial-800 rounded-lg px-5 py-3">
+        <div><div className="text-[10px] font-mono text-gray-500 uppercase">Ronda</div><div className="text-2xl font-black text-white">{round}</div></div>
+        <div><div className="text-[10px] font-mono text-gray-500 uppercase">Puntos</div><div className="text-2xl font-black text-white">{score}</div></div>
+        <div><div className="text-[10px] font-mono text-gray-500 uppercase">Récord</div><div className="text-2xl font-black font-mono" style={{ color: '#b14eff' }}>{highScore}</div></div>
+      </div>
+
+      <div className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400 min-h-[20px] text-center">
+        {phase === 'idle' && 'Presiona INICIAR para comenzar'}
+        {phase === 'showing' && <span style={{ color: '#b14eff' }}>▶ Observa la secuencia...</span>}
+        {phase === 'player' && <span className="text-green-400 animate-pulse">★ TU TURNO – Repite la secuencia</span>}
+        {phase === 'fail' && <span className="text-red-400">✕ ¡Error! Intenta de nuevo</span>}
+        {phase === 'win' && <span className="text-yellow-400">🏆 ¡Maestro del Ritmo! (12/12)</span>}
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 w-full">
+        {PADS.map((pad) => (
+          <button
+            key={pad.id}
+            onPointerDown={() => handlePadPress(pad.id)}
+            disabled={phase !== 'player'}
+            className="h-28 sm:h-36 rounded-xl font-black text-sm uppercase tracking-wider font-mono select-none cursor-pointer disabled:cursor-default transition-all duration-100"
+            style={{
+              backgroundColor: activePad === pad.id ? pad.color : '#111118',
+              color: activePad === pad.id ? '#000' : pad.color,
+              border: `2px solid ${pad.color}`,
+              boxShadow: activePad === pad.id ? `0 0 30px ${pad.glow}, inset 0 0 20px ${pad.glow}` : `0 0 6px ${pad.glow}40`,
+              transform: activePad === pad.id ? 'scale(0.95)' : 'scale(1)',
+            }}
+          >{pad.label}</button>
+        ))}
+      </div>
+
+      {sequence.length > 0 && (
+        <div className="flex gap-1.5 flex-wrap justify-center">
+          {sequence.map((padId, i) => (
+            <div key={i} className="w-2.5 h-2.5 rounded-full border transition-all" style={{ backgroundColor: i < playerSeq.length ? PADS[padId].color : 'transparent', borderColor: PADS[padId].color, opacity: i < playerSeq.length ? 1 : 0.3 }} />
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-4">
+        {(phase === 'idle' || phase === 'fail' || phase === 'win') && (
+          <button onClick={startGame} className="px-8 py-3 font-mono font-black uppercase tracking-widest text-xs text-black rounded cursor-pointer" style={{ backgroundColor: '#b14eff' }}>
+            {phase === 'idle' ? 'INICIAR' : phase === 'win' ? 'OTRA RONDA' : 'INTENTAR DE NUEVO'}
+          </button>
+        )}
+        {phase === 'showing' && <div className="px-8 py-3 font-mono text-xs text-gray-500 border border-industrial-800 rounded animate-pulse">Memorizando...</div>}
+      </div>
+      <p className="text-[10px] text-gray-600 font-mono text-center">Memoriza y repite la secuencia. ¡Ronda 12 = Victoria!</p>
     </div>
   );
 }

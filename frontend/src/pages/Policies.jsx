@@ -2,7 +2,7 @@ import React from 'react';
 import PageTransition from '../components/PageTransition';
 import { Shield, Sparkles, AlertTriangle, EyeOff, Send, AlertCircle } from 'lucide-react';
 import { api } from '../services/api';
-import WarehouseMap from '../components/WarehouseMap';
+// import WarehouseMap from '../components/WarehouseMap'; // TODO: re-habilitar cuando el mapa esté listo
 
 /**
  * Policies page focusing on the "Espacio Seguro" protocol.
@@ -112,7 +112,8 @@ export default function Policies() {
             ))}
           </div>
 
-          {/* Mapa de Seguridad de la Bodega */}
+          {/* TODO: Distribución de Asistencia en Bodega — deshabilitado temporalmente.
+               Para re-habilitar: descomentar el import de WarehouseMap y este bloque.
           <div className="mb-16">
             <div className="text-center mb-6">
               <h2 className="text-xl font-black text-white uppercase tracking-wider">
@@ -124,6 +125,7 @@ export default function Policies() {
             </div>
             <WarehouseMap />
           </div>
+          */}
 
           {/* Formulario de Alerta en Tiempo Real */}
           <div className="bg-gradient-to-r from-red-950/10 to-industrial-900 border border-red-500/20 rounded-lg p-6 sm:p-10 mb-16 shadow-[0_0_15px_rgba(239,68,68,0.05)]">
