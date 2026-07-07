@@ -33,7 +33,8 @@ export default function Footer() {
             <ul className="space-y-2 text-xs text-gray-400">
               <li><Link to="/" className="hover:text-neon-glow transition-colors">Inicio</Link></li>
               <li><Link to="/about" className="hover:text-neon-glow transition-colors">Manifiesto</Link></li>
-              <li><Link to="/events" className="hover:text-neon-glow transition-colors">Eventos</Link></li>
+              <li><Link to="/eventos" className="hover:text-neon-glow transition-colors">Eventos</Link></li>
+              <li><Link to="/arcade" className="hover:text-neon-glow transition-colors">Zona Arcade</Link></li>
             </ul>
           </div>
 

@@ -2,6 +2,7 @@ import React from 'react';
 import PageTransition from '../components/PageTransition';
 import { Shield, Sparkles, AlertTriangle, EyeOff, Send, AlertCircle } from 'lucide-react';
 import { api } from '../services/api';
+import WarehouseMap from '../components/WarehouseMap';
 
 /**
  * Policies page focusing on the "Espacio Seguro" protocol.
@@ -109,6 +110,19 @@ export default function Policies() {
                 </p>
               </div>
             ))}
+          </div>
+
+          {/* Mapa de Seguridad de la Bodega */}
+          <div className="mb-16">
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-black text-white uppercase tracking-wider">
+                Distribución de Asistencia en Bodega
+              </h2>
+              <p className="text-[10px] text-gray-500 font-mono uppercase mt-1">
+                Conoce la ubicación de los puntos clave de asistencia, salud y bienestar
+              </p>
+            </div>
+            <WarehouseMap />
           </div>
 
           {/* Formulario de Alerta en Tiempo Real */}

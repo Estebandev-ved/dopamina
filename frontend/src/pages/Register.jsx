@@ -75,6 +75,7 @@ export default function Register() {
   const [success, setSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
     if (!nombre) { setNombreError(''); return; }
@@ -110,6 +111,7 @@ export default function Register() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailError('Verifique el email.'); return; }
     if (telefono.length < 7 || telefono.length > 20) { setTelefonoError('Verifique el teléfono.'); return; }
     if (password.length < 6) { setPasswordError('Contraseña muy corta.'); return; }
+    if (!termsAccepted) { setSubmitError('Debes aceptar los términos y condiciones para registrarte.'); return; }
     setLoading(true);
     try {
       await api.register(nombre, email, telefono, password);
@@ -250,6 +252,28 @@ export default function Register() {
                     </button>
                   </div>
                   {passwordError && <p className="text-[10px] text-rose-400 font-medium tracking-wide">{passwordError}</p>}
+                </div>
+
+                <div className="flex items-start gap-3 pt-2">
+                  <input
+                    type="checkbox"
+                    id="terms"
+                    checked={termsAccepted}
+                    onChange={e => setTermsAccepted(e.target.checked)}
+                    className="mt-0.5 accent-neon-purple cursor-pointer"
+                    style={{ width: '16px', height: '16px', minWidth: '16px' }}
+                  />
+                  <label htmlFor="terms" className="text-xs text-gray-400 leading-relaxed cursor-pointer select-none">
+                    Acepto los{' '}
+                    <Link to="/terminos" target="_blank" className="text-neon-glow hover:underline font-semibold">
+                      Términos y Condiciones
+                    </Link>{' '}
+                    y la{' '}
+                    <Link to="/terminos" target="_blank" className="text-neon-glow hover:underline font-semibold">
+                      Política de Privacidad
+                    </Link>{' '}
+                    de Dopamina.
+                  </label>
                 </div>
 
                 <button type="submit" disabled={loading}

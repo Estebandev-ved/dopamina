@@ -141,6 +141,15 @@ CREATE TABLE IF NOT EXISTS `sets_musicales` (
 CREATE INDEX idx_sets_genero ON `sets_musicales` (`genero`);
 CREATE INDEX idx_sets_activo ON `sets_musicales` (`activo`);
 
+-- 11. Create PWA_Installs Table (para tracking de descargas de la app móvil)
+CREATE TABLE IF NOT EXISTS `pwa_installs` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `platform` VARCHAR(20) DEFAULT NULL,
+    `user_agent` VARCHAR(500) DEFAULT NULL,
+    `ip_address` VARCHAR(45) DEFAULT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 10. Create Promotor_Bonos Table
 CREATE TABLE IF NOT EXISTS `promotor_bonos` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,

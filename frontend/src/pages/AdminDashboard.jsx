@@ -107,6 +107,7 @@ const Icon = ({ name, size = 20 }) => {
     search: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width={size} height={size}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
     star: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width={size} height={size}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
     home: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width={size} height={size}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+    smartphone: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width={size} height={size}><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>,
   };
   return icons[name] || null;
 };
@@ -486,10 +487,20 @@ export default function AdminDashboard() {
   }, []);
 
   // Estados para Visitas
+  const [pwaStats, setPwaStats] = useState(null);
   const [visitStats, setVisitStats] = useState(null);
   const [allVisits, setAllVisits] = useState([]);
   const [loadingVisits, setLoadingVisits] = useState(false);
   const [searchVisit, setSearchVisit] = useState('');
+
+  const fetchPwaStats = useCallback(async () => {
+    try {
+      const data = await api.adminGetPwaStats();
+      setPwaStats(data);
+    } catch (err) {
+      console.error('Error fetching PWA stats:', err);
+    }
+  }, []);
 
   const fetchVisitStats = useCallback(async () => {
     setLoadingVisits(true);
@@ -768,6 +779,7 @@ export default function AdminDashboard() {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   useEffect(() => {
+    if (activeTab === 'overview') fetchPwaStats();
     if (activeTab === 'visitas') fetchVisitStats();
     if (activeTab === 'sets') fetchSets();
     if (activeTab === 'sugerencias') fetchSugerencias();
@@ -1028,6 +1040,8 @@ export default function AdminDashboard() {
         <StatCard label="Total Compras" value={stats?.totalCompras ?? 0} icon="chart" color={theme.accent} delay={0.05} />
         <StatCard label="Ingresos Totales" value={`$${(stats?.totalIngresos ?? 0).toLocaleString('es-CO')}`} icon="money" color={theme.warning} delay={0.1} />
         <StatCard label="Boletas Vendidas" value={stats?.totalBoletas ?? 0} icon="ticket" color={theme.success} delay={0.15} />
+        <StatCard label="Descargas App" value={pwaStats?.totalInstalls ?? 0} icon="smartphone" color="#22d3ee" delay={0.2} />
+        <StatCard label="Descargas (30 días)" value={pwaStats?.installsLast30Days ?? 0} icon="chart" color="#ec4899" delay={0.25} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>

@@ -215,6 +215,14 @@ export default function Navbar() {
             >
               ESPACIO SEGURO
             </Link>
+            <Link
+              to="/arcade"
+              className={`text-sm font-semibold tracking-wider transition-colors duration-200 ${
+                isActive('/arcade') ? 'text-neon-glow' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              ARCADE 🕹️
+            </Link>
           </div>
 
           {/* User Auth Info / Actions */}
@@ -401,6 +409,15 @@ export default function Navbar() {
               }`}
             >
               ESPACIO SEGURO
+            </Link>
+            <Link
+              to="/arcade"
+              onClick={() => setIsOpen(false)}
+              className={`text-sm font-bold tracking-widest py-2 ${
+                isActive('/arcade') ? 'text-neon-glow' : 'text-gray-400'
+              }`}
+            >
+              ARCADE 🕹️
             </Link>
             {currentUser && (
               <Link

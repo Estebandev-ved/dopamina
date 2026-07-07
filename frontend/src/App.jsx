@@ -17,9 +17,13 @@ import Artistas from './pages/Artistas';
 import PagoResultado from './pages/PagoResultado';
 import AdminDashboard from './pages/AdminDashboard';
 import PromoterDashboard from './pages/PromoterDashboard';
+import Terminos from './pages/Terminos';
+import Arcade from './pages/Arcade';
 import { api } from './services/api';
 import usePageTracking from './services/usePageTracking';
 import ChatbotWidget from './components/ChatbotWidget';
+import InstallApp from './components/InstallApp';
+import CookiesConsent from './components/CookiesConsent';
 
 /**
  * Route guard: only allows access if user is authenticated.
@@ -146,6 +150,8 @@ export default function App() {
                   <Route path="/promotor" element={<PromoterRoute><PromoterDashboard /></PromoterRoute>} />
                   <Route path="/eventos" element={<Eventos />} />
                   <Route path="/artistas" element={<Artistas />} />
+                  <Route path="/terminos" element={<Terminos />} />
+                  <Route path="/arcade" element={<Arcade />} />
                   <Route path="/pago-resultado" element={<PagoResultado />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
@@ -153,6 +159,8 @@ export default function App() {
             </main>
             <Footer />
             <ChatbotWidget />
+            <InstallApp />
+            <CookiesConsent />
           </div>
         )}
       </AnimatePresence>

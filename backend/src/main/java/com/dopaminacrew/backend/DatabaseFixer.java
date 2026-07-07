@@ -121,7 +121,8 @@ public class DatabaseFixer implements CommandLineRunner {
             // Siembra de cupones por defecto con INSERT IGNORE
             jdbcTemplate.update("INSERT IGNORE INTO cupones (codigo, descuento_porcentaje, activo, descripcion) VALUES (?, ?, ?, ?)", "DOPAMINA10", 10.0, true, "Descuento general del 10%");
             jdbcTemplate.update("INSERT IGNORE INTO cupones (codigo, descuento_porcentaje, activo, descripcion) VALUES (?, ?, ?, ?)", "REGALO15", 15.0, true, "Cupón regalo sorpresa del 15%");
-            System.out.println("✔ Cupones por defecto DOPAMINA10 y REGALO15 insertados.");
+            jdbcTemplate.update("INSERT IGNORE INTO cupones (codigo, descuento_porcentaje, activo, descripcion) VALUES (?, ?, ?, ?)", "DOPA-ARCADE-10", 10.0, true, "Descuento por superar la Zona Arcade (10%)");
+            System.out.println("✔ Cupones por defecto DOPAMINA10, REGALO15 y DOPA-ARCADE-10 insertados.");
         } catch (Exception e) {
             System.err.println("Error creando o sembrando la tabla cupones: " + e.getMessage());
         }

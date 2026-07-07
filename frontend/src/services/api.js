@@ -478,6 +478,15 @@ class ApiService {
     );
   }
 
+  // ── PWA / App Install Tracking ──────────────────────────────────────────────
+  trackPwaInstall(platform) {
+    return this.post('/api/public/pwa/install', { platform });
+  }
+
+  adminGetPwaStats() {
+    return this.get('/api/admin/pwa/stats');
+  }
+
   // ── Campañas y Retos ────────────────────────────────────────────────────────
   adminEnviarCampana(subject, message, target) {
     return this.post('/api/admin/campanas/enviar', { subject, message, target });

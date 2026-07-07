@@ -43,6 +43,9 @@ export default {
           '0%, 100%': { transform: 'scale(1)', opacity: 0.8, filter: 'drop-shadow(0 0 5px rgba(177, 78, 255, 0.5))' },
           '50%':       { transform: 'scale(1.05)', opacity: 1, filter: 'drop-shadow(0 0 20px rgba(201, 127, 255, 0.9))' },
         }
+      },
+      gridTemplateColumns: {
+        '16': 'repeat(16, minmax(0, 1fr))',
       }
     },
   },
