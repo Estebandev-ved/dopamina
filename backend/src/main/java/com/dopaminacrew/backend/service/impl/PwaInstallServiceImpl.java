@@ -29,7 +29,11 @@ public class PwaInstallServiceImpl implements PwaInstallService {
                 ip = request.getRemoteAddr();
             }
             install.setIpAddress(ip);
-            install.setUserAgent(request.getHeader("User-Agent"));
+            String ua = request.getHeader("User-Agent");
+            if (ua != null && ua.length() > 500) {
+                ua = ua.substring(0, 500);
+            }
+            install.setUserAgent(ua);
         }
 
         pwaInstallRepository.save(install);

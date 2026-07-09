@@ -405,7 +405,7 @@ export default function Checkout() {
                   {preventaRestante > 0 && (
                     <div className="text-emerald-400 text-[11px] font-bold normal-case bg-emerald-500/10 border border-emerald-500/20 rounded px-2 py-1.5 flex items-center gap-1.5">
                       <Ticket className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Preventa activa: ${Number(selectedEvento.precioPreventa).toLocaleString('es-CO')} c/u — quedan {preventaRestanteUrgente} entradas a este precio.</span>
+                      <span>🔥 Precio de preventa — una vez se agoten, el precio sube. No esperes.</span>
                     </div>
                   )}
                   <div className="flex justify-between text-gray-400">

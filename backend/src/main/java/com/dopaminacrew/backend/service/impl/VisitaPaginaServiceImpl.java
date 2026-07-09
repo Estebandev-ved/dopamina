@@ -38,8 +38,18 @@ public class VisitaPaginaServiceImpl implements VisitaPaginaService {
                 ip = request.getRemoteAddr();
             }
             visita.setIpAddress(ip);
-            visita.setUserAgent(request.getHeader("User-Agent"));
-            visita.setReferrer(request.getHeader("Referer"));
+            
+            String ua = request.getHeader("User-Agent");
+            if (ua != null && ua.length() > 500) {
+                ua = ua.substring(0, 500);
+            }
+            visita.setUserAgent(ua);
+            
+            String ref = request.getHeader("Referer");
+            if (ref != null && ref.length() > 500) {
+                ref = ref.substring(0, 500);
+            }
+            visita.setReferrer(ref);
         }
 
         return visitaPaginaRepository.save(visita);

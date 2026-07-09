@@ -725,6 +725,9 @@ export default function AdminDashboard() {
       const userObj = api.getUser();
       const subAdmin = userObj?.rol === 'ROLE_SUBADMIN';
 
+      // Refresh PWA statistics
+      fetchPwaStats().catch(() => {});
+
       if (subAdmin) {
         const [statsData, comprasData, eventosData, artistasData, canjesData] = await Promise.all([
           api.adminGetStats(),
@@ -785,7 +788,7 @@ export default function AdminDashboard() {
     if (activeTab === 'sugerencias') fetchSugerencias();
     if (activeTab === 'promotores') fetchPromotores();
     if (activeTab === 'campanas') fetchRetoActivo();
-  }, [activeTab, fetchVisitStats, fetchSets, fetchSugerencias, fetchPromotores, fetchRetoActivo]);
+  }, [activeTab, fetchPwaStats, fetchVisitStats, fetchSets, fetchSugerencias, fetchPromotores, fetchRetoActivo]);
 
   // ── Derived chart data ──
   const comprasConEvento = useMemo(() => compras.filter(c => c.eventoNombre), [compras]);

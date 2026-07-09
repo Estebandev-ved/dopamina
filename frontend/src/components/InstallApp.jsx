@@ -77,8 +77,9 @@ export default function InstallApp() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
             style={{
-              position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)',
-              zIndex: 9999, maxWidth: '400px', width: 'calc(100% - 32px)',
+              position: 'fixed', bottom: '20px', left: 0, right: 0,
+              zIndex: 9999, display: 'flex', justifyContent: 'center',
+              padding: '0 16px', pointerEvents: 'none',
             }}
           >
             <div style={{
@@ -87,6 +88,8 @@ export default function InstallApp() {
               borderRadius: '16px', padding: '16px 20px',
               boxShadow: '0 8px 40px rgba(177, 78, 255, 0.2), 0 0 60px rgba(177, 78, 255, 0.08)',
               backdropFilter: 'blur(20px)',
+              maxWidth: '400px', width: '100%',
+              pointerEvents: 'auto', position: 'relative',
             }}>
               <button
                 onClick={handleDismiss}
