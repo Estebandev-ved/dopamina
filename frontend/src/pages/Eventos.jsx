@@ -445,8 +445,8 @@ export default function Eventos() {
                     } else {
                       return (
                         <div className="flex items-center justify-center md:justify-start gap-1.5 mt-1 text-[9.5px] text-rose-400 font-bold uppercase tracking-wider font-mono">
-                          <Ticket className="w-3 h-3 text-rose-500 animate-pulse-glow" />
-                          <span>🚨 ¡Últimas entradas generales! — Aforo al 92% vendido</span>
+                          <Ticket className="w-3 h-3 text-rose-500" />
+                          <span>🎟️ Entrada General disponible — Compra fácil online</span>
                         </div>
                       );
                     }
@@ -774,20 +774,20 @@ export default function Eventos() {
                    </div>
 
                    {preventaRestante(selectedEvento) > 0 ? (
-                     <div className="bg-amber-500/10 border border-amber-500/30 rounded p-2.5 text-[10px] text-amber-400 flex items-start space-x-2 animate-pulse">
-                       <Flame className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                       <span>
-                         <strong>🚨 ¡PREVENTA EN ÚLTIMOS CUPOS!</strong> Quedan solo {preventaUrgente(selectedEvento)} entradas de preventa a <strong>${Number(selectedEvento.precioPreventa).toLocaleString('es-CO')} COP</strong>. ¡Asegura tu precio especial antes de que se agoten!
-                       </span>
-                     </div>
-                   ) : (
-                     <div className="bg-rose-500/10 border border-rose-500/30 rounded p-2.5 text-[10px] text-rose-400 flex items-start space-x-2 animate-pulse">
-                       <Flame className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
-                       <span>
-                         <strong>🚨 ¡ÚLTIMOS CUPOS GENERALES!</strong> El aforo está al 92% de su capacidad. Compra tu boleta general a <strong>${Number(selectedEvento.precio).toLocaleString('es-CO')} COP</strong> antes de que el evento se agote por completo.
-                       </span>
-                     </div>
-                   )}
+                      <div className="bg-amber-500/10 border border-amber-500/30 rounded p-2.5 text-[10px] text-amber-400 flex items-start space-x-2">
+                        <Flame className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                        <span>
+                          <strong>🚨 ¡PREVENTA ACTIVA!</strong> Consigue tu entrada a precio especial de <strong>${Number(selectedEvento.precioPreventa).toLocaleString('es-CO')} COP</strong> antes del cambio de fase a precio regular.
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="bg-neon-purple/10 border border-neon-purple/20 rounded p-2.5 text-[10px] text-neon-glow flex items-start space-x-2">
+                        <Ticket className="w-4 h-4 text-neon-purple flex-shrink-0 mt-0.5" />
+                        <span>
+                          <strong>🎟️ ¡ASEGURA TU INGRESO!</strong> Compra tu boleta general online a <strong>${Number(selectedEvento.precio).toLocaleString('es-CO')} COP</strong>. Ahorra tiempo en taquilla física el día del evento y asegura tu entrada digital 100% segura.
+                        </span>
+                      </div>
+                    )}
 
                   <div className="flex items-center justify-between py-2 border-t border-industrial-850 pt-4">
                     <div className="space-y-0.5">
