@@ -121,14 +121,24 @@ export default function Navbar() {
           {/* Neon background overlay */}
           <div className="absolute inset-0 bg-neon-purple/[0.03] pointer-events-none" />
           
-          <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 text-center z-10">
-            <span className="text-[10px] sm:text-xs font-mono font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-neon-purple animate-ping" style={{ backgroundColor: 'var(--color-neon)' }} />
-              ⚡ PRÓXIMO RITUAL: <strong className="text-white">{(featuredEvent.nombre || '').toUpperCase()}</strong>
-              <Link to="/eventos" className="text-[10px] text-neon-purple hover:text-neon-glow font-bold uppercase tracking-wider ml-1" style={{ color: 'var(--color-neon)' }}>
+          <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-center z-10">
+            <div className="text-[10px] sm:text-xs font-mono font-bold text-gray-300 uppercase tracking-wider flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-neon-purple animate-ping" style={{ backgroundColor: 'var(--color-neon)' }} />
+                ⚡ PRÓXIMO RITUAL: <strong className="text-white">{(featuredEvent.nombre || '').toUpperCase()}</strong>
+              </span>
+              <Link 
+                to="/eventos" 
+                className="text-[9px] bg-neon-purple/10 border border-neon-purple/35 text-neon-glow hover:bg-neon-purple/20 hover:border-neon-purple px-2 py-0.5 rounded transition-all duration-200 uppercase tracking-widest font-black"
+                style={{ 
+                  color: 'var(--color-neon)', 
+                  borderColor: 'rgba(var(--color-neon), 0.35)',
+                  boxShadow: '0 0 8px rgba(var(--color-neon), 0.1)'
+                }}
+              >
                 Adquirir Boletas →
               </Link>
-            </span>
+            </div>
             
             <div className="flex items-center gap-2 text-[10px] sm:text-xs font-mono text-gray-400">
               <span className="font-bold">INICIA EN:</span>
@@ -162,7 +172,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo Brand */}
-          <div className="flex items-center">
+          <div className="flex items-center flex-shrink-0">
             <Link to="/" className="flex items-center space-x-3 group">
               <div className="w-8 h-8 rounded border border-neon-purple flex items-center justify-center bg-black overflow-hidden transition-all duration-300 group-hover:shadow-neon-sm group-hover:border-neon-violet">
                 <img src={logoImg} alt="Dopamina Logo" className="w-6 h-6 object-contain" />
@@ -174,10 +184,10 @@ export default function Navbar() {
           </div>
 
           {/* Desktop Navigation Links */}
-          <div className="hidden lg:flex items-center space-x-6 xl:space-x-8">
+          <div className="hidden lg:flex items-center justify-center flex-1 px-8 space-x-5 xl:space-x-7">
             <Link
               to="/"
-              className={`text-sm font-semibold tracking-wider transition-colors duration-200 ${
+              className={`text-xs font-bold tracking-widest transition-colors duration-200 ${
                 isActive('/') ? 'text-neon-glow' : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -185,7 +195,7 @@ export default function Navbar() {
             </Link>
             <Link
               to="/eventos"
-              className={`text-sm font-semibold tracking-wider transition-colors duration-200 ${
+              className={`text-xs font-bold tracking-widest transition-colors duration-200 ${
                 isActive('/eventos') ? 'text-neon-glow' : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -193,7 +203,7 @@ export default function Navbar() {
             </Link>
             <Link
               to="/artistas"
-              className={`text-sm font-semibold tracking-wider transition-colors duration-200 ${
+              className={`text-xs font-bold tracking-widest transition-colors duration-200 ${
                 isActive('/artistas') ? 'text-neon-glow' : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -201,7 +211,7 @@ export default function Navbar() {
             </Link>
             <Link
               to="/about"
-              className={`text-sm font-semibold tracking-wider transition-colors duration-200 ${
+              className={`text-xs font-bold tracking-widest transition-colors duration-200 whitespace-nowrap ${
                 isActive('/about') ? 'text-neon-glow' : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -209,7 +219,7 @@ export default function Navbar() {
             </Link>
             <Link
               to="/policies"
-              className={`text-sm font-semibold tracking-wider transition-colors duration-200 ${
+              className={`text-xs font-bold tracking-widest transition-colors duration-200 whitespace-nowrap ${
                 isActive('/policies') ? 'text-neon-glow' : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -217,12 +227,12 @@ export default function Navbar() {
             </Link>
             <Link
               to="/arcade"
-              className={`text-sm font-semibold tracking-wider transition-colors duration-200 flex items-center gap-1.5 ${
+              className={`text-xs font-bold tracking-widest transition-colors duration-200 flex items-center gap-1.5 ${
                 isActive('/arcade') ? 'text-neon-glow' : 'text-gray-400 hover:text-white'
               }`}
             >
               <span>ARCADE</span>
-              <svg className="w-4 h-4 fill-current animate-pulse text-neon-purple" viewBox="0 0 24 24" style={{ color: 'var(--color-neon)' }}>
+              <svg className="w-3.5 h-3.5 fill-current animate-pulse text-neon-purple animate-pulse" viewBox="0 0 24 24" style={{ color: 'var(--color-neon)' }}>
                 <path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2Zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2Zm4.5 3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5Zm4-3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5Z"/>
               </svg>
             </Link>

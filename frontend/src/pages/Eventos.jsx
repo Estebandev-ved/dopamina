@@ -45,25 +45,17 @@ export default function Eventos() {
   }, [selectedEvento]);
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
-  const getNextSundayDeadline = () => {
+  const getTonightDeadline = () => {
     const now = new Date();
     const resultDate = new Date();
-    const dayOfWeek = now.getDay();
-    let daysToAdd = (7 - dayOfWeek) % 7;
-    
-    resultDate.setDate(now.getDate() + daysToAdd);
     resultDate.setHours(23, 59, 59, 999);
-
-    if (resultDate.getTime() - now.getTime() < 12 * 60 * 60 * 1000) {
-      resultDate.setDate(resultDate.getDate() + 7);
-    }
     return resultDate;
   };
 
   useEffect(() => {
     if (!selectedEvento) return;
 
-    const deadline = getNextSundayDeadline();
+    const deadline = getTonightDeadline();
 
     const updateTimer = () => {
       const now = new Date().getTime();
@@ -196,7 +188,7 @@ export default function Eventos() {
   };
 
   const eventosFiltrados = eventos.filter(e => {
-    const matchesFiltro = filtro === 'destacados' ? e.destacado : true;
+    const matchesFiltro = filtro === 'todos' ? true : (filtro === 'destacados' ? e.destacado : true);
     const matchesSearch = searchTerm.trim() === '' || 
       e.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       e.lugar.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -446,7 +438,7 @@ export default function Eventos() {
                         return (
                           <div className="flex items-center justify-center md:justify-start gap-1.5 mt-1 text-[9.5px] text-amber-400 font-bold uppercase tracking-wider font-mono">
                             <Tag className="w-3 h-3 text-amber-500 animate-pulse-glow" />
-                            <span>Preventa {porcentajeVendido}% vendida</span>
+                            <span>🔥 Preventa {porcentajeVendido}% vendida — ¡Sube a $35.000 HOY!</span>
                           </div>
                         );
                       }
@@ -733,7 +725,7 @@ export default function Eventos() {
                          <span>La preventa finaliza en:</span>
                        </span>
                        <span className="text-neon-glow font-black text-xs tracking-wider">
-                         {countdown.days}d {countdown.hours}h {countdown.minutes}m {countdown.seconds}s
+                         {countdown.hours}h {countdown.minutes}m {countdown.seconds}s
                        </span>
                      </div>
                    )}
@@ -782,13 +774,13 @@ export default function Eventos() {
                    </div>
 
                   {preventaRestante(selectedEvento) > 0 && (
-                    <div className="bg-emerald-500/10 border border-emerald-500/30 rounded p-2.5 text-[10px] text-emerald-400 flex items-start space-x-2">
-                      <Ticket className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                      <span>
-                        <strong>¡Preventa activa!</strong> Las primeras {selectedEvento.cantidadPreventa} entradas a ${Number(selectedEvento.precioPreventa).toLocaleString('es-CO')} c/u. Quedan {preventaUrgente(selectedEvento)} a este precio; luego suben a ${Number(selectedEvento.precio).toLocaleString('es-CO')}.
-                      </span>
-                    </div>
-                  )}
+                     <div className="bg-amber-500/10 border border-amber-500/30 rounded p-2.5 text-[10px] text-amber-400 flex items-start space-x-2 animate-pulse">
+                       <Flame className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                       <span>
+                         <strong>🚨 ¡ÚLTIMA OPORTUNIDAD!</strong> Quedan solo {preventaUrgente(selectedEvento)} entradas de preventa a <strong>${Number(selectedEvento.precioPreventa).toLocaleString('es-CO')} COP</strong>. ¡El precio sube a <strong>$35.000 COP</strong> HOY a las 11:59 PM!
+                       </span>
+                     </div>
+                   )}
 
                   <div className="flex items-center justify-between py-2 border-t border-industrial-850 pt-4">
                     <div className="space-y-0.5">

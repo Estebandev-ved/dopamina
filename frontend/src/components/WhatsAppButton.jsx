@@ -52,11 +52,11 @@ export default function WhatsAppButton() {
       style={{
         position: 'fixed',
         bottom: '24px',
-        right: '24px',
+        left: '24px',
         zIndex: 9999,
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'flex-end',
+        alignItems: 'flex-start',
         gap: '10px',
       }}
     >
@@ -72,7 +72,7 @@ export default function WhatsAppButton() {
               background: '#1A1A24',
               border: '1px solid rgba(177,78,255,0.25)',
               borderRadius: '16px',
-              borderBottomRightRadius: '4px',
+              borderBottomLeftRadius: '4px',
               padding: '14px 16px',
               maxWidth: '240px',
               boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(177,78,255,0.1)',
