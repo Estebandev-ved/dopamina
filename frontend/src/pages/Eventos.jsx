@@ -773,23 +773,14 @@ export default function Eventos() {
                       })()}
                    </div>
 
-                   {preventaRestante(selectedEvento) > 0 ? (
-                      <div className="bg-amber-500/10 border border-amber-500/30 rounded p-2.5 text-[10px] text-amber-400 flex items-start space-x-2">
-                        <Flame className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                        <span>
-                          <strong>🚨 ¡PREVENTA ACTIVA!</strong> Consigue tu entrada a precio especial de <strong>${Number(selectedEvento.precioPreventa).toLocaleString('es-CO')} COP</strong> antes del cambio de fase a precio regular.
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="bg-neon-purple/10 border border-neon-purple/20 rounded p-2.5 text-[10px] text-neon-glow flex items-start space-x-2">
-                        <Ticket className="w-4 h-4 text-neon-purple flex-shrink-0 mt-0.5" />
-                        <span>
-                          <strong>🎟️ ¡ASEGURA TU INGRESO!</strong> Compra tu boleta general online a <strong>${Number(selectedEvento.precio).toLocaleString('es-CO')} COP</strong>. Ahorra tiempo en taquilla física el día del evento y asegura tu entrada digital 100% segura.
-                        </span>
-                      </div>
-                    )}
+                   <div className="bg-neon-purple/10 border border-neon-purple/20 rounded p-2.5 text-[10px] text-neon-glow flex items-start space-x-2">
+                     <Ticket className="w-4 h-4 text-neon-purple flex-shrink-0 mt-0.5" />
+                     <span>
+                       <strong>🎟️ ¡ASEGURA TU INGRESO!</strong> Compra tu boleta online a <strong>${Number(precioDesde(selectedEvento)).toLocaleString('es-CO')} COP</strong>. Ahorra tiempo en taquilla física el día del evento y asegura tu entrada digital 100% segura.
+                     </span>
+                   </div>
 
-                  <div className="flex items-center justify-between py-2 border-t border-industrial-850 pt-4">
+                   <div className="flex items-center justify-between py-2 border-t border-industrial-850 pt-4">
                     <div className="space-y-0.5">
                       <span className="text-xs font-bold text-white block">Entrada General</span>
                       <span className="text-[10px] text-gray-500 font-mono">Máximo 10 boletas por compra</span>
