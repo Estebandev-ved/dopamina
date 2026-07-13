@@ -245,7 +245,7 @@ export default function Checkout() {
               <div className="bg-industrial-900 border border-industrial-800 rounded-lg p-6">
                 <h3 className="text-sm font-black text-white uppercase tracking-wider mb-4 flex items-center justify-between">
                   <span>1. Selecciona tus Entradas</span>
-                  <span className="text-xs font-mono text-neon-glow">Preventa Inicial</span>
+                  <span className="text-xs font-mono text-neon-glow">{preventaRestante > 0 ? "Preventa Activa" : "Boletería General"}</span>
                 </h3>
                 
                 <div className="flex items-center justify-between py-4 border-y border-industrial-800">
@@ -283,8 +283,20 @@ export default function Checkout() {
                   </div>
                 </div>
 
+                {/* Phase Alert Banner */}
+                <div className="mt-4 bg-rose-500/10 border border-rose-500/20 rounded p-3 text-xs text-rose-400 flex items-start space-x-2.5 animate-pulse">
+                  <Flame className="w-4.5 h-4.5 text-rose-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    {preventaRestante > 0 ? (
+                      <span><strong>🔥 Precio de preventa</strong> — una vez se agoten, el precio sube. No esperes.</span>
+                    ) : (
+                      <span><strong>🔥 Entrada General</strong> — una vez se agoten, no habrá más ingresos. No esperes.</span>
+                    )}
+                  </div>
+                </div>
+
                 {/* Promo notice */}
-                <div className="mt-4 bg-neon-purple/5 border border-neon-purple/20 rounded p-3 text-xs text-gray-300 flex items-start space-x-2.5">
+                <div className="mt-3 bg-neon-purple/5 border border-neon-purple/20 rounded p-3 text-xs text-gray-300 flex items-start space-x-2.5">
                   <BadgePercent className="w-4.5 h-4.5 text-neon-glow flex-shrink-0 mt-0.5" />
                   <div>
                     {promoParcheDisponible ? (
