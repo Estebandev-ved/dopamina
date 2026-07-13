@@ -45,8 +45,11 @@ public class AdminServiceImpl implements AdminService {
 
         // Return last 10 purchases and last 10 users for the dashboard overview
         List<AdminStatsResponse.CompraAdminDTO> ultimasCompras = todasCompras.stream()
-                .sorted((a, b) -> b.getCreatedAt() != null && a.getCreatedAt() != null
-                        ? b.getCreatedAt().compareTo(a.getCreatedAt()) : 0)
+                .sorted((a, b) -> {
+                    if (a.getCreatedAt() == null) return 1;
+                    if (b.getCreatedAt() == null) return -1;
+                    return b.getCreatedAt().compareTo(a.getCreatedAt());
+                })
                 .limit(10)
                 .map(this::toCompraDTO)
                 .collect(Collectors.toList());
@@ -72,8 +75,11 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public List<AdminStatsResponse.CompraAdminDTO> getAllCompras() {
         return compraRepository.findAll().stream()
-                .sorted((a, b) -> b.getCreatedAt() != null && a.getCreatedAt() != null
-                        ? b.getCreatedAt().compareTo(a.getCreatedAt()) : 0)
+                .sorted((a, b) -> {
+                    if (a.getCreatedAt() == null) return 1;
+                    if (b.getCreatedAt() == null) return -1;
+                    return b.getCreatedAt().compareTo(a.getCreatedAt());
+                })
                 .map(this::toCompraDTO)
                 .collect(Collectors.toList());
     }
@@ -82,8 +88,11 @@ public class AdminServiceImpl implements AdminService {
     public List<AdminStatsResponse.UsuarioAdminDTO> getAllUsuarios() {
         List<Compra> todasCompras = compraRepository.findAll();
         return userRepository.findAll().stream()
-                .sorted((a, b) -> b.getCreatedAt() != null && a.getCreatedAt() != null
-                        ? b.getCreatedAt().compareTo(a.getCreatedAt()) : 0)
+                .sorted((a, b) -> {
+                    if (a.getCreatedAt() == null) return 1;
+                    if (b.getCreatedAt() == null) return -1;
+                    return b.getCreatedAt().compareTo(a.getCreatedAt());
+                })
                 .map(u -> toUsuarioDTO(u, todasCompras))
                 .collect(Collectors.toList());
     }
@@ -117,7 +126,8 @@ public class AdminServiceImpl implements AdminService {
                 c.getCodigoCupon(),
                 c.getEstado(),
                 c.getCodigoQr(),
-                c.getCreatedAt() != null ? c.getCreatedAt().toString() : null
+                c.getCreatedAt() != null ? c.getCreatedAt().toString() : null,
+                c.getEvento() != null ? c.getEvento().getNombre() : "General"
         );
     }
 

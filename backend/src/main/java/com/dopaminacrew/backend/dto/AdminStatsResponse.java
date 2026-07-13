@@ -36,6 +36,7 @@ public class AdminStatsResponse {
         private String estado;
         private String codigoQr;
         private String createdAt;
+        private String eventoNombre;
     }
 
     @Data

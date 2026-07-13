@@ -122,16 +122,19 @@ const SvgIcon = ({ letter }) => (
 );
 
 // ── Stat Card ──
-const StatCard = ({ label, value, icon, color, trend, trendLabel, delay }) => (
+const StatCard = ({ label, value, icon, color, trend, trendLabel, delay, onClick }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
+    whileHover={onClick ? { scale: 1.02, borderColor: color } : {}}
     transition={{ duration: 0.4, delay }}
+    onClick={onClick}
     style={{
       background: theme.card, border: `1px solid ${theme.border}`,
       borderRadius: '14px', padding: '24px',
       display: 'flex', flexDirection: 'column', gap: '12px',
       position: 'relative', overflow: 'hidden',
+      cursor: onClick ? 'pointer' : 'default',
     }}
   >
     <div style={{
@@ -382,6 +385,7 @@ export default function AdminDashboard() {
   const [searchTransfer, setSearchTransfer] = useState('');
   const [searchLog, setSearchLog] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [filtroEstadoCompra, setFiltroEstadoCompra] = useState('TODOS');
   const [confirmModal, setConfirmModal] = useState(null);
   const [emailModal, setEmailModal] = useState({
     open: false,
@@ -794,11 +798,15 @@ export default function AdminDashboard() {
   const comprasConEvento = useMemo(() => compras.filter(c => c.eventoNombre), [compras]);
 
   // ── Filtered data ──
-  const filteredCompras = compras.filter(c =>
-    c.usuarioEmail?.toLowerCase().includes(searchCompra.toLowerCase()) ||
-    c.usuarioNombre?.toLowerCase().includes(searchCompra.toLowerCase()) ||
-    String(c.id).includes(searchCompra)
-  );
+  const filteredCompras = useMemo(() => {
+    return compras.filter(c => {
+      const matchSearch = c.usuarioEmail?.toLowerCase().includes(searchCompra.toLowerCase()) ||
+        c.usuarioNombre?.toLowerCase().includes(searchCompra.toLowerCase()) ||
+        String(c.id).includes(searchCompra);
+      const matchEstado = filtroEstadoCompra === 'TODOS' || c.estado === filtroEstadoCompra;
+      return matchSearch && matchEstado;
+    });
+  }, [compras, searchCompra, filtroEstadoCompra]);
   const filteredUsuarios = usuarios.filter(u =>
     u.email?.toLowerCase().includes(searchUser.toLowerCase()) ||
     u.nombre?.toLowerCase().includes(searchUser.toLowerCase())
@@ -820,6 +828,36 @@ export default function AdminDashboard() {
   );
 
   // ── Handlers ──
+  const exportComprasToCSV = () => {
+    const headers = ['ID,Usuario,Email,Evento,Cantidad,Subtotal,Descuento,Total,Cupon,Estado,QR,Fecha'];
+    const rows = filteredCompras.map(c => 
+      `"${c.id}","${c.usuarioNombre}","${c.usuarioEmail}","${c.eventoNombre || 'General'}","${c.cantidad}","${c.subtotal || 0}","${c.descuento || 0}","${c.total || 0}","${c.codigoCupon || ''}","${c.estado}","${c.codigoQr || ''}","${c.createdAt || ''}"`
+    );
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers, ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `compras_dopamina_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportUsuariosToCSV = () => {
+    const headers = ['ID,Nombre,Email,Telefono,Rol,Compras,Gastado,Registro,Estado'];
+    const rows = filteredUsuarios.map(u => 
+      `"${u.id}","${u.nombre}","${u.email}","${u.telefono || ''}","${u.rol}","${u.totalCompras}","${u.totalGastado}","${u.createdAt || ''}","${u.banned ? 'SUSPENDIDO' : 'ACTIVO'}"`
+    );
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers, ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `usuarios_dopamina_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleLogout = () => { api.clearAuth(); navigate('/'); };
   const handleDeleteCompra = (id) => setConfirmModal({ type: 'compra', id, message: `¿Eliminar la compra #${id}? Esta acción no se puede deshacer.` });
   
@@ -1039,12 +1077,12 @@ export default function AdminDashboard() {
   const renderOverview = () => (
     <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        <StatCard label="Usuarios Registrados" value={stats?.totalUsuarios ?? 0} icon="users" color={theme.info} delay={0} />
-        <StatCard label="Total Compras" value={stats?.totalCompras ?? 0} icon="chart" color={theme.accent} delay={0.05} />
-        <StatCard label="Ingresos Totales" value={`$${(stats?.totalIngresos ?? 0).toLocaleString('es-CO')}`} icon="money" color={theme.warning} delay={0.1} />
-        <StatCard label="Boletas Vendidas" value={stats?.totalBoletas ?? 0} icon="ticket" color={theme.success} delay={0.15} />
-        <StatCard label="Descargas App" value={pwaStats?.totalInstalls ?? 0} icon="smartphone" color="#22d3ee" delay={0.2} />
-        <StatCard label="Descargas (30 días)" value={pwaStats?.installsLast30Days ?? 0} icon="chart" color="#ec4899" delay={0.25} />
+        <StatCard label="Usuarios Registrados" value={stats?.totalUsuarios ?? 0} icon="users" color={theme.info} delay={0} onClick={() => setActiveTab('usuarios')} />
+        <StatCard label="Total Compras" value={stats?.totalCompras ?? 0} icon="chart" color={theme.accent} delay={0.05} onClick={() => setActiveTab('compras')} />
+        <StatCard label="Ingresos Totales" value={`$${(stats?.totalIngresos ?? 0).toLocaleString('es-CO')}`} icon="money" color={theme.warning} delay={0.1} onClick={() => setActiveTab('compras')} />
+        <StatCard label="Boletas Vendidas" value={stats?.totalBoletas ?? 0} icon="ticket" color={theme.success} delay={0.15} onClick={() => setActiveTab('compras')} />
+        <StatCard label="Descargas App" value={pwaStats?.totalInstalls ?? 0} icon="smartphone" color="#22d3ee" delay={0.2} onClick={() => setActiveTab('visitas')} />
+        <StatCard label="Descargas (30 días)" value={pwaStats?.installsLast30Days ?? 0} icon="chart" color="#ec4899" delay={0.25} onClick={() => setActiveTab('visitas')} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
@@ -1331,12 +1369,44 @@ export default function AdminDashboard() {
 
   const renderCompras = () => (
     <motion.div key="compras" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <Section icon="ticket" title={`Todas las Compras (${filteredCompras.length})`}>
-        <input style={inputStyle} placeholder="Buscar por nombre, email o ID..." value={searchCompra} onChange={e => setSearchCompra(e.target.value)} />
+      <Section 
+        icon="ticket" 
+        title={`Todas las Compras (${filteredCompras.length})`}
+        extra={
+          <button onClick={exportComprasToCSV} style={{ ...btnPrimary, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            📥 Exportar CSV
+          </button>
+        }
+      >
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+          <div style={{ flex: 1 }}>
+            <input style={{ ...inputStyle, marginBottom: 0 }} placeholder="Buscar por nombre, email o ID..." value={searchCompra} onChange={e => setSearchCompra(e.target.value)} />
+          </div>
+          <select
+            value={filtroEstadoCompra}
+            onChange={(e) => setFiltroEstadoCompra(e.target.value)}
+            style={{
+              background: 'rgba(255,255,255,0.04)',
+              border: `1px solid ${theme.border}`,
+              borderRadius: '8px',
+              color: theme.text,
+              fontSize: '0.85rem',
+              padding: '10px 16px',
+              cursor: 'pointer',
+              outline: 'none',
+              minWidth: '180px'
+            }}
+          >
+            <option value="TODOS">Todos los Estados</option>
+            <option value="PAGADO">PAGADO</option>
+            <option value="PENDIENTE">PENDIENTE</option>
+            <option value="RECHAZADO">RECHAZADO</option>
+          </select>
+        </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
             <thead><tr>
-              {['#', 'Usuario', 'Email', 'Cant.', 'Subtotal', 'Descuento', 'Total', 'Cupón', 'Estado', 'Código QR', 'Fecha', 'Acción'].map(h => <th key={h} style={thStyle}>{h}</th>)}
+              {['#', 'Usuario', 'Email', 'Evento', 'Cant.', 'Subtotal', 'Descuento', 'Total', 'Cupón', 'Estado', 'Código QR', 'Fecha', 'Acción'].map(h => <th key={h} style={thStyle}>{h}</th>)}
             </tr></thead>
             <tbody>
               {filteredCompras.map(c => (
@@ -1347,6 +1417,7 @@ export default function AdminDashboard() {
                   <td style={{ ...tdStyle, color: theme.accent, fontFamily: "'JetBrains Mono', monospace" }}>#{c.id}</td>
                   <td style={{ ...tdStyle, fontWeight: 600, color: theme.text }}>{c.usuarioNombre}</td>
                   <td style={{ ...tdStyle, color: theme.textMuted, fontSize: '0.8rem' }}>{c.usuarioEmail}</td>
+                  <td style={{ ...tdStyle, fontWeight: 600, color: theme.info }}>{c.eventoNombre || 'General'}</td>
                   <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>{c.cantidad}</td>
                   <td style={tdStyle}>{c.subtotal ? `$${c.subtotal.toLocaleString('es-CO')}` : '—'}</td>
                   <td style={{ ...tdStyle, color: c.descuento > 0 ? theme.success : theme.textMuted }}>{c.descuento > 0 ? `-$${c.descuento.toLocaleString('es-CO')}` : '—'}</td>
@@ -1396,7 +1467,7 @@ export default function AdminDashboard() {
                   </td>
                 </tr>
               ))}
-              {filteredCompras.length === 0 && <tr><td colSpan={12} style={{ ...tdStyle, textAlign: 'center', color: theme.textMuted, padding: '40px' }}>No se encontraron compras.</td></tr>}
+              {filteredCompras.length === 0 && <tr><td colSpan={13} style={{ ...tdStyle, textAlign: 'center', color: theme.textMuted, padding: '40px' }}>No se encontraron compras.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -1406,7 +1477,15 @@ export default function AdminDashboard() {
 
   const renderUsuarios = () => (
     <motion.div key="usuarios" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <Section icon="users" title={`Todos los Usuarios (${filteredUsuarios.length})`}>
+      <Section 
+        icon="users" 
+        title={`Todos los Usuarios (${filteredUsuarios.length})`}
+        extra={
+          <button onClick={exportUsuariosToCSV} style={{ ...btnPrimary, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            📥 Exportar CSV
+          </button>
+        }
+      >
         <input style={inputStyle} placeholder="Buscar por nombre o email..." value={searchUser} onChange={e => setSearchUser(e.target.value)} />
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
