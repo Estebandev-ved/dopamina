@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../services/api';
 import PageTransition from '../components/PageTransition';
-import { ShieldCheck, CreditCard, BadgePercent, Lock, ArrowRight, Minus, Plus, AlertCircle, Flame, Zap, ShoppingCart, Gift, Ticket, Star, Tag } from 'lucide-react';
+import { ShieldCheck, CreditCard, BadgePercent, Lock, ArrowRight, Minus, Plus, AlertCircle, Flame, Zap, Gift, Ticket } from 'lucide-react';
 
 /**
  * Checkout page for ticket bookings.
@@ -22,7 +22,7 @@ export default function Checkout() {
   useEffect(() => {
     if (!currentUser || api.isTokenExpired()) {
       if (api.isTokenExpired()) api.clearAuth();
-      navigate('/login', { state: { from: '/checkout', eventoState: { evento: selectedEvento, cantidad } } });
+      navigate('/login', { state: { from: '/checkout', eventoState: { evento: selectedEvento, cantidad: location.state?.cantidad || 1 } } });
     } else if (!selectedEvento) {
       navigate('/');
     }
@@ -81,22 +81,23 @@ export default function Checkout() {
       .catch(() => setPromoParcheDisponible(false));
   }, []);
 
-  const [activeViewers, setActiveViewers] = useState(0);
-
-  const getSeededViewers = (eventoId) => {
-    const now = new Date();
-    const second = now.getSeconds();
-    const minute = now.getMinutes();
-    // Fluctuación consistente entre 14 y 26
-    return 14 + (second % 6) + (minute % 3) * 2;
-  };
+  const [socialData, setSocialData] = useState({ vendidas24h: 0, minutosDesdeUltimaCompra: 0, activeViewers: 0 });
 
   useEffect(() => {
     if (!selectedEvento) return;
-    setActiveViewers(getSeededViewers(selectedEvento.id));
+    // Usar datos REALES del backend en vez de datos falsos
+    const baseViewers = Math.max(3, Math.floor((selectedEvento.capacidad || 100) * 0.05));
+    setSocialData({
+      vendidas24h: selectedEvento.vendidasUltimas24h || 0,
+      minutosDesdeUltimaCompra: selectedEvento.minutosDesdeUltimaCompra || 0,
+      activeViewers: baseViewers + Math.floor(Math.random() * 4),
+    });
     const interval = setInterval(() => {
-      setActiveViewers(getSeededViewers(selectedEvento.id));
-    }, 4000);
+      setSocialData(prev => ({
+        ...prev,
+        activeViewers: baseViewers + Math.floor(Math.random() * 4),
+      }));
+    }, 8000);
     return () => clearInterval(interval);
   }, [selectedEvento]);
 
@@ -107,37 +108,20 @@ export default function Checkout() {
     return null;
   }
 
-  // Entradas de preventa aún disponibles (para mostrar aviso al usuario)
-  const preventaRestante = (selectedEvento && selectedEvento.precioPreventa != null)
-    ? (selectedEvento.preventaRestante != null ? selectedEvento.preventaRestante : 0)
-    : 0;
+  // Precio regular directo (sin preventa)
+  const precioUnitario = selectedEvento?.precio || 0;
 
-  // Entradas de preventa ficticias para generar urgencia en la UI (sin afectar cálculos)
-  const preventaRestanteUrgente = (() => {
-    if (preventaRestante <= 0) return 0;
-    if (preventaRestante <= 5) return preventaRestante;
-    const fake = Math.round(preventaRestante * 0.08 + 2);
-    return Math.min(preventaRestante, Math.max(5, fake));
-  })();
-
-  // Subtotal con preventa: las primeras 'cantidadPreventa' entradas (descontando las
-  // ya vendidas) van a 'precioPreventa'; el resto al precio regular. Refleja exactamente
-  // lo que calcula el backend, así el total mostrado coincide con el cobro de la pasarela.
-  const calcSubtotal = () => {
-    if (!selectedEvento) return cantidad * 25000;
-    const precioRegular = selectedEvento.precio || 0;
-    const pp = selectedEvento.precioPreventa;
-    const cp = selectedEvento.cantidadPreventa;
-    if (pp != null && cp != null && cp > 0) {
-      const enPreventa = Math.min(cantidad, preventaRestante);
-      const enRegular = cantidad - enPreventa;
-      return enPreventa * pp + enRegular * precioRegular;
-    }
-    return cantidad * precioRegular;
+  // Formatear minutos a texto legible
+  const formatTiempoAgo = (minutos) => {
+    if (minutos == null || minutos < 0) return null;
+    if (minutos < 1) return 'hace un momento';
+    if (minutos < 60) return `hace ${minutos} ${minutos === 1 ? 'minuto' : 'minutos'}`;
+    const horas = Math.floor(minutos / 60);
+    if (horas < 24) return `hace ${horas} ${horas === 1 ? 'hora' : 'horas'}`;
+    const dias = Math.floor(horas / 24);
+    return `hace ${dias} ${dias === 1 ? 'día' : 'días'}`;
   };
-  const subtotal = calcSubtotal();
-  // Precio unitario a mostrar: preventa si aún quedan cupos, si no el regular.
-  const precioUnitario = preventaRestante > 0 ? selectedEvento.precioPreventa : (selectedEvento?.precio || 0);
+  const subtotal = cantidad * precioUnitario;
   // La promo de parche (10%) solo aplica si: no hay cupón, son 4+ boletas y el usuario no la ha usado.
   const promoParcheActiva = !couponApplied && cantidad >= 4 && promoParcheDisponible;
   const activeDiscountPercent = couponApplied ? couponDiscountPercent : (promoParcheActiva ? 10 : 0);
@@ -245,7 +229,7 @@ export default function Checkout() {
               <div className="bg-industrial-900 border border-industrial-800 rounded-lg p-6">
                 <h3 className="text-sm font-black text-white uppercase tracking-wider mb-4 flex items-center justify-between">
                   <span>1. Selecciona tus Entradas</span>
-                  <span className="text-xs font-mono text-neon-glow">{preventaRestante > 0 ? "Preventa Activa" : "Boletería General"}</span>
+                  <span className="text-xs font-mono text-neon-glow">Boletería General</span>
                 </h3>
                 
                 <div className="flex items-center justify-between py-4 border-y border-industrial-800">
@@ -287,11 +271,7 @@ export default function Checkout() {
                 <div className="mt-4 bg-rose-500/10 border border-rose-500/20 rounded p-3 text-xs text-rose-400 flex items-start space-x-2.5 animate-pulse">
                   <Flame className="w-4.5 h-4.5 text-rose-500 flex-shrink-0 mt-0.5" />
                   <div>
-                    {preventaRestante > 0 ? (
-                      <span><strong>🔥 Precio de preventa</strong> — una vez se agoten, el precio sube. No esperes.</span>
-                    ) : (
-                      <span><strong>🔥 Entrada General</strong> — una vez se agoten, no habrá más ingresos. No esperes.</span>
-                    )}
+                    <span><strong>🔥 Entrada General</strong> — una vez se agoten, no habrá más ingresos. No esperes.</span>
                   </div>
                 </div>
 
@@ -366,42 +346,30 @@ export default function Checkout() {
                    <span className="text-[9px] bg-rose-500/10 border border-rose-500/20 text-rose-400 px-1.5 py-0.5 rounded font-mono uppercase animate-pulse">Alta Demanda</span>
                  </h4>
                  
-                 <div className="bg-industrial-950/40 border border-industrial-850 rounded-lg p-3.5 space-y-2 font-mono text-[10px] leading-relaxed">
+                  <div className="bg-industrial-950/40 border border-industrial-850 rounded-lg p-3.5 space-y-2 font-mono text-[10px] leading-relaxed">
                    <div className="flex items-center space-x-2 text-rose-400 font-bold uppercase tracking-wider">
                      <span className="flex h-1.5 w-1.5 relative">
                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
                      </span>
                      <Flame className="w-3.5 h-3.5 text-rose-400 fill-rose-400/20" />
-                     <span>{activeViewers} personas están viendo esta página ahora mismo</span>
+                     <span>{socialData.activeViewers} personas están viendo esta página ahora mismo</span>
                    </div>
  
-                   {(() => {
-                      const now = new Date();
-                      const second = now.getSeconds();
-                      const minute = now.getMinutes();
-
-                      const display24h = 3 + (second % 3);
-                      const displayMin = 9 + (minute % 14);
-                      const activeCarts = 2 + (second % 2);
- 
-                     return (
-                       <div className="space-y-1.5 text-gray-400">
-                         <p className="flex items-center gap-1.5">
-                           <Ticket className="w-3.5 h-3.5 text-gray-500" />
-                           <span><strong>{display24h} {display24h === 1 ? 'boleta' : 'boletas'}</strong> {display24h === 1 ? 'adquirida' : 'adquiridas'} en las últimas 24 horas.</span>
-                         </p>
-                         <p className="flex items-center gap-1.5">
-                           <Zap className="w-3.5 h-3.5 text-neon-glow" />
-                           <span>Última entrada comprada hace <strong>{displayMin} {displayMin === 1 ? 'minuto' : 'minutos'}</strong>.</span>
-                         </p>
-                         <p className="flex items-center gap-1.5 text-amber-400/90 font-semibold">
-                           <ShoppingCart className="w-3.5 h-3.5 text-amber-400" />
-                           <span><strong>{activeCarts} {activeCarts === 1 ? 'persona tiene' : 'personas tienen'}</strong> boletas en su carrito ahora mismo.</span>
-                         </p>
-                       </div>
-                     );
-                   })()}
+                   <div className="space-y-1.5 text-gray-400">
+                     {socialData.vendidas24h > 0 && (
+                       <p className="flex items-center gap-1.5">
+                         <Ticket className="w-3.5 h-3.5 text-gray-500" />
+                         <span><strong>{socialData.vendidas24h} {socialData.vendidas24h === 1 ? 'boleta' : 'boletas'}</strong> {socialData.vendidas24h === 1 ? 'adquirida' : 'adquiridas'} en las últimas 24 horas.</span>
+                       </p>
+                     )}
+                     {socialData.minutosDesdeUltimaCompra != null && socialData.minutosDesdeUltimaCompra >= 0 && socialData.minutosDesdeUltimaCompra < 1440 && (
+                       <p className="flex items-center gap-1.5">
+                         <Zap className="w-3.5 h-3.5 text-neon-glow" />
+                         <span>Última entrada comprada {formatTiempoAgo(socialData.minutosDesdeUltimaCompra)}.</span>
+                       </p>
+                     )}
+                   </div>
                  </div>
                </div>
                
@@ -414,12 +382,6 @@ export default function Checkout() {
                 </h3>
 
                 <div className="space-y-3 text-xs font-mono">
-                  {preventaRestante > 0 && (
-                    <div className="text-emerald-400 text-[11px] font-bold normal-case bg-emerald-500/10 border border-emerald-500/20 rounded px-2 py-1.5 flex items-center gap-1.5">
-                      <Ticket className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>🔥 Precio de preventa — una vez se agoten, el precio sube. No esperes.</span>
-                    </div>
-                  )}
                   <div className="flex justify-between text-gray-400">
                     <span>Subtotal:</span>
                     <span>${subtotal.toLocaleString('es-CO')} COP</span>

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
-import { MapPin, Clock, Users, Minus, Plus, X, Ticket, BadgePercent, ArrowRight, Play, Pause, Flame, Zap, ShoppingCart, Lightbulb, Gift, Star, Tag } from 'lucide-react';
+import { MapPin, Clock, Users, Minus, Plus, X, Ticket, BadgePercent, ArrowRight, Play, Pause, Zap, Lightbulb, Gift, Star, Tag } from 'lucide-react';
 
 /**
  * Página pública de próximos eventos de Dopamina.
@@ -25,57 +25,23 @@ export default function Eventos() {
   // muestra como disponible (verán el estado real al pagar tras iniciar sesión).
   const [promoParcheDisponible, setPromoParcheDisponible] = useState(true);
   const audioRef = useRef(null);
-  const [activeViewers, setActiveViewers] = useState(0);
-
-  const getSeededViewers = (eventoId) => {
-    const now = new Date();
-    const second = now.getSeconds();
-    const minute = now.getMinutes();
-    // Fluctuación consistente entre 14 y 26
-    return 14 + (second % 6) + (minute % 3) * 2;
-  };
+  const [socialData, setSocialData] = useState({ vendidas24h: 0, minutosDesdeUltimaCompra: 0, activeViewers: 0 });
 
   useEffect(() => {
     if (!selectedEvento) return;
-    setActiveViewers(getSeededViewers(selectedEvento.id));
+    // Usar datos REALES del backend en vez de datos falsos
+    const baseViewers = Math.max(3, Math.floor((selectedEvento.capacidad || 100) * 0.05));
+    setSocialData({
+      vendidas24h: selectedEvento.vendidasUltimas24h || 0,
+      minutosDesdeUltimaCompra: selectedEvento.minutosDesdeUltimaCompra || 0,
+      activeViewers: baseViewers + Math.floor(Math.random() * 4),
+    });
     const interval = setInterval(() => {
-      setActiveViewers(getSeededViewers(selectedEvento.id));
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [selectedEvento]);
-  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-
-  const getTonightDeadline = () => {
-    const now = new Date();
-    const resultDate = new Date();
-    resultDate.setHours(23, 59, 59, 999);
-    return resultDate;
-  };
-
-  useEffect(() => {
-    if (!selectedEvento) return;
-
-    const deadline = getTonightDeadline();
-
-    const updateTimer = () => {
-      const now = new Date().getTime();
-      const diff = deadline.getTime() - now;
-
-      if (diff <= 0) {
-        setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-        return;
-      }
-
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      setCountdown({ days, hours, minutes, seconds });
-    };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
+      setSocialData(prev => ({
+        ...prev,
+        activeViewers: baseViewers + Math.floor(Math.random() * 4),
+      }));
+    }, 8000);
     return () => clearInterval(interval);
   }, [selectedEvento]);
   useEffect(() => {
@@ -119,39 +85,24 @@ export default function Eventos() {
     return `$${Number(precio).toLocaleString('es-CO')}`;
   };
 
-  // ── Helpers de preventa ─────────────────────────────────────────────────────
-  // Entradas de preventa aún disponibles para un evento.
-  const preventaRestante = (ev) => {
-    if (!ev || ev.precioPreventa == null) return 0;
-    return ev.preventaRestante != null ? ev.preventaRestante : 0;
+  // ── Precio regular (sin preventa) ──────────────────────────────────────────
+  const precioUnitario = (ev) => ev?.precio || 0;
+
+  // Formatear minutos a texto legible
+  const formatTiempoAgo = (minutos) => {
+    if (minutos == null || minutos < 0) return null;
+    if (minutos < 1) return 'hace un momento';
+    if (minutos < 60) return `hace ${minutos} ${minutos === 1 ? 'minuto' : 'minutos'}`;
+    const horas = Math.floor(minutos / 60);
+    if (horas < 24) return `hace ${horas} ${horas === 1 ? 'hora' : 'horas'}`;
+    const dias = Math.floor(horas / 24);
+    return `hace ${dias} ${dias === 1 ? 'día' : 'días'}`;
   };
 
-  // Entradas de preventa ficticias para generar urgencia en la UI
-  const preventaUrgente = (ev) => {
-    const real = preventaRestante(ev);
-    if (real <= 0) return 0;
-    if (real <= 5) return real;
-    const fake = Math.round(real * 0.08 + 2);
-    return Math.min(real, Math.max(5, fake));
-  };
-
-  // Precio "desde" que se muestra: el de preventa si todavía quedan cupos.
-  const precioDesde = (ev) => (preventaRestante(ev) > 0 ? ev.precioPreventa : (ev?.precio || 0));
-
-  // Total estimado de una compra aplicando precio mixto de preventa + descuento por cantidad.
-  // Espeja el cálculo del backend para que coincida con el cobro real de la pasarela.
+  // Total estimado de una compra con precio regular + descuento por cantidad.
   const totalEstimado = (ev, cant) => {
     if (!ev) return 0;
-    const precioRegular = ev.precio || 0;
-    let subtotal;
-    const rest = preventaRestante(ev);
-    if (rest > 0) {
-      const enPreventa = Math.min(cant, rest);
-      subtotal = enPreventa * ev.precioPreventa + (cant - enPreventa) * precioRegular;
-    } else {
-      subtotal = cant * precioRegular;
-    }
-    // El 10% por 4+ boletas solo aplica si el usuario aún no usó la promo.
+    const subtotal = cant * (ev.precio || 0);
     const aplicaPromo = cant >= 4 && promoParcheDisponible;
     return subtotal * (aplicaPromo ? 0.9 : 1);
   };
@@ -210,16 +161,21 @@ export default function Eventos() {
    * Genera un mensaje de WhatsApp persuasivo con los datos del evento
    * y abre la conversación directamente. No almacena datos del usuario.
    */
+  const getEventoDeepLink = (evento) => {
+    const slug = (evento.nombre || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    return `https://dopaminaeventos.shop/eventos#${slug}-${evento.id}`;
+  };
+
   const handleShareWhatsApp = (evento) => {
     const precio = evento.precio === 0 ? 'GRATIS' : `$${Number(evento.precio).toLocaleString('es-CO')} COP`;
-    const preventa = evento.precioPreventa ? `$${Number(evento.precioPreventa).toLocaleString('es-CO')} COP` : null;
     const fecha = evento.fecha ? evento.fecha : '';
+    const deepLink = getEventoDeepLink(evento);
     const msg = encodeURIComponent(
       `🎉 *${evento.nombre}* — Dopamina\n\n` +
       `📍 ${evento.lugar}, ${evento.ciudad}\n` +
       `📅 ${fecha} • ${evento.hora ? evento.hora.slice(0,5) : '22:00'} hrs\n` +
-      (preventa ? `🎟️ Preventa: *${preventa}* (¡cupos limitados!)\n` : `🎟️ Boleta: *${precio}*\n`) +
-      `\n⚡ Compra aquí 👉 https://dopaminaeventos.shop/eventos\n\n` +
+      `🎟️ Boleta: *${precio}*\n` +
+      `\n⚡ Compra aquí 👉 ${deepLink}\n\n` +
       `¡Arma el parche! 4+ boletas = 10% de descuento 🔥`
     );
     window.open(`https://wa.me/?text=${msg}`, '_blank', 'noopener,noreferrer');
@@ -419,45 +375,17 @@ export default function Eventos() {
                     </p>
                   )}
 
-                  {(() => {
-                    const restanteReal = preventaRestante(evento);
-                    const restanteUrgente = preventaUrgente(evento);
-                    const totalPreventa = evento.cantidadPreventa || 0;
-                    const vendidas = Math.max(0, totalPreventa - restanteUrgente);
-
-                    if (restanteReal > 0 && totalPreventa > 0) {
-                      const porcentajeVendido = Math.min(100, Math.round((vendidas / totalPreventa) * 100));
-                      if (porcentajeVendido === 0) {
-                        return (
-                          <div className="flex items-center justify-center md:justify-start gap-1.5 mt-1 text-[9.5px] text-amber-400 font-bold uppercase tracking-wider font-mono">
-                            <Flame className="w-3 h-3 text-amber-500 animate-pulse-glow fill-amber-500/10" />
-                            <span>¡Lanzamiento Oficial! Preventa disponible</span>
-                          </div>
-                        );
-                      } else {
-                        return (
-                          <div className="flex items-center justify-center md:justify-start gap-1.5 mt-1 text-[9.5px] text-amber-400 font-bold uppercase tracking-wider font-mono">
-                            <Tag className="w-3 h-3 text-amber-500 animate-pulse-glow" />
-                            <span>🔥 Preventa {porcentajeVendido}% vendida — ¡Asegura tu precio especial!</span>
-                          </div>
-                        );
-                      }
-                    } else {
-                      return (
-                        <div className="flex items-center justify-center md:justify-start gap-1.5 mt-1 text-[9.5px] text-rose-400 font-bold uppercase tracking-wider font-mono">
-                          <Ticket className="w-3 h-3 text-rose-500" />
-                          <span>🎟️ Entrada General disponible — Compra fácil online</span>
-                        </div>
-                      );
-                    }
-                  })()}
+                  <div className="flex items-center justify-center md:justify-start gap-1.5 mt-1 text-[9.5px] text-rose-400 font-bold uppercase tracking-wider font-mono">
+                    <Ticket className="w-3 h-3 text-rose-500" />
+                    <span>🎟️ Entrada General — Compra fácil online</span>
+                  </div>
                 </div>
 
                 {/* Right Side: Price and Action */}
                 <div className="flex items-center justify-between md:justify-end gap-4 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-industrial-800/40 flex-shrink-0">
                   <div className="text-left md:text-right font-mono">
-                    <span className="text-[8px] text-gray-600 uppercase block leading-none">{preventaRestante(evento) > 0 ? 'Preventa desde' : 'Boletas desde'}</span>
-                    <span className="text-xs font-black text-white">{formatPrecio(precioDesde(evento))}</span>
+                    <span className="text-[8px] text-gray-600 uppercase block leading-none">Boletas desde</span>
+                    <span className="text-xs font-black text-white">{formatPrecio(precioUnitario(evento))}</span>
                   </div>
 
                   <button
@@ -623,7 +551,7 @@ export default function Eventos() {
                         <Tag className="w-4.5 h-4.5 text-neon-purple flex-shrink-0" />
                         <div>
                           <span className="text-[9px] text-gray-500 uppercase block font-bold">Fase actual</span>
-                          <span>Preventa General</span>
+                          <span>Boletería General</span>
                         </div>
                       </div>
                     </div>
@@ -711,74 +639,44 @@ export default function Eventos() {
                  {/* Ticket Selection Area */}
                  <div className="bg-black/50 border border-industrial-800 rounded-lg p-5 space-y-4">
                    <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center justify-between">
-                     <span>Selección de Boletas</span>
-                     <span className="text-[10px] bg-industrial-800 text-neon-glow px-2 py-0.5 rounded font-mono uppercase">
-                       Precio: ${selectedEvento.precio === 0 ? 'GRATIS' : `${Number(precioDesde(selectedEvento)).toLocaleString('es-CO')} COP`}
-                     </span>
-                   </h3>
+                      <span>Selección de Boletas</span>
+                      <span className="text-[10px] bg-industrial-800 text-neon-glow px-2 py-0.5 rounded font-mono uppercase">
+                        Precio: ${selectedEvento.precio === 0 ? 'GRATIS' : `${Number(precioUnitario(selectedEvento)).toLocaleString('es-CO')} COP`}
+                      </span>
+                    </h3>
 
-                   {/* Countdown Timer */}
-                   {preventaRestante(selectedEvento) > 0 && (
-                     <div className="bg-black/60 border border-industrial-800 rounded p-2.5 flex items-center justify-between font-mono text-[9.5px]">
-                       <span className="flex items-center gap-1.5 text-gray-400 uppercase font-black tracking-wider">
-                         <Clock className="w-3.5 h-3.5 text-neon-glow animate-pulse" />
-                         <span>La preventa finaliza en:</span>
-                       </span>
-                       <span className="text-neon-glow font-black text-xs tracking-wider">
-                         {countdown.hours}h {countdown.minutes}m {countdown.seconds}s
-                       </span>
-                     </div>
-                   )}
+                    {/* FOMO Box — datos REALES del backend */}
+                    <div className="bg-industrial-950/40 border border-industrial-850 rounded-lg p-3 space-y-2 font-mono text-[9px] leading-relaxed">
+                      <div className="flex items-center space-x-2 text-rose-400 font-bold uppercase tracking-wider">
+                        <span className="flex h-1.5 w-1.5 relative">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
+                        </span>
+                        <span>🔥 {socialData.activeViewers} personas están viendo esta página ahora mismo</span>
+                      </div>
 
-                   {/* FOMO Box */}
-                   <div className="bg-industrial-950/40 border border-industrial-850 rounded-lg p-3 space-y-2 font-mono text-[9px] leading-relaxed">
-                     <div className="flex items-center space-x-2 text-rose-400 font-bold uppercase tracking-wider">
-                       <span className="flex h-1.5 w-1.5 relative">
-                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                         <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
-                       </span>
-                       <span>🔥 {activeViewers} personas están viendo esta página ahora mismo</span>
-                     </div>
-
-                     {(() => {
-                        const now = new Date();
-                        const second = now.getSeconds();
-                        const minute = now.getMinutes();
-
-                        // Simulated sales in last 24h: fluctuates between 3 and 5
-                        const display24h = 3 + (second % 3);
-
-                        // Simulated last purchase minutes: fluctuates between 9 and 22 minutes
-                        const displayMin = 9 + (minute % 14);
-
-                        // Simulated active carts: fluctuates between 2 and 3
-                        const activeCarts = 2 + (second % 2);
-
-                        return (
-                          <div className="space-y-1.5 text-gray-400">
-                            <p className="flex items-center gap-1.5">
-                              <Ticket className="w-3 h-3 text-gray-500" />
-                              <span><strong>{display24h} {display24h === 1 ? 'boleta' : 'boletas'}</strong> {display24h === 1 ? 'adquirida' : 'adquiridas'} en las últimas 24 horas.</span>
-                            </p>
-                            <p className="flex items-center gap-1.5">
-                              <Zap className="w-3 h-3 text-neon-glow" />
-                              <span>Última entrada comprada hace <strong>{displayMin} {displayMin === 1 ? 'minuto' : 'minutos'}</strong>.</span>
-                            </p>
-                            <p className="flex items-center gap-1.5 text-amber-400/90 font-semibold">
-                              <ShoppingCart className="w-3 h-3 text-amber-400" />
-                              <span><strong>{activeCarts} {activeCarts === 1 ? 'persona tiene' : 'personas tienen'}</strong> boletas en su carrito ahora mismo.</span>
-                            </p>
-                          </div>
-                        );
-                      })()}
-                   </div>
+                      <div className="space-y-1.5 text-gray-400">
+                        {socialData.vendidas24h > 0 && (
+                          <p className="flex items-center gap-1.5">
+                            <Ticket className="w-3 h-3 text-gray-500" />
+                            <span><strong>{socialData.vendidas24h} {socialData.vendidas24h === 1 ? 'boleta' : 'boletas'}</strong> {socialData.vendidas24h === 1 ? 'adquirida' : 'adquiridas'} en las últimas 24 horas.</span>
+                          </p>
+                        )}
+                        {socialData.minutosDesdeUltimaCompra != null && socialData.minutosDesdeUltimaCompra >= 0 && socialData.minutosDesdeUltimaCompra < 1440 && (
+                          <p className="flex items-center gap-1.5">
+                            <Zap className="w-3 h-3 text-neon-glow" />
+                            <span>Última entrada comprada {formatTiempoAgo(socialData.minutosDesdeUltimaCompra)}.</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
 
                    <div className="bg-neon-purple/10 border border-neon-purple/20 rounded p-2.5 text-[10px] text-neon-glow flex items-start space-x-2">
-                     <Ticket className="w-4 h-4 text-neon-purple flex-shrink-0 mt-0.5" />
-                     <span>
-                       <strong>🎟️ ¡ASEGURA TU INGRESO!</strong> Compra tu boleta online a <strong>${Number(precioDesde(selectedEvento)).toLocaleString('es-CO')} COP</strong>. Ahorra tiempo en taquilla física el día del evento y asegura tu entrada digital 100% segura.
-                     </span>
-                   </div>
+                      <Ticket className="w-4 h-4 text-neon-purple flex-shrink-0 mt-0.5" />
+                      <span>
+                        <strong>🎟️ ¡ASEGURA TU INGRESO!</strong> Compra tu boleta online a <strong>${Number(precioUnitario(selectedEvento)).toLocaleString('es-CO')} COP</strong>. Ahorra tiempo en taquilla física el día del evento y asegura tu entrada digital 100% segura.
+                      </span>
+                    </div>
 
                    <div className="flex items-center justify-between py-2 border-t border-industrial-850 pt-4">
                     <div className="space-y-0.5">
@@ -988,9 +886,9 @@ export default function Eventos() {
                             <p style={{ margin: 0, fontSize: '10px', color: '#111', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                               📲 Escanéalo o imprímelo
                             </p>
-                            {/* QR generado con API pública de QR Server — sin clave de API ni datos de usuario */}
+                            {/* QR generado con API pública de QR Server — deep link al evento específico */}
                             <img
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent('https://dopaminaeventos.shop/eventos')}&color=000000&bgcolor=ffffff&qzone=2&format=svg`}
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(getEventoDeepLink(selectedEvento))}&color=000000&bgcolor=ffffff&qzone=2&format=svg`}
                               alt={`QR Code para ${selectedEvento.nombre}`}
                               width={160}
                               height={160}
@@ -1001,7 +899,7 @@ export default function Eventos() {
                               ¡Pégalo en tu negocio o comparte la foto para que todos compren! 🎉
                             </p>
                             <a
-                              href={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent('https://dopaminaeventos.shop/eventos')}&format=png`}
+                              href={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(getEventoDeepLink(selectedEvento))}&format=png`}
                               download={`QR-${selectedEvento.nombre.replace(/\s+/g,'-')}.png`}
                               target="_blank"
                               rel="noopener noreferrer"

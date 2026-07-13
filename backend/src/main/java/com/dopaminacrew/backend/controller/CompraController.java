@@ -45,6 +45,9 @@ public class CompraController {
     @Autowired
     private com.dopaminacrew.backend.repository.TransferenciaLogRepository transferenciaLogRepository;
 
+    @Autowired
+    private com.dopaminacrew.backend.service.EmailService emailService;
+
     @PostMapping("/checkout")
     public ResponseEntity<?> checkout(@Valid @RequestBody CheckoutRequest checkoutRequest, 
                                       @AuthenticationPrincipal UserPrincipal currentUser,
@@ -193,6 +196,15 @@ public class CompraController {
         log.setCodigoQrAnterior(previousQr);
         log.setCodigoQrNuevo(newQr);
         transferenciaLogRepository.save(log);
+
+        String eventoNombre = boleta.getCompra() != null && boleta.getCompra().getEvento() != null
+                ? boleta.getCompra().getEvento().getNombre() : "Evento Dopamina";
+        try {
+            emailService.sendTicketTransferNotification(senderUser, destUser, newQr, eventoNombre);
+        } catch (Exception emailEx) {
+            // No bloquear la transferencia si falla el email
+            System.err.println("Error enviando email de transferencia: " + emailEx.getMessage());
+        }
 
         return ResponseEntity.ok(new MessageResponse("Boleta transferida con éxito a " + destUser.getNombre() + "."));
     }
