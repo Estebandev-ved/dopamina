@@ -438,7 +438,7 @@ export default function Eventos() {
                         return (
                           <div className="flex items-center justify-center md:justify-start gap-1.5 mt-1 text-[9.5px] text-amber-400 font-bold uppercase tracking-wider font-mono">
                             <Tag className="w-3 h-3 text-amber-500 animate-pulse-glow" />
-                            <span>🔥 Preventa {porcentajeVendido}% vendida — ¡Sube a $35.000 HOY!</span>
+                            <span>🔥 Preventa {porcentajeVendido}% vendida — ¡Asegura tu precio especial!</span>
                           </div>
                         );
                       }
@@ -446,7 +446,7 @@ export default function Eventos() {
                       return (
                         <div className="flex items-center justify-center md:justify-start gap-1.5 mt-1 text-[9.5px] text-rose-400 font-bold uppercase tracking-wider font-mono">
                           <Ticket className="w-3 h-3 text-rose-500 animate-pulse-glow" />
-                          <span>Boletería General disponible</span>
+                          <span>🚨 ¡Últimas entradas generales! — Aforo al 92% vendido</span>
                         </div>
                       );
                     }
@@ -773,11 +773,18 @@ export default function Eventos() {
                       })()}
                    </div>
 
-                  {preventaRestante(selectedEvento) > 0 && (
+                   {preventaRestante(selectedEvento) > 0 ? (
                      <div className="bg-amber-500/10 border border-amber-500/30 rounded p-2.5 text-[10px] text-amber-400 flex items-start space-x-2 animate-pulse">
                        <Flame className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
                        <span>
-                         <strong>🚨 ¡ÚLTIMA OPORTUNIDAD!</strong> Quedan solo {preventaUrgente(selectedEvento)} entradas de preventa a <strong>${Number(selectedEvento.precioPreventa).toLocaleString('es-CO')} COP</strong>. ¡El precio sube a <strong>$35.000 COP</strong> HOY a las 11:59 PM!
+                         <strong>🚨 ¡PREVENTA EN ÚLTIMOS CUPOS!</strong> Quedan solo {preventaUrgente(selectedEvento)} entradas de preventa a <strong>${Number(selectedEvento.precioPreventa).toLocaleString('es-CO')} COP</strong>. ¡Asegura tu precio especial antes de que se agoten!
+                       </span>
+                     </div>
+                   ) : (
+                     <div className="bg-rose-500/10 border border-rose-500/30 rounded p-2.5 text-[10px] text-rose-400 flex items-start space-x-2 animate-pulse">
+                       <Flame className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
+                       <span>
+                         <strong>🚨 ¡ÚLTIMOS CUPOS GENERALES!</strong> El aforo está al 92% de su capacidad. Compra tu boleta general a <strong>${Number(selectedEvento.precio).toLocaleString('es-CO')} COP</strong> antes de que el evento se agote por completo.
                        </span>
                      </div>
                    )}
