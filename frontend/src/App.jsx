@@ -24,6 +24,7 @@ import usePageTracking from './services/usePageTracking';
 import ChatbotWidget from './components/ChatbotWidget';
 import InstallApp from './components/InstallApp';
 import CookiesConsent from './components/CookiesConsent';
+import WhatsAppButton from './components/WhatsAppButton';
 
 /**
  * Route guard: only allows access if user is authenticated.
@@ -159,6 +160,7 @@ export default function App() {
             </main>
             <Footer />
             <ChatbotWidget />
+            <WhatsAppButton />
             <InstallApp />
             <CookiesConsent />
           </div>
