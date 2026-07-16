@@ -69,6 +69,19 @@ public class Compra {
     @Column(name = "comision_promotor")
     private Double comisionPromotor = 0.0;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "combo_id")
+    private Combo combo;
+
+    @Column(name = "combo_nombre", length = 150)
+    private String comboNombre;
+
+    @Column(name = "combo_items", length = 255)
+    private String comboItems;
+
+    @Column(name = "requiere_verificacion_cumple", nullable = false)
+    private Boolean requiereVerificacionCumple = false;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

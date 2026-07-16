@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.UUID;
 import com.dopaminacrew.backend.model.PromotorBono;
 import com.dopaminacrew.backend.repository.PromotorBonoRepository;
+import com.dopaminacrew.backend.model.Combo;
+import com.dopaminacrew.backend.repository.ComboRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -53,6 +55,9 @@ public class CompraServiceImpl implements CompraService {
     @Autowired
     private PromotorBonoRepository promotorBonoRepository;
 
+    @Autowired
+    private ComboRepository comboRepository;
+
     @Override
     @Transactional
     public Compra processCheckout(CheckoutRequest request, Long userId) {
@@ -60,6 +65,17 @@ public class CompraServiceImpl implements CompraService {
                 .orElseThrow(() -> new RuntimeException("Error: Usuario no encontrado."));
 
         int cantidad = request.getCantidad();
+        Combo combo = null;
+        boolean esCombo = request.getComboId() != null;
+
+        if (esCombo) {
+            combo = comboRepository.findById(request.getComboId())
+                    .orElseThrow(() -> new RuntimeException("Error: Combo seleccionado no encontrado."));
+            if (!combo.getActivo()) {
+                throw new RuntimeException("Error: El combo seleccionado no está activo.");
+            }
+            cantidad = combo.getCantidadBoletas();
+        }
 
         // Retrieve event if provided to determine pricing
         Evento evento = null;
@@ -88,21 +104,56 @@ public class CompraServiceImpl implements CompraService {
                         + (cuposRestantes > 0 ? cuposRestantes : 0) + " entradas disponibles.");
             }
 
-            // ── Precio dinámico de preventa ─────────────────────────────────────
-            // Las primeras 'cantidadPreventa' entradas se cobran a 'precioPreventa';
-            // a partir de ahí, a 'precio' regular. Una compra que cruce el límite
-            // se factura mezclada (parte preventa + parte regular) para que el total
-            // que llega a la pasarela sea siempre exacto.
-            if (evento.getPrecioPreventa() != null && evento.getCantidadPreventa() != null
-                    && evento.getCantidadPreventa() > 0) {
-                double precioPreventa = evento.getPrecioPreventa().doubleValue();
-                int cupoPreventa = evento.getCantidadPreventa();
-                int preventaRestante = Math.max(0, cupoPreventa - sold);
-                enPreventa = Math.min(cantidad, preventaRestante);
-                enRegular = cantidad - enPreventa;
-                subtotal = (enPreventa * precioPreventa) + (enRegular * price);
+            if (esCombo) {
+                if (combo.getEsCumpleanero()) {
+                    // Validar fecha de nacimiento para el Combo Cumpleañero
+                    if (request.getFechaNacimientoCumpleanero() == null || request.getFechaNacimientoCumpleanero().isEmpty()) {
+                        throw new RuntimeException("Se requiere la fecha de nacimiento para activar el Combo Cumpleañero.");
+                    }
+                    try {
+                        LocalDate fechaNac = LocalDate.parse(request.getFechaNacimientoCumpleanero());
+                        int mesNac = fechaNac.getMonthValue();
+                        int mesActual = LocalDate.now().getMonthValue();
+                        if (mesNac != mesActual) {
+                            throw new RuntimeException("El Combo Cumpleañero solo aplica si tu mes de cumpleaños coincide con el mes actual.");
+                        }
+                    } catch (Exception e) {
+                        throw new RuntimeException("Formato de fecha de nacimiento inválido. Debe ser AAAA-MM-DD.");
+                    }
+
+                    // Calcular total normal de 4 boletas y descontar 1 boleta
+                    if (evento.getPrecioPreventa() != null && evento.getCantidadPreventa() != null
+                            && evento.getCantidadPreventa() > 0) {
+                        double precioPreventa = evento.getPrecioPreventa().doubleValue();
+                        int cupoPreventa = evento.getCantidadPreventa();
+                        int preventaRestante = Math.max(0, cupoPreventa - sold);
+                        enPreventa = Math.min(cantidad, preventaRestante);
+                        enRegular = cantidad - enPreventa;
+                        subtotal = (enPreventa * precioPreventa) + (enRegular * price);
+                    } else {
+                        subtotal = cantidad * price;
+                    }
+                } else {
+                    // Combo normal con precio fijo
+                    subtotal = combo.getPrecio();
+                }
             } else {
-                subtotal = cantidad * price;
+                // ── Precio dinámico de preventa ─────────────────────────────────────
+                // Las primeras 'cantidadPreventa' entradas se cobran a 'precioPreventa';
+                // a partir de ahí, a 'precio' regular. Una compra que cruce el límite
+                // se factura mezclada (parte preventa + parte regular) para que el total
+                // que llega a la pasarela sea siempre exacto.
+                if (evento.getPrecioPreventa() != null && evento.getCantidadPreventa() != null
+                        && evento.getCantidadPreventa() > 0) {
+                    double precioPreventa = evento.getPrecioPreventa().doubleValue();
+                    int cupoPreventa = evento.getCantidadPreventa();
+                    int preventaRestante = Math.max(0, cupoPreventa - sold);
+                    enPreventa = Math.min(cantidad, preventaRestante);
+                    enRegular = cantidad - enPreventa;
+                    subtotal = (enPreventa * precioPreventa) + (enRegular * price);
+                } else {
+                    subtotal = cantidad * price;
+                }
             }
         } else {
             subtotal = cantidad * price;
@@ -113,44 +164,55 @@ public class CompraServiceImpl implements CompraService {
         boolean promoParcheAplicada = false;
         String couponUsed = request.getCodigoCupon() != null ? request.getCodigoCupon().trim().toUpperCase() : "";
 
-        if (!couponUsed.isEmpty()) {
-            com.dopaminacrew.backend.model.Cupon cupon = cuponRepository.findByCodigoIgnoreCase(couponUsed)
-                    .orElseThrow(() -> new RuntimeException("El cupón '" + couponUsed + "' no existe."));
-            
-            if (!cupon.getActivo()) {
-                throw new RuntimeException("El cupón '" + couponUsed + "' no está activo o ya venció.");
-            }
-
-            // Validar un único uso por usuario
-            long usosPrevios = compraRepository.countByUsuarioIdAndCodigoCupon(user.getId(), cupon.getCodigo());
-            if (usosPrevios > 0) {
-                throw new RuntimeException("Ya has usado el cupón '" + cupon.getCodigo() + "' en una compra anterior.");
-            }
-
-            // Validar límite global de usos totales (por ejemplo, para ganadores de sorteos)
-            if (cupon.getMaxUsos() != null && cupon.getMaxUsos() > 0) {
-                long usosTotales = compraRepository.countTotalUsagesOfCoupon(cupon.getCodigo());
-                if (usosTotales >= cupon.getMaxUsos()) {
-                    throw new RuntimeException("El cupón '" + cupon.getCodigo() + "' ya no está disponible (alcanzó su límite máximo de usos).");
+        if (esCombo) {
+            if (combo.getEsCumpleanero()) {
+                // Descuento equivalente a 1 boleta (si hay preventa activa se descuenta preventa, sino precio regular)
+                double valorDescuento = price;
+                if (evento != null && evento.getPrecioPreventa() != null && enPreventa > 0) {
+                    valorDescuento = evento.getPrecioPreventa().doubleValue();
                 }
+                descuento = valorDescuento;
             }
+        } else {
+            if (!couponUsed.isEmpty()) {
+                com.dopaminacrew.backend.model.Cupon cupon = cuponRepository.findByCodigoIgnoreCase(couponUsed)
+                        .orElseThrow(() -> new RuntimeException("El cupón '" + couponUsed + "' no existe."));
+                
+                if (!cupon.getActivo()) {
+                    throw new RuntimeException("El cupón '" + couponUsed + "' no está activo o ya venció.");
+                }
 
-            // Validar mínimo de boletas requeridas
-            if (cupon.getMinBoletas() != null && cantidad < cupon.getMinBoletas()) {
-                throw new RuntimeException("El cupón '" + cupon.getCodigo() + "' requiere la compra de mínimo " + cupon.getMinBoletas() + " boletas.");
-            }
-            
-            descuento = subtotal * (cupon.getDescuentoPorcentaje() / 100.0);
+                // Validar un único uso por usuario
+                long usosPrevios = compraRepository.countByUsuarioIdAndCodigoCupon(user.getId(), cupon.getCodigo());
+                if (usosPrevios > 0) {
+                    throw new RuntimeException("Ya has usado el cupón '" + cupon.getCodigo() + "' en una compra anterior.");
+                }
 
-            // Calcular comision de promotor si el cupón está asignado a uno
-            if (cupon.getPromotor() != null) {
-                comisionPromotor = (enPreventa * 2375.0) + (enRegular * 3325.0);
+                // Validar límite global de usos totales (por ejemplo, para ganadores de sorteos)
+                if (cupon.getMaxUsos() != null && cupon.getMaxUsos() > 0) {
+                    long usosTotales = compraRepository.countTotalUsagesOfCoupon(cupon.getCodigo());
+                    if (usosTotales >= cupon.getMaxUsos()) {
+                        throw new RuntimeException("El cupón '" + cupon.getCodigo() + "' ya no está disponible (alcanzó su límite máximo de usos).");
+                    }
+                }
+
+                // Validar mínimo de boletas requeridas
+                if (cupon.getMinBoletas() != null && cantidad < cupon.getMinBoletas()) {
+                    throw new RuntimeException("El cupón '" + cupon.getCodigo() + "' requiere la compra de mínimo " + cupon.getMinBoletas() + " boletas.");
+                }
+                
+                descuento = subtotal * (cupon.getDescuentoPorcentaje() / 100.0);
+
+                // Calcular comision de promotor si el cupón está asignado a uno
+                if (cupon.getPromotor() != null) {
+                    comisionPromotor = (enPreventa * 2375.0) + (enRegular * 3325.0);
+                }
+            } else if (cantidad >= 4 && !compraRepository.usuarioYaUsoPromoParche(user.getId())) {
+                // Descuento automático del 10% por cantidad (promo parche), sin cupón.
+                // Es de un solo uso por usuario: una vez consumida queda deshabilitada.
+                descuento = subtotal * 0.10;
+                promoParcheAplicada = true;
             }
-        } else if (cantidad >= 4 && !compraRepository.usuarioYaUsoPromoParche(user.getId())) {
-            // Descuento automático del 10% por cantidad (promo parche), sin cupón.
-            // Es de un solo uso por usuario: una vez consumida queda deshabilitada.
-            descuento = subtotal * 0.10;
-            promoParcheAplicada = true;
         }
 
         double total = subtotal - descuento;
@@ -167,6 +229,16 @@ public class CompraServiceImpl implements CompraService {
         compra.setCantidadPreventa(enPreventa);
         compra.setCantidadRegular(enRegular);
         compra.setComisionPromotor(comisionPromotor);
+
+        if (esCombo) {
+            compra.setCombo(combo);
+            compra.setComboNombre(combo.getNombre());
+            compra.setComboItems(combo.getItemsAdicionales());
+            if (combo.getEsCumpleanero()) {
+                compra.setRequiereVerificacionCumple(true);
+            }
+        }
+
         compra.setEstado("PENDIENTE"); // Pending payment via Efipay
 
         // Generate a unique purchase reference QR code

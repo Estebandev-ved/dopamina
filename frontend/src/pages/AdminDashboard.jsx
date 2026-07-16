@@ -38,6 +38,7 @@ const SIDEBAR_ITEMS = [
   { id: 'artistas', label: 'Artistas', icon: 'A' },
   { id: 'compras', label: 'Compras', icon: 'C' },
   { id: 'usuarios', label: 'Usuarios', icon: 'U' },
+  { id: 'combos', label: 'Combos', icon: '🎁' },
   { id: 'canjes', label: 'Canjes', icon: 'G' },
   { id: 'regalos', label: 'Regalar Boletas', icon: 'R' },
   { id: 'puerta', label: 'Puerta', icon: 'Q' },
@@ -398,6 +399,14 @@ export default function AdminDashboard() {
   });
 
   const [reportesSeguridad, setReportesSeguridad] = useState([]);
+
+  // Estados para Combos
+  const [combos, setCombos] = useState([]);
+  const [loadingCombos, setLoadingCombos] = useState(false);
+  const [showComboForm, setShowComboForm] = useState(false);
+  const [editingCombo, setEditingCombo] = useState(null);
+  const [formCombo, setFormCombo] = useState({ nombre: '', descripcion: '', precio: 0.0, precioOriginal: 0.0, cantidadBoletas: 1, itemsAdicionales: '', imagenUrl: '', esCumpleanero: false, activo: true });
+  const [searchCombo, setSearchCombo] = useState('');
   const [transferencias, setTransferencias] = useState([]);
   const [loginLogs, setLoginLogs] = useState([]);
   const [artistas, setArtistas] = useState([]);
@@ -533,6 +542,62 @@ export default function AdminDashboard() {
       setLoadingSugerencias(false);
     }
   }, []);
+
+  const fetchCombos = useCallback(async () => {
+    setLoadingCombos(true);
+    try {
+      const data = await api.adminGetCombos();
+      setCombos(data || []);
+    } catch (err) {
+      console.error('Error fetching combos:', err);
+    } finally {
+      setLoadingCombos(false);
+    }
+  }, []);
+
+  const handleSubmitCombo = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingCombo) {
+        const updated = await api.adminActualizarCombo(editingCombo.id, formCombo);
+        setCombos(prev => prev.map(c => c.id === editingCombo.id ? updated : c));
+      } else {
+        const created = await api.adminCrearCombo(formCombo);
+        setCombos(prev => [...prev, created]);
+      }
+      setShowComboForm(false);
+      setEditingCombo(null);
+      setFormCombo({ nombre: '', descripcion: '', precio: 0.0, precioOriginal: 0.0, cantidadBoletas: 1, itemsAdicionales: '', imagenUrl: '', esCumpleanero: false, activo: true });
+    } catch (err) {
+      setError('Error al guardar el combo.');
+    }
+  };
+
+  const handleEditCombo = (combo) => {
+    setEditingCombo(combo);
+    setFormCombo({
+      nombre: combo.nombre,
+      descripcion: combo.descripcion || '',
+      precio: combo.precio,
+      precioOriginal: combo.precioOriginal || 0.0,
+      cantidadBoletas: combo.cantidadBoletas,
+      itemsAdicionales: combo.itemsAdicionales || '',
+      imagenUrl: combo.imagenUrl || '',
+      esCumpleanero: combo.esCumpleanero || false,
+      activo: combo.activo
+    });
+    setShowComboForm(true);
+  };
+
+  const handleDeleteCombo = async (id) => {
+    if (!window.confirm('¿Desactivar este combo?')) return;
+    try {
+      await api.adminDeleteCombo(id);
+      fetchCombos();
+    } catch (err) {
+      setError('Error al desactivar el combo.');
+    }
+  };
 
   const fetchCupones = useCallback(async () => {
     setLoadingCupones(true);
@@ -792,7 +857,8 @@ export default function AdminDashboard() {
     if (activeTab === 'sugerencias') fetchSugerencias();
     if (activeTab === 'promotores') fetchPromotores();
     if (activeTab === 'campanas') fetchRetoActivo();
-  }, [activeTab, fetchPwaStats, fetchVisitStats, fetchSets, fetchSugerencias, fetchPromotores, fetchRetoActivo]);
+    if (activeTab === 'combos') fetchCombos();
+  }, [activeTab, fetchPwaStats, fetchVisitStats, fetchSets, fetchSugerencias, fetchPromotores, fetchRetoActivo, fetchCombos]);
 
   // ── Derived chart data ──
   const comprasConEvento = useMemo(() => compras.filter(c => c.eventoNombre), [compras]);
@@ -1679,6 +1745,46 @@ export default function AdminDashboard() {
                       <div style={{ gridColumn: 'span 2' }}><span style={{ fontSize: '0.7rem', color: theme.textMuted, textTransform: 'uppercase', fontWeight: 700 }}>Evento</span><span style={{ fontSize: '1.1rem', fontWeight: 800, color: theme.text, display: 'block', marginTop: '4px' }}>{scanResult.boleta.eventoNombre}</span></div>
                       <div><span style={{ fontSize: '0.7rem', color: theme.textMuted, textTransform: 'uppercase', fontWeight: 700 }}>Fecha</span><span style={{ fontSize: '0.85rem', color: theme.textSec, display: 'block', marginTop: '4px' }}>{scanResult.boleta.eventoFecha}</span></div>
                       <div><span style={{ fontSize: '0.7rem', color: theme.textMuted, textTransform: 'uppercase', fontWeight: 700 }}>Lugar</span><span style={{ fontSize: '0.85rem', color: theme.textSec, display: 'block', marginTop: '4px' }}>{scanResult.boleta.eventoLugar}</span></div>
+
+                      {scanResult.boleta.comboNombre && (
+                        <div style={{
+                          gridColumn: 'span 2',
+                          background: 'rgba(177, 78, 255, 0.15)',
+                          border: `2px dashed ${theme.accent}`,
+                          borderRadius: '8px',
+                          padding: '16px',
+                          marginTop: '8px'
+                        }}>
+                          <span style={{ fontSize: '0.7rem', color: theme.accentLight, textTransform: 'uppercase', fontWeight: 900, display: 'block', letterSpacing: '1px' }}>🎁 COMBO ADQUIRIDO</span>
+                          <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff', display: 'block', marginTop: '4px' }}>{scanResult.boleta.comboNombre}</span>
+                          
+                          <div style={{ marginTop: '10px', background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '6px' }}>
+                            <span style={{ fontSize: '0.65rem', color: theme.textMuted, textTransform: 'uppercase', display: 'block', fontWeight: 700 }}>Entregar en barra:</span>
+                            <span style={{ fontSize: '0.9rem', color: '#4ade80', fontWeight: 800 }}>{scanResult.boleta.comboItems || 'Sin ítems adicionales registrados.'}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {scanResult.boleta.requiereVerificacionCumple && (
+                        <div style={{
+                          gridColumn: 'span 2',
+                          background: 'rgba(245, 158, 11, 0.15)',
+                          border: '2px dashed #f59e0b',
+                          borderRadius: '8px',
+                          padding: '16px',
+                          marginTop: '8px'
+                        }}>
+                          <span style={{ fontSize: '0.75rem', color: '#f59e0b', textTransform: 'uppercase', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            🎂 VERIFICACIÓN FÍSICA OBLIGATORIA
+                          </span>
+                          <span style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 800, display: 'block', marginTop: '4px' }}>
+                            Combo Cumpleañero: ¡Solicitar cédula física original para corroborar que el asistente cumple años este mes!
+                          </span>
+                          <span style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'block', marginTop: '4px' }}>
+                            Si la fecha de nacimiento no corresponde al mes actual, el descuento NO es válido y se debe denegar el ingreso o cobrar el excedente.
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -3186,6 +3292,168 @@ export default function AdminDashboard() {
     </motion.div>
   );
 
+  const renderCombos = () => (
+    <motion.div key="combos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      {showComboForm ? (
+        <Section icon="gift" title={editingCombo ? 'Editar Combo' : 'Nuevo Combo'}>
+          <form onSubmit={handleSubmitCombo} style={{ display: 'grid', gap: '16px', gridTemplateColumns: '1fr 1fr' }}>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>NOMBRE DEL COMBO</label>
+              <input required style={inputStyle} value={formCombo.nombre} onChange={e => setFormCombo({ ...formCombo, nombre: e.target.value })} placeholder="Ej. Combo Ron & Parche" />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>DESCRIPCIÓN</label>
+              <textarea style={{ ...inputStyle, height: '80px', resize: 'none', padding: '10px 16px' }} value={formCombo.descripcion} onChange={e => setFormCombo({ ...formCombo, descripcion: e.target.value })} placeholder="Breve explicación del combo..." />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>PRECIO ORIGINAL (COP)</label>
+              <input type="number" required style={inputStyle} value={formCombo.precioOriginal} onChange={e => setFormCombo({ ...formCombo, precioOriginal: parseFloat(e.target.value) || 0 })} placeholder="Valor sin descuento" />
+              <span style={{ fontSize: '10px', color: theme.textMuted, marginTop: '4px', display: 'block' }}>El precio que pagaría el cliente SIN el combo</span>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>PRECIO COMBO (COP)</label>
+              <input type="number" required style={inputStyle} value={formCombo.precio} onChange={e => setFormCombo({ ...formCombo, precio: parseFloat(e.target.value) || 0 })} placeholder="Precio con descuento" />
+              <span style={{ fontSize: '10px', color: theme.textMuted, marginTop: '4px', display: 'block' }}>El precio final que paga el cliente</span>
+            </div>
+            {(formCombo.precioOriginal > 0 && formCombo.precio > 0 && formCombo.precioOriginal > formCombo.precio) && (
+              <div style={{ gridColumn: 'span 2', background: 'rgba(16, 185, 129, 0.1)', border: `1px solid ${theme.success}`, borderRadius: '10px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <span style={{ fontSize: '11px', color: theme.textMuted, fontWeight: 600 }}>AHORRO PARA EL CLIENTE</span>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: theme.success, marginTop: '2px' }}>
+                    ${(formCombo.precioOriginal - formCombo.precio).toLocaleString('es-CO')} COP
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: '11px', color: theme.textMuted, fontWeight: 600 }}>PORCENTAJE</span>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: theme.warning, marginTop: '2px' }}>
+                    {Math.round(((formCombo.precioOriginal - formCombo.precio) / formCombo.precioOriginal) * 100)}% OFF
+                  </div>
+                </div>
+              </div>
+            )}
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>CANTIDAD DE BOLETAS INCLUIDAS</label>
+              <input type="number" min="1" required style={inputStyle} value={formCombo.cantidadBoletas} onChange={e => setFormCombo({ ...formCombo, cantidadBoletas: parseInt(e.target.value) || 1 })} placeholder="1" />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>ITEMS ADICIONALES (PRODUCTOS INCLUIDOS)</label>
+              <input style={inputStyle} value={formCombo.itemsAdicionales} onChange={e => setFormCombo({ ...formCombo, itemsAdicionales: e.target.value })} placeholder="Ej. 1 Botella de Ron + Hielo" />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>IMAGEN DEL COMBO (URL)</label>
+              <input style={inputStyle} value={formCombo.imagenUrl} onChange={e => setFormCombo({ ...formCombo, imagenUrl: e.target.value })} placeholder="https://ejemplo.com/imagen-combo.jpg" />
+              <span style={{ fontSize: '10px', color: theme.textMuted, marginTop: '4px', display: 'block' }}>Pega la URL de la imagen del combo (puede ser de Imgur, Google Drive, etc.)</span>
+              {formCombo.imagenUrl && (
+                <div style={{ marginTop: '10px', borderRadius: '10px', overflow: 'hidden', border: `1px solid ${theme.border}`, maxWidth: '280px' }}>
+                  <img src={formCombo.imagenUrl} alt="Preview" style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }} onError={e => { e.target.style.display = 'none'; }} />
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '20px', gridColumn: 'span 2', marginBottom: '16px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                <input type="checkbox" checked={formCombo.esCumpleanero} onChange={e => setFormCombo({ ...formCombo, esCumpleanero: e.target.checked })} style={{ accentColor: theme.accent }} />
+                <span>¿Es Combo de Cumpleañero? (Aplica descuento dinámico de 1 boleta gratis)</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                <input type="checkbox" checked={formCombo.activo} onChange={e => setFormCombo({ ...formCombo, activo: e.target.checked })} style={{ accentColor: theme.accent }} />
+                <span>Combo Activo</span>
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', gridColumn: 'span 2', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => { setShowComboForm(false); setEditingCombo(null); }} style={btnGhost}>Cancelar</button>
+              <button type="submit" style={btnPrimary}>Guardar Combo</button>
+            </div>
+          </form>
+        </Section>
+      ) : (
+        <Section icon="gift" title="Catálogo de Combos & Promociones"
+          extra={
+            <button onClick={() => {
+              setEditingCombo(null);
+              setFormCombo({ nombre: '', descripcion: '', precio: 0, precioOriginal: 0, cantidadBoletas: 1, itemsAdicionales: '', imagenUrl: '', esCumpleanero: false, activo: true });
+              setShowComboForm(true);
+            }} style={btnPrimary}>+ Crear Combo</button>
+          }
+        >
+          <input style={inputStyle} placeholder="Buscar combo por nombre o ítems..." value={searchCombo} onChange={e => setSearchCombo(e.target.value)} />
+          <div style={{ overflowX: 'auto' }}>
+            <table style={tableStyle}>
+              <thead><tr>
+                {['#', 'Nombre / Descripción', 'P. Original', 'P. Combo', 'Ahorro', 'Boletas', 'Ítems', 'Tipo', 'Estado', 'Acciones'].map(h => <th key={h} style={thStyle}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {combos.filter(c =>
+                  !searchCombo ||
+                  c.nombre?.toLowerCase().includes(searchCombo.toLowerCase()) ||
+                  c.itemsAdicionales?.toLowerCase().includes(searchCombo.toLowerCase())
+                ).map(c => (
+                  <tr key={c.id}
+                    onMouseEnter={e => e.currentTarget.style.background = theme.cardHover}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <td style={{ ...tdStyle, color: theme.accent, fontFamily: "'JetBrains Mono', monospace" }}>#{c.id}</td>
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {c.imagenUrl ? (
+                          <img src={c.imagenUrl} alt={c.nombre} style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover', border: `1px solid ${theme.border}`, flexShrink: 0 }} />
+                        ) : (
+                          <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: theme.cardBg, border: `1px dashed ${theme.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>📦</div>
+                        )}
+                        <div>
+                          <div style={{ fontWeight: 700, color: theme.text }}>{c.nombre}</div>
+                          <div style={{ fontSize: '11px', color: theme.textMuted }}>{c.descripcion || 'Sin descripción'}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ ...tdStyle, fontWeight: 600, color: theme.textMuted }}>
+                      {c.precioOriginal > 0 ? `$${c.precioOriginal.toLocaleString('es-CO')}` : '—'}
+                    </td>
+                    <td style={{ ...tdStyle, fontWeight: 700, color: theme.success }}>
+                      {c.esCumpleanero ? (
+                        <span style={{ fontSize: '0.8rem', color: theme.success }}>Dinámico (3+1)</span>
+                      ) : (
+                        `$${c.precio.toLocaleString('es-CO')}`
+                      )}
+                    </td>
+                    <td style={{ ...tdStyle, fontWeight: 700, color: theme.warning }}>
+                      {(c.precioOriginal > 0 && c.precio > 0 && c.precioOriginal > c.precio) ? (
+                        <>
+                          <div style={{ color: theme.success, fontWeight: 800 }}>${(c.precioOriginal - c.precio).toLocaleString('es-CO')}</div>
+                          <div style={{ fontSize: '10px', color: theme.warning }}>{Math.round(((c.precioOriginal - c.precio) / c.precioOriginal) * 100)}% OFF</div>
+                        </>
+                      ) : (
+                        <span style={{ color: theme.textMuted }}>—</span>
+                      )}
+                    </td>
+                    <td style={{ ...tdStyle, fontFamily: "'JetBrains Mono', monospace" }}>{c.cantidadBoletas}x</td>
+                    <td style={{ ...tdStyle, color: theme.accentLight }}>{c.itemsAdicionales || 'Ninguno'}</td>
+                    <td>
+                      {c.esCumpleanero ? (
+                        <span style={badgeStyle(theme.warning)}>CUMPLEAÑERO 🎂</span>
+                      ) : (
+                        <span style={badgeStyle(theme.info)}>REGULAR ⚡</span>
+                      )}
+                    </td>
+                    <td><span style={badgeStyle(c.activo ? theme.success : theme.danger)}>{c.activo ? 'ACTIVO' : 'INACTIVO'}</span></td>
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button onClick={() => handleEditCombo(c)} style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', background: 'rgba(96,165,250,0.1)', color: theme.info, cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700 }}>Editar</button>
+                        <button onClick={() => handleDeleteCombo(c.id)} style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', background: 'rgba(239,68,68,0.1)', color: theme.danger, cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700 }}>Desactivar</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {combos.length === 0 && (
+                  <tr><td colSpan={8} style={{ ...tdStyle, textAlign: 'center', color: theme.textMuted, padding: '30px' }}>No hay combos registrados.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      )}
+    </motion.div>
+  );
+
   const renderVisitas = () => (
     <motion.div key="visitas" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       {loadingVisits ? (
@@ -3601,6 +3869,7 @@ export default function AdminDashboard() {
           {activeTab === 'campanas' && api.getUser()?.rol === 'ROLE_ADMIN' && renderCampanas()}
           {activeTab === 'visitas' && renderVisitas()}
           {activeTab === 'sets' && renderSets()}
+          {activeTab === 'combos' && renderCombos()}
           {activeTab === 'sugerencias' && renderSugerencias()}
           {activeTab === 'seguridad' && api.getUser()?.rol === 'ROLE_ADMIN' && renderSeguridad()}
         </AnimatePresence>

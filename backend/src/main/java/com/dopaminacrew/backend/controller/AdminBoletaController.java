@@ -240,6 +240,15 @@ public class AdminBoletaController {
             ticketDate = java.time.LocalDateTime.now();
         }
 
+        String comboNombre = null;
+        String comboItems = null;
+        Boolean requiereVerificacionCumple = false;
+        if (compra != null) {
+            comboNombre = compra.getComboNombre();
+            comboItems = compra.getComboItems();
+            requiereVerificacionCumple = compra.getRequiereVerificacionCumple() != null ? compra.getRequiereVerificacionCumple() : false;
+        }
+
         return new BoletaResponse(
                 boleta.getId(),
                 evNombre,
@@ -251,7 +260,10 @@ public class AdminBoletaController {
                 boleta.getEstado(),
                 ticketDate,
                 usuarioNombre,
-                boleta.getNumeroSorteo()
+                boleta.getNumeroSorteo(),
+                comboNombre,
+                comboItems,
+                requiereVerificacionCumple
         );
     }
 

@@ -28,6 +28,13 @@ export default function Checkout() {
     }
   }, [currentUser, selectedEvento, navigate]);
 
+  const comboId = location.state?.comboId || null;
+  const comboNombre = location.state?.comboNombre || null;
+  const comboPrecio = location.state?.comboPrecio !== undefined ? location.state.comboPrecio : null;
+  const comboItems = location.state?.comboItems || null;
+  const fechaNacimientoCumpleanero = location.state?.fechaNacimientoCumpleanero || null;
+  const esCombo = !!comboId;
+
   const [cantidad, setCantidad] = useState(location.state?.cantidad || 1);
   const [couponCode, setCouponCode] = useState('');
   const [couponDiscountPercent, setCouponDiscountPercent] = useState(0);
@@ -42,8 +49,9 @@ export default function Checkout() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Auto apply active coupon from profile chest or state
+  // Auto apply active coupon from profile chest or state (only if NOT purchasing a combo)
   useEffect(() => {
+    if (esCombo) return;
     let targetCoupon = location.state?.autoCoupon;
     
     if (!targetCoupon) {
@@ -72,7 +80,7 @@ export default function Checkout() {
         })
         .catch(err => console.log('Error al autoaplicar cupón sorpresa:', err));
     }
-  }, [location.state, cantidad]);
+  }, [location.state, cantidad, esCombo]);
 
   // Consultar si el usuario todavía tiene disponible la promo de 4+ boletas
   useEffect(() => {
@@ -121,12 +129,30 @@ export default function Checkout() {
     const dias = Math.floor(horas / 24);
     return `hace ${dias} ${dias === 1 ? 'día' : 'días'}`;
   };
-  const subtotal = cantidad * precioUnitario;
-  // La promo de parche (10%) solo aplica si: no hay cupón, son 4+ boletas y el usuario no la ha usado.
-  const promoParcheActiva = !couponApplied && cantidad >= 4 && promoParcheDisponible;
-  const activeDiscountPercent = couponApplied ? couponDiscountPercent : (promoParcheActiva ? 10 : 0);
-  const descuento = subtotal * (activeDiscountPercent / 100.0);
-  const total = subtotal - descuento;
+  let subtotal = cantidad * precioUnitario;
+  let descuento = 0;
+  let total = subtotal;
+  let activeDiscountPercent = 0;
+
+  if (esCombo) {
+    if (comboPrecio !== null && comboPrecio > 0) {
+      subtotal = comboPrecio;
+      descuento = 0;
+      total = comboPrecio;
+    } else {
+      // Combo Cumpleañero (3 pagan, 1 gratis)
+      subtotal = cantidad * precioUnitario;
+      descuento = precioUnitario; // 1 gratis
+      total = subtotal - descuento;
+      activeDiscountPercent = 25; // 1/4 is 25% discount
+    }
+  } else {
+    subtotal = cantidad * precioUnitario;
+    const promoParcheActiva = !couponApplied && cantidad >= 4 && promoParcheDisponible;
+    activeDiscountPercent = couponApplied ? couponDiscountPercent : (promoParcheActiva ? 10 : 0);
+    descuento = subtotal * (activeDiscountPercent / 100.0);
+    total = subtotal - descuento;
+  }
 
   const handleApplyCoupon = async (e) => {
     e.preventDefault();
@@ -185,7 +211,9 @@ export default function Checkout() {
       const result = await api.efipayGenerate(
         cantidad,
         couponApplied ? couponCode.toUpperCase() : null,
-        selectedEvento ? selectedEvento.id : null
+        selectedEvento ? selectedEvento.id : null,
+        comboId,
+        fechaNacimientoCumpleanero
       );
 
       if (result.redirectUrl) {
@@ -249,7 +277,7 @@ export default function Checkout() {
                   <div className="flex items-center space-x-4">
                     <button
                       onClick={() => handleQuantityChange(-1)}
-                      disabled={cantidad <= 1}
+                      disabled={esCombo || cantidad <= 1}
                       className="w-10 h-10 rounded border border-industrial-800 flex items-center justify-center text-gray-400 hover:text-white hover:border-neon-purple/50 disabled:opacity-30 transition-colors"
                     >
                       <Minus className="w-4 h-4" />
@@ -259,7 +287,7 @@ export default function Checkout() {
                     </span>
                     <button
                       onClick={() => handleQuantityChange(1)}
-                      disabled={cantidad >= 10}
+                      disabled={esCombo || cantidad >= 10}
                       className="w-10 h-10 rounded border border-industrial-800 flex items-center justify-center text-gray-400 hover:text-white hover:border-neon-purple/50 disabled:opacity-30 transition-colors"
                     >
                       <Plus className="w-4 h-4" />
@@ -275,21 +303,32 @@ export default function Checkout() {
                   </div>
                 </div>
 
-                {/* Promo notice */}
-                <div className="mt-3 bg-neon-purple/5 border border-neon-purple/20 rounded p-3 text-xs text-gray-300 flex items-start space-x-2.5">
-                  <BadgePercent className="w-4.5 h-4.5 text-neon-glow flex-shrink-0 mt-0.5" />
-                  <div>
-                    {promoParcheDisponible ? (
-                      <>
-                        <span className="font-bold text-white">Promo Parche:</span> Compra 4 o más entradas y obtén un <span className="text-neon-glow font-bold">10% de descuento automático</span>. ¡Solo se puede usar una vez!
-                      </>
-                    ) : (
-                      <>
-                        <span className="font-bold text-white">Promo Parche ya utilizada:</span> Ya aprovechaste tu 10% de descuento por 4+ boletas en una compra anterior. ¡Gracias por traer a tu parche!
-                      </>
-                    )}
+                {/* Promo notice / Combo items details */}
+                {esCombo ? (
+                  <div className="mt-3 bg-neon-purple/10 border border-neon-purple/35 rounded p-3.5 text-xs text-gray-300 flex items-start space-x-2.5 animate-pulse" style={{ borderColor: 'rgba(var(--color-neon), 0.35)', backgroundColor: 'rgba(var(--color-neon), 0.1)' }}>
+                    <Gift className="w-4.5 h-4.5 text-neon-glow flex-shrink-0 mt-0.5" style={{ color: 'var(--color-neon)' }} />
+                    <div className="text-left">
+                      <span className="font-bold text-white block uppercase tracking-wide">PAQUETE ADICIONAL INCLUIDO:</span>
+                      <span className="text-neon-glow font-black text-sm block mt-1" style={{ color: 'var(--color-neon-light)' }}>{comboItems}</span>
+                      <span className="text-gray-400 block mt-1 text-[10px]">Reclama tus productos adicionales en la barra del evento escaneando el código de compra de tu perfil.</span>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="mt-3 bg-neon-purple/5 border border-neon-purple/20 rounded p-3 text-xs text-gray-300 flex items-start space-x-2.5">
+                    <BadgePercent className="w-4.5 h-4.5 text-neon-glow flex-shrink-0 mt-0.5" />
+                    <div>
+                      {promoParcheDisponible ? (
+                        <>
+                          <span className="font-bold text-white">Promo Parche:</span> Compra 4 o más entradas y obtén un <span className="text-neon-glow font-bold">10% de descuento automático</span>. ¡Solo se puede usar una vez!
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-bold text-white">Promo Parche ya utilizada:</span> Ya aprovechaste tu 10% de descuento por 4+ boletas en una compra anterior. ¡Gracias por traer a tu parche!
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Sorteo notice */}
                 <div className="mt-3 bg-purple-950/10 border border-purple-500/20 rounded p-3 text-xs text-gray-300 flex items-start space-x-2.5">
@@ -380,64 +419,77 @@ export default function Checkout() {
                 <h3 className="text-sm font-black text-white uppercase tracking-wider mb-6 pb-2 border-b border-industrial-800">
                   Resumen del Pedido
                 </h3>
+                  <div className="space-y-3 text-xs font-mono text-left">
+                   {esCombo && (
+                     <div className="bg-neon-purple/10 border border-neon-purple/20 p-2.5 rounded text-[11px] text-gray-300 mb-4 flex flex-col gap-1" style={{ borderColor: 'rgba(var(--color-neon), 0.2)', backgroundColor: 'rgba(var(--color-neon), 0.08)' }}>
+                       <span className="text-[9px] uppercase tracking-wider font-bold text-neon-glow font-sans" style={{ color: 'var(--color-neon)' }}>Combo Activado</span>
+                       <strong className="text-white text-xs uppercase font-black font-sans">{comboNombre}</strong>
+                       <span className="text-[10px] text-gray-400">{comboItems}</span>
+                     </div>
+                   )}
 
-                <div className="space-y-3 text-xs font-mono">
-                  <div className="flex justify-between text-gray-400">
-                    <span>Subtotal:</span>
-                    <span>${subtotal.toLocaleString('es-CO')} COP</span>
-                  </div>
-                  
-                  {descuento > 0 && (
-                    <div className="flex justify-between text-emerald-400">
-                      <span>Descuento ({activeDiscountPercent}%):</span>
-                      <span>-${descuento.toLocaleString('es-CO')} COP</span>
-                    </div>
-                  )}
+                   <div className="flex justify-between text-gray-400">
+                     <span>Subtotal:</span>
+                     <span>${subtotal.toLocaleString('es-CO')} COP</span>
+                   </div>
+                   
+                   {descuento > 0 && (
+                     <div className="flex justify-between text-emerald-400">
+                       <span>{esCombo ? 'Descuento Combo:' : `Descuento (${activeDiscountPercent}%):`}</span>
+                       <span>-${descuento.toLocaleString('es-CO')} COP</span>
+                     </div>
+                   )}
 
-                  <div className="flex justify-between text-gray-400">
-                    <span>Entradas:</span>
-                    <span>{cantidad}x</span>
-                  </div>
+                   <div className="flex justify-between text-gray-400">
+                     <span>Entradas:</span>
+                     <span>{cantidad}x</span>
+                   </div>
 
-                  <div className="flex justify-between text-white text-sm font-bold pt-3 border-t border-industrial-850">
-                    <span>TOTAL:</span>
-                    <span className="text-neon-glow">${total.toLocaleString('es-CO')} COP</span>
-                  </div>
-                </div>
+                   <div className="flex justify-between text-white text-sm font-bold pt-3 border-t border-industrial-850">
+                     <span>TOTAL:</span>
+                     <span className="text-neon-glow" style={{ color: 'var(--color-neon)' }}>${total.toLocaleString('es-CO')} COP</span>
+                   </div>
+                 </div>
 
-                {/* Coupon Code Input */}
-                <form onSubmit={handleApplyCoupon} className="mt-6 pt-4 border-t border-industrial-800">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">
-                    ¿Tienes un Cupón?
-                  </label>
-                  <div className="flex space-x-2">
-                    <input
-                      type="text"
-                      placeholder="CÓDIGO"
-                      value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value)}
-                      disabled={couponApplied}
-                      className="flex-grow bg-black border border-industrial-800 text-xs px-3 py-2 text-white uppercase font-mono rounded focus:outline-none focus:border-neon-purple"
-                    />
-                    <button
-                      type="submit"
-                      disabled={couponApplied || !couponCode}
-                      className="bg-industrial-800 hover:bg-neon-purple text-white text-xs font-bold px-3 py-2 rounded transition-colors disabled:opacity-40"
-                    >
-                      Aplicar
-                    </button>
-                  </div>
-                  {couponApplied && (
-                    <p className="text-[10px] text-emerald-400 font-semibold mt-1">
-                      ✓ Cupón {couponCode.toUpperCase()} ({couponDiscountPercent}%) aplicado con éxito.
-                    </p>
-                  )}
-                  {couponError && (
-                    <p className="text-[10px] text-rose-400 font-semibold mt-1">
-                      {couponError}
-                    </p>
-                  )}
-                </form>
+                 {/* Coupon Code Input (hidden for combos to avoid double discounts) */}
+                 {!esCombo ? (
+                   <form onSubmit={handleApplyCoupon} className="mt-6 pt-4 border-t border-industrial-800">
+                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">
+                       ¿Tienes un Cupón?
+                     </label>
+                     <div className="flex space-x-2">
+                       <input
+                         type="text"
+                         placeholder="CÓDIGO"
+                         value={couponCode}
+                         onChange={(e) => setCouponCode(e.target.value)}
+                         disabled={couponApplied}
+                         className="flex-grow bg-black border border-industrial-800 text-xs px-3 py-2 text-white uppercase font-mono rounded focus:outline-none focus:border-neon-purple"
+                       />
+                       <button
+                         type="submit"
+                         disabled={couponApplied || !couponCode}
+                         className="bg-industrial-800 hover:bg-neon-purple text-white text-xs font-bold px-3 py-2 rounded transition-colors disabled:opacity-40"
+                       >
+                         Aplicar
+                       </button>
+                     </div>
+                     {couponApplied && (
+                       <p className="text-[10px] text-emerald-400 font-semibold mt-1">
+                         ✓ Cupón {couponCode.toUpperCase()} ({couponDiscountPercent}%) aplicado con éxito.
+                       </p>
+                     )}
+                     {couponError && (
+                       <p className="text-[10px] text-rose-400 font-semibold mt-1">
+                         {couponError}
+                       </p>
+                     )}
+                   </form>
+                 ) : (
+                   <div className="mt-4 pt-4 border-t border-industrial-800 text-[10px] text-gray-500 text-left font-mono">
+                     *Los combos ya incluyen descuentos especiales integrados y no aceptan cupones promocionales adicionales.
+                   </div>
+                 )}
 
                 {/* Submit Action */}
                 <div className="mt-8">

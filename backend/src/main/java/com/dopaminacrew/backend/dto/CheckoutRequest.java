@@ -18,4 +18,8 @@ public class CheckoutRequest {
     private String codigoCupon;
 
     private Long eventoId;
+
+    private Long comboId;
+
+    private String fechaNacimientoCumpleanero;
 }

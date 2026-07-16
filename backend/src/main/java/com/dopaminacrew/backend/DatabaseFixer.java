@@ -182,6 +182,52 @@ public class DatabaseFixer implements CommandLineRunner {
             System.out.println("Info: Columna tipo_cuenta ya existe: " + e.getMessage());
         }
 
+        try {
+            jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS `combos` (" +
+                "    `id` BIGINT AUTO_INCREMENT PRIMARY KEY," +
+                "    `nombre` VARCHAR(150) NOT NULL," +
+                "    `descripcion` TEXT," +
+                "    `precio` DECIMAL(10,2) NOT NULL," +
+                "    `precio_original` DECIMAL(10,2) DEFAULT 0.00," +
+                "    `cantidad_boletas` INT NOT NULL DEFAULT 1," +
+                "    `activo` TINYINT(1) NOT NULL DEFAULT 1," +
+                "    `imagen_url` VARCHAR(500)," +
+                "    `items_adicionales` VARCHAR(255)," +
+                "    `es_cumpleanero` TINYINT(1) NOT NULL DEFAULT 0," +
+                "    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                "    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
+            );
+            System.out.println("✔ Tabla combos verificada / creada.");
+
+            try {
+                jdbcTemplate.execute("ALTER TABLE combos ADD COLUMN precio_original DECIMAL(10,2) DEFAULT 0.00;");
+                System.out.println("✔ Columna precio_original agregada a combos.");
+            } catch (Exception e) {
+                // Ignore if it already exists
+            }
+
+            Integer combosCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM combos", Integer.class);
+            if (combosCount == null || combosCount == 0) {
+                jdbcTemplate.update("INSERT INTO combos (nombre, descripcion, precio, precio_original, cantidad_boletas, items_adicionales, es_cumpleanero, activo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        "Combo Ron Crew", "Arma el parche: 4 entradas generales y una Botella de Ron para iniciar la noche.", 100000.0, 180000.0, 4, "1 Botella de Ron", false, true);
+                jdbcTemplate.update("INSERT INTO combos (nombre, descripcion, precio, precio_original, cantidad_boletas, items_adicionales, es_cumpleanero, activo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        "Combo Vape Crew", "El combo ideal para parejas: 2 entradas generales y 1 Vape premium a tu elección.", 60000.0, 100000.0, 2, "1 Vape Premium", false, true);
+                jdbcTemplate.update("INSERT INTO combos (nombre, descripcion, precio, precio_original, cantidad_boletas, items_adicionales, es_cumpleanero, activo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        "Combo Cumpleañero", "¡Tu cumpleaños va por cuenta de la casa! Compra 3 entradas y la 4ta (la tuya) es GRATIS. Válido presentando cédula física en portería.", 75000.0, 100000.0, 4, "1 Entrada Gratis (Verificar Cédula)", true, true);
+                System.out.println("✔ Combos por defecto sembrados en la base de datos.");
+            } else {
+                // Update existing database seeds to have correct original prices
+                jdbcTemplate.update("UPDATE combos SET precio_original = 180000.0 WHERE nombre = 'Combo Ron Crew' AND (precio_original IS NULL OR precio_original = 0.0)");
+                jdbcTemplate.update("UPDATE combos SET precio_original = 100000.0 WHERE nombre = 'Combo Vape Crew' AND (precio_original IS NULL OR precio_original = 0.0)");
+                jdbcTemplate.update("UPDATE combos SET precio_original = 100000.0, precio = 75000.0 WHERE nombre = 'Combo Cumpleañero' AND (precio_original IS NULL OR precio_original = 0.0)");
+                System.out.println("✔ Precios originales de combos existentes actualizados.");
+            }
+        } catch (Exception e) {
+            System.err.println("Error creando o sembrando la tabla combos: " + e.getMessage());
+        }
+
         System.out.println("====== REPARACION DE BASE DE DATOS FINALIZADA ======");
     }
 }

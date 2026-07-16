@@ -23,4 +23,7 @@ public class BoletaResponse {
     private LocalDateTime createdAt;
     private String usuarioNombre;
     private Integer numeroSorteo;
+    private String comboNombre;
+    private String comboItems;
+    private Boolean requiereVerificacionCumple = false;
 }

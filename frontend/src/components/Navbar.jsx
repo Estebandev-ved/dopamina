@@ -202,6 +202,14 @@ export default function Navbar() {
               EVENTOS
             </Link>
             <Link
+              to="/combos"
+              className={`text-xs font-bold tracking-widest transition-colors duration-200 ${
+                isActive('/combos') ? 'text-neon-glow' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              COMBOS ⚡
+            </Link>
+            <Link
               to="/artistas"
               className={`text-xs font-bold tracking-widest transition-colors duration-200 ${
                 isActive('/artistas') ? 'text-neon-glow' : 'text-gray-400 hover:text-white'
@@ -395,6 +403,15 @@ export default function Navbar() {
               }`}
             >
               EVENTOS
+            </Link>
+            <Link
+              to="/combos"
+              onClick={() => setIsOpen(false)}
+              className={`text-sm font-bold tracking-widest py-2 ${
+                isActive('/combos') ? 'text-neon-glow' : 'text-gray-400'
+              }`}
+            >
+              COMBOS ⚡
             </Link>
             <Link
               to="/artistas"

@@ -294,8 +294,8 @@ class ApiService {
   }
 
   // ── Efipay Payment Gateway ──────────────────────────────────────────────────
-  efipayGenerate(cantidad, codigoCupon, eventoId) {
-    return this.post('/api/pagos/efipay/generate', { cantidad, codigoCupon, eventoId });
+  efipayGenerate(cantidad, codigoCupon, eventoId, comboId = null, fechaNacimientoCumpleanero = null) {
+    return this.post('/api/pagos/efipay/generate', { cantidad, codigoCupon, eventoId, comboId, fechaNacimientoCumpleanero });
   }
 
   efipayPaymentStatus(compraId) {
@@ -502,6 +502,30 @@ class ApiService {
 
   promotorGetRanking() {
     return this.get('/api/promotor/ranking');
+  }
+
+  // ── Combos ───────────────────────────────────────────────────────────────
+  getCombos() {
+    return this.get('/api/combos');
+  }
+
+  adminGetCombos() {
+    return this.get('/api/admin/combos/all');
+  }
+
+  adminCrearCombo(data) {
+    return this.post('/api/admin/combos', data);
+  }
+
+  adminActualizarCombo(id, data) {
+    return this.request(`/api/admin/combos/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  adminDeleteCombo(id) {
+    return this.delete(`/api/admin/combos/${id}`);
   }
 }
 
