@@ -57,6 +57,21 @@ public class EfipayController {
         try {
             Compra compra = compraService.processCheckout(checkoutRequest, currentUser.getId());
 
+            // Compra gratuita (ej. cupón 100% ganado en el arcade): el total es 0, así que no
+            // pasa por la pasarela — se confirma directamente y se generan las boletas.
+            if (compra.getTotal() != null && compra.getTotal() <= 0.0) {
+                compra.setEfipayStatus("GRATIS");
+                compraRepository.save(compra);
+                compraService.confirmCompra(compra.getId());
+
+                Map<String, Object> freeResponse = new HashMap<>();
+                freeResponse.put("compraId", compra.getId());
+                freeResponse.put("saved", true);
+                freeResponse.put("checkoutType", "free");
+                freeResponse.put("estado", "PAGADO");
+                return ResponseEntity.ok(freeResponse);
+            }
+
             Optional<User> userOpt = userRepository.findById(currentUser.getId());
             User user = userOpt.orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 

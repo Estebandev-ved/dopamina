@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../services/api';
 import PageTransition from '../components/PageTransition';
 import { ShieldCheck, CreditCard, BadgePercent, Lock, ArrowRight, Minus, Plus, AlertCircle, Flame, Zap, Gift, Ticket } from 'lucide-react';
+import useFacebookPixel from '../services/useFacebookPixel';
 
 /**
  * Checkout page for ticket bookings.
@@ -15,6 +16,7 @@ import { ShieldCheck, CreditCard, BadgePercent, Lock, ArrowRight, Minus, Plus, A
 export default function Checkout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { trackEvent } = useFacebookPixel();
   const selectedEvento = location.state?.evento;
   const currentUser = api.getUser();
 
@@ -87,6 +89,20 @@ export default function Checkout() {
     api.getPromoParcheDisponible()
       .then(res => setPromoParcheDisponible(!!res.disponible))
       .catch(() => setPromoParcheDisponible(false));
+  }, []);
+
+  // Facebook Pixel: InitiateCheckout when entering checkout page
+  useEffect(() => {
+    if (!selectedEvento || !currentUser) return;
+    const precioTotal = cantidad * (selectedEvento.precio || 0);
+    trackEvent('InitiateCheckout', {
+      content_name: selectedEvento.nombre,
+      content_ids: [String(selectedEvento.id)],
+      content_type: 'Evento',
+      num_items: cantidad,
+      value: precioTotal,
+      currency: 'COP',
+    });
   }, []);
 
   const [socialData, setSocialData] = useState({ vendidas24h: 0, minutosDesdeUltimaCompra: 0, activeViewers: 0 });
@@ -183,6 +199,14 @@ export default function Checkout() {
     const newQty = cantidad + val;
     if (newQty >= 1 && newQty <= 10) {
       setCantidad(newQty);
+      trackEvent('AddToCart', {
+        content_name: selectedEvento.nombre,
+        content_ids: [String(selectedEvento.id)],
+        content_type: 'Evento',
+        quantity: newQty,
+        value: newQty * (selectedEvento.precio || 0),
+        currency: 'COP',
+      });
       // Validar si la nueva cantidad no cumple la condición del cupón ya aplicado
       if (couponApplied && newQty < couponMinTickets) {
         setCouponApplied(false);
@@ -257,7 +281,9 @@ export default function Checkout() {
               <div className="bg-industrial-900 border border-industrial-800 rounded-lg p-6">
                 <h3 className="text-sm font-black text-white uppercase tracking-wider mb-4 flex items-center justify-between">
                   <span>1. Selecciona tus Entradas</span>
-                  <span className="text-xs font-mono text-neon-glow">Boletería General</span>
+                  <span className={`text-xs font-mono ${esCombo ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded' : 'text-neon-glow'}`} style={!esCombo ? { color: 'var(--color-neon)' } : {}}>
+                    {esCombo ? `Combo: ${comboNombre}` : 'Boletería General'}
+                  </span>
                 </h3>
                 
                 <div className="flex items-center justify-between py-4 border-y border-industrial-800">

@@ -20,6 +20,7 @@ import PromoterDashboard from './pages/PromoterDashboard';
 import Terminos from './pages/Terminos';
 import Arcade from './pages/Arcade';
 import Combos from './pages/Combos';
+import Graffiti from './pages/Graffiti';
 import { api } from './services/api';
 import usePageTracking from './services/usePageTracking';
 import ChatbotWidget from './components/ChatbotWidget';
@@ -155,6 +156,7 @@ export default function App() {
                   <Route path="/terminos" element={<Terminos />} />
                   <Route path="/arcade" element={<Arcade />} />
                   <Route path="/combos" element={<Combos />} />
+                  <Route path="/graffiti" element={<Graffiti />} />
                   <Route path="/pago-resultado" element={<PagoResultado />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

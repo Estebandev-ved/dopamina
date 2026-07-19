@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../services/api';
 import PageTransition from '../components/PageTransition';
+import useFacebookPixel from '../services/useFacebookPixel';
 
 // ── Constantes de polling ───────────────────────────────────────────────────
 const MAX_INTENTOS = 8;          // Máximo número de verificaciones
@@ -23,6 +24,7 @@ const normalizar = (s) => {
 export default function PagoResultado() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { trackEvent } = useFacebookPixel();
 
   const estadoUrl = searchParams.get('estado');   // Parámetro que envía Efipay en la URL de retorno
   const compraId  = searchParams.get('compraId');
@@ -46,8 +48,19 @@ export default function PagoResultado() {
 
       if (norm === 'aprobado') {
         setVerificando(false);
-        setConfetti(true);           // Disparar animación de celebración
-        return true;                 // Indica que terminamos
+        setConfetti(true);
+        // Facebook Pixel: Purchase event
+        const pendingData = JSON.parse(sessionStorage.getItem('dopamina_checkout_state') || '{}');
+        trackEvent('Purchase', {
+          content_name: pendingData?.evento?.nombre || 'Evento',
+          content_ids: pendingData?.evento?.id ? [String(pendingData.evento.id)] : [],
+          content_type: 'Evento',
+          num_items: pendingData?.cantidad || 1,
+          value: pendingData?.evento?.precio ? pendingData.evento.precio * (pendingData.cantidad || 1) : 0,
+          currency: 'COP',
+          status: 'approved',
+        });
+        return true;
       }
       if (norm === 'rechazado') {
         setVerificando(false);
@@ -70,7 +83,17 @@ export default function PagoResultado() {
     if (estadoInicial === 'aprobado') {
       setVerificando(false);
       setConfetti(true);
-      // Aun así verificar 1 vez en background para confirmar en BD (genera boletas y envía email)
+      // Facebook Pixel: Purchase event (from URL redirect)
+      const pendingData = JSON.parse(sessionStorage.getItem('dopamina_checkout_state') || '{}');
+      trackEvent('Purchase', {
+        content_name: pendingData?.evento?.nombre || 'Evento',
+        content_ids: pendingData?.evento?.id ? [String(pendingData.evento.id)] : [],
+        content_type: 'Evento',
+        num_items: pendingData?.cantidad || 1,
+        value: pendingData?.evento?.precio ? pendingData.evento.precio * (pendingData.cantidad || 1) : 0,
+        currency: 'COP',
+        status: 'approved',
+      });
       setTimeout(() => verificarEstado(), ESPERA_INICIAL_MS);
       return;
     }

@@ -1,6 +1,7 @@
 package com.dopaminacrew.backend.controller;
 
 import com.dopaminacrew.backend.dto.BoletaResponse;
+import com.dopaminacrew.backend.dto.ComboItemClaimResponse;
 import com.dopaminacrew.backend.dto.MessageResponse;
 import com.dopaminacrew.backend.dto.RegaloBoletaRequest;
 import com.dopaminacrew.backend.model.*;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -44,6 +46,9 @@ public class AdminBoletaController {
 
     @Autowired
     private CompraRepository compraRepository;
+
+    @Autowired
+    private ComboItemClaimRepository comboItemClaimRepository;
 
     @Autowired
     private RoleRepository roleRepository;
@@ -179,11 +184,43 @@ public class AdminBoletaController {
         boleta.setEstado("USADA");
         Boleta savedBoleta = boletaRepository.save(boleta);
 
+        // Retroactivamente crear combo_item_claims si la compra tiene comboItems pero no tiene claims
+        Compra compraForClaims = boleta.getCompra();
+        if (compraForClaims != null && compraForClaims.getComboItems() != null && !compraForClaims.getComboItems().isBlank()) {
+            long existingClaims = comboItemClaimRepository.findByCompraId(compraForClaims.getId()).size();
+            if (existingClaims == 0) {
+                String[] items = compraForClaims.getComboItems().split(",");
+                for (String item : items) {
+                    String nombre = item.trim();
+                    if (!nombre.isEmpty()) {
+                        ComboItemClaim claim = new ComboItemClaim();
+                        claim.setCompra(compraForClaims);
+                        claim.setItemNombre(nombre);
+                        claim.setReclamado(false);
+                        comboItemClaimRepository.save(claim);
+                    }
+                }
+            }
+        }
+
         // Guardar registro de acceso exitoso
         RegistroAcceso log = new RegistroAcceso(null, qr, usuarioNombre, evNombre, "SUCCESS", "¡ACCESO PERMITIDO!", null);
         registroAccesoRepository.save(log);
 
         return ResponseEntity.ok(mapToBoletaResponse(savedBoleta));
+    }
+
+    @GetMapping("/por-qr")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> getBoletaByQr(@RequestParam("codigoQr") String codigoQr) {
+        if (codigoQr == null || codigoQr.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: El código QR no puede estar vacío."));
+        }
+        Optional<Boleta> boletaOpt = boletaRepository.findByCodigoQr(codigoQr.trim());
+        if (boletaOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(new MessageResponse("Boleta no encontrada."));
+        }
+        return ResponseEntity.ok(mapToBoletaResponse(boletaOpt.get()));
     }
 
     @GetMapping("/sorteo")
@@ -249,7 +286,7 @@ public class AdminBoletaController {
             requiereVerificacionCumple = compra.getRequiereVerificacionCumple() != null ? compra.getRequiereVerificacionCumple() : false;
         }
 
-        return new BoletaResponse(
+        BoletaResponse response = new BoletaResponse(
                 boleta.getId(),
                 evNombre,
                 evFecha,
@@ -265,6 +302,106 @@ public class AdminBoletaController {
                 comboItems,
                 requiereVerificacionCumple
         );
+
+        if (compra != null) {
+            response.setCompraId(compra.getId());
+        }
+
+        // Agregar claims de items del combo si existen
+        if (compra != null) {
+            if (compra.getComboItems() != null && !compra.getComboItems().isBlank()) {
+                long existingClaims = comboItemClaimRepository.findByCompraId(compra.getId()).size();
+                if (existingClaims == 0) {
+                    String[] items = compra.getComboItems().split(",");
+                    for (String item : items) {
+                        String nombre = item.trim();
+                        if (!nombre.isEmpty()) {
+                            ComboItemClaim claim = new ComboItemClaim();
+                            claim.setCompra(compra);
+                            claim.setItemNombre(nombre);
+                            claim.setReclamado(false);
+                            comboItemClaimRepository.save(claim);
+                        }
+                    }
+                }
+            }
+            List<ComboItemClaim> claims = comboItemClaimRepository.findByCompraId(compra.getId());
+            List<ComboItemClaimResponse> claimResponses = claims.stream()
+                    .map(c -> new ComboItemClaimResponse(
+                            c.getId(),
+                            c.getItemNombre(),
+                            c.getReclamado(),
+                            c.getReclamadoPorNombre(),
+                            c.getReclamadoAt()))
+                    .collect(Collectors.toList());
+            response.setComboItemClaims(claimResponses);
+        }
+
+        return response;
+    }
+
+    @PostMapping("/combo-claims/{compraId}/claim")
+    @Transactional
+    public ResponseEntity<?> claimComboItem(@PathVariable Long compraId,
+                                             @RequestBody Map<String, String> request) {
+        String itemNombre = request.get("itemNombre");
+        String reclamadoPorNombre = request.getOrDefault("reclamadoPorNombre", "Barra");
+
+        if (itemNombre == null || itemNombre.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: itemNombre es requerido."));
+        }
+
+        Optional<ComboItemClaim> claimOpt = comboItemClaimRepository.findByCompraIdAndItemNombre(compraId, itemNombre.trim());
+        if (claimOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(new MessageResponse("Error: Item no encontrado para esta compra."));
+        }
+
+        ComboItemClaim claim = claimOpt.get();
+        claim.setReclamado(true);
+        claim.setReclamadoPorNombre(reclamadoPorNombre);
+        claim.setReclamadoAt(LocalDateTime.now());
+        comboItemClaimRepository.save(claim);
+
+        return ResponseEntity.ok(new MessageResponse("Item '" + itemNombre + "' marcado como entregado."));
+    }
+
+    @PostMapping("/combo-claims/{compraId}/unclaim")
+    @Transactional
+    public ResponseEntity<?> unclaimComboItem(@PathVariable Long compraId,
+                                               @RequestBody Map<String, String> request) {
+        String itemNombre = request.get("itemNombre");
+
+        if (itemNombre == null || itemNombre.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: itemNombre es requerido."));
+        }
+
+        Optional<ComboItemClaim> claimOpt = comboItemClaimRepository.findByCompraIdAndItemNombre(compraId, itemNombre.trim());
+        if (claimOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(new MessageResponse("Error: Item no encontrado para esta compra."));
+        }
+
+        ComboItemClaim claim = claimOpt.get();
+        claim.setReclamado(false);
+        claim.setReclamadoPorNombre(null);
+        claim.setReclamadoAt(null);
+        comboItemClaimRepository.save(claim);
+
+        return ResponseEntity.ok(new MessageResponse("Item '" + itemNombre + "' desmarcado."));
+    }
+
+    @GetMapping("/combo-claims/{compraId}")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> getComboClaims(@PathVariable Long compraId) {
+        List<ComboItemClaim> claims = comboItemClaimRepository.findByCompraId(compraId);
+        List<ComboItemClaimResponse> response = claims.stream()
+                .map(c -> new ComboItemClaimResponse(
+                        c.getId(),
+                        c.getItemNombre(),
+                        c.getReclamado(),
+                        c.getReclamadoPorNombre(),
+                        c.getReclamadoAt()))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/logs-acceso")

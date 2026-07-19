@@ -372,6 +372,53 @@ export default function Perfil() {
 
               </div>
 
+              {/* SECTION: MIS ITEMS DE COMBO */}
+              {boletas.some(b => b.comboNombre) && (
+                <div className="bg-industrial-900 border border-industrial-800 rounded-lg p-6">
+                  <h3 className="text-xs font-black text-white uppercase tracking-wider mb-4 flex items-center space-x-2">
+                    <Gift className="w-4 h-4 text-amber-400" />
+                    <span>Mis Items de Combo — Barra</span>
+                  </h3>
+                  <p className="text-xs text-gray-400 mb-6 font-mono leading-relaxed">
+                    * Los items de tu combo se entregan en la barra del evento. Muestra este estado al personal.
+                  </p>
+                  <div className="space-y-4">
+                    {boletas.filter(b => b.comboNombre).map(b => (
+                      <div key={b.id} className="border border-amber-500/20 bg-amber-500/5 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <span className="text-[10px] text-amber-400 font-mono uppercase tracking-wider font-bold">Evento: {b.eventoNombre}</span>
+                            <h4 className="text-sm font-black text-white uppercase tracking-wide mt-0.5">{b.comboNombre}</h4>
+                          </div>
+                          <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-black border border-amber-500/30 text-amber-400">#{b.id}</span>
+                        </div>
+                        {b.comboItemClaims && b.comboItemClaims.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {b.comboItemClaims.map((claim) => (
+                              <div key={claim.id} className={`flex items-center justify-between text-[11px] font-mono px-3 py-1.5 rounded ${
+                                claim.reclamado
+                                  ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'
+                                  : 'text-amber-400 bg-amber-500/10 border border-amber-500/20'
+                              }`}>
+                                <span className="flex items-center gap-1.5">
+                                  <span>{claim.reclamado ? '✅' : '⏳'}</span>
+                                  <span className="font-bold">{claim.itemNombre}</span>
+                                </span>
+                                <span className="text-[9px] opacity-70">{claim.reclamado ? 'Entregado' : 'Pendiente'}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : b.comboItems ? (
+                          <p className="text-[11px] text-amber-400 font-mono bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded inline-block">
+                            Incluye: {b.comboItems}
+                          </p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* SECTION: MIS CANJES REALES (Voucher History) */}
               <div className="bg-industrial-900 border border-industrial-800 rounded-lg p-6">
                 <h3 className="text-xs font-black text-white uppercase tracking-wider mb-4 flex items-center space-x-2">

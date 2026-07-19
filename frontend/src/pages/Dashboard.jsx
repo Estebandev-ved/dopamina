@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import PageTransition from '../components/PageTransition';
-import { Ticket, Download, Printer, Calendar, ShieldCheck, Clock, X } from 'lucide-react';
+import { Ticket, Download, Printer, Calendar, ShieldCheck, Clock, X, Gift } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -177,6 +177,7 @@ export default function Dashboard() {
     const pw = window.open('', '_blank');
     if (!pw) return;
     const qrVal = boleta.codigoQr;
+    const comboLabel = boleta.comboNombre ? `<div style="color:#F59E0B;font-size:11px;margin:8px 0;padding:6px 10px;border:1px solid rgba(245,158,11,.3);border-radius:6px;background:rgba(245,158,11,.05)"><strong>COMBO:</strong> ${boleta.comboNombre}${boleta.comboItems ? ' — Incluye: ' + boleta.comboItems : ''}</div>` : '';
     const html = `<!DOCTYPE html><html><head><title>Boleta #${boleta.id} - Dopamina</title>
       <style>
         body{margin:0;padding:24px;background:#0a0a0a;color:white;font-family:monospace}
@@ -193,6 +194,7 @@ export default function Dashboard() {
       </head><body><div class="t">
       <h1>DOPAMINA</h1><p class="sub">BOLETA OFICIAL #${boleta.id}</p>
       <h2>${boleta.eventoNombre || 'Evento Dopamina'}</h2>
+      ${comboLabel}
       <div class="g">
         <div><label>Asistente</label><span class="val">${currentUser.nombre}</span></div>
         <div><label>Estado</label><span class="val">${boleta.estado}</span></div>
@@ -440,7 +442,7 @@ export default function Dashboard() {
                   className="bg-industrial-900 border border-industrial-800 rounded-lg overflow-hidden flex flex-col md:flex-row relative"
                 >
                   {/* Left design tag */}
-                  <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-neon-purple to-neon-violet" />
+                  <div className={`absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b ${boleta.comboNombre ? 'from-amber-500 to-orange-500' : 'from-neon-purple to-neon-violet'}`} />
 
                   {/* TICKET DESCRIPTION AREA */}
                   <div className="flex-grow p-6 sm:p-8 flex flex-col justify-between border-b md:border-b-0 md:border-r border-industrial-800">
@@ -469,9 +471,37 @@ export default function Dashboard() {
                         <h2 className="text-2xl font-black text-white uppercase tracking-wide">
                           {boleta.eventoNombre || "Borrachos pero nunca fachos"}
                         </h2>
-                        <p className="text-xs text-neon-glow font-bold tracking-wider font-mono mt-0.5 uppercase">
-                          Entrada Individual (Pase Único)
-                        </p>
+                        {boleta.comboNombre ? (
+                          <div className="mt-1.5 space-y-1.5">
+                            <p className="text-xs font-bold tracking-wider font-mono uppercase flex items-center gap-1.5" style={{ color: 'var(--color-neon)' }}>
+                              <Gift className="w-3.5 h-3.5" />
+                              {boleta.comboNombre}
+                            </p>
+                            {boleta.comboItemClaims && boleta.comboItemClaims.length > 0 ? (
+                              <div className="space-y-1">
+                                {boleta.comboItemClaims.map((claim) => (
+                                  <p key={claim.id} className={`text-[11px] font-mono px-2 py-1 rounded inline-flex items-center gap-1.5 ${
+                                    claim.reclamado 
+                                      ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' 
+                                      : 'text-amber-400 bg-amber-500/10 border border-amber-500/20'
+                                  }`}>
+                                    <span>{claim.reclamado ? '✅' : '⏳'}</span>
+                                    <span>{claim.itemNombre}</span>
+                                    <span className="text-[9px] opacity-70">— {claim.reclamado ? 'Entregado' : 'Pendiente'}</span>
+                                  </p>
+                                ))}
+                              </div>
+                            ) : boleta.comboItems ? (
+                              <p className="text-[11px] text-amber-400 font-mono bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded inline-block">
+                                Incluye: {boleta.comboItems}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-neon-glow font-bold tracking-wider font-mono mt-0.5 uppercase">
+                            Entrada Individual (Pase Único)
+                          </p>
+                        )}
                       </div>
 
                       {/* Info breakdown */}

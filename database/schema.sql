@@ -83,6 +83,8 @@ CREATE TABLE IF NOT EXISTS `cupones` (
     `codigo` VARCHAR(50) NOT NULL UNIQUE,
     `descuento_porcentaje` DOUBLE NOT NULL,
     `activo` BOOLEAN NOT NULL DEFAULT TRUE,
+    `max_usos` INT NOT NULL DEFAULT 0,
+    `min_boletas` INT NOT NULL DEFAULT 1,
     `descripcion` VARCHAR(255),
     `promotor_id` BIGINT DEFAULT NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -160,6 +162,19 @@ CREATE TABLE IF NOT EXISTS `promotor_bonos` (
     `pagado` BOOLEAN NOT NULL DEFAULT FALSE,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (`promotor_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 12. Create Arcade Rewards Table
+CREATE TABLE IF NOT EXISTS `arcade_rewards` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `usuario_id` BIGINT NOT NULL,
+    `juego` VARCHAR(30) NOT NULL,
+    `tier` INT NOT NULL,
+    `puntaje` INT NOT NULL,
+    `codigo_cupon` VARCHAR(50) NOT NULL,
+    `fecha` DATE NOT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 

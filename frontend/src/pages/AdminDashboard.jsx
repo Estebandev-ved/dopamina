@@ -49,6 +49,7 @@ const SIDEBAR_ITEMS = [
   { id: 'sugerencias', label: 'Sugerencias', icon: 'I' },
   { id: 'visitas', label: 'Visitas', icon: 'V' },
   { id: 'sets', label: 'Sets', icon: 'M' },
+  { id: 'graffiti', label: 'Graffiti', icon: '🎨' },
   { id: 'seguridad', label: 'Seguridad', icon: 'S' },
 ];
 
@@ -387,6 +388,7 @@ export default function AdminDashboard() {
   const [searchLog, setSearchLog] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [filtroEstadoCompra, setFiltroEstadoCompra] = useState('TODOS');
+  const [filtroTipoCompra, setFiltroTipoCompra] = useState('TODOS');
   const [confirmModal, setConfirmModal] = useState(null);
   const [emailModal, setEmailModal] = useState({
     open: false,
@@ -596,6 +598,75 @@ export default function AdminDashboard() {
       fetchCombos();
     } catch (err) {
       setError('Error al desactivar el combo.');
+    }
+  };
+
+  // ===== GRAFFITI =====
+  const [graffitis, setGraffitis] = useState([]);
+  const [loadingGraffitis, setLoadingGraffitis] = useState(false);
+  const [showGraffitiForm, setShowGraffitiForm] = useState(false);
+  const [editingGraffiti, setEditingGraffiti] = useState(null);
+  const [formGraffiti, setFormGraffiti] = useState({ titulo: '', artista: '', descripcion: '', imagenUrl: '', ubicacion: '', latitud: '', longitud: '', tags: '', activo: true });
+  const [searchGraffiti, setSearchGraffiti] = useState('');
+
+  const fetchGraffitis = useCallback(async () => {
+    setLoadingGraffitis(true);
+    try {
+      const data = await api.adminGetGraffiti();
+      setGraffitis(data || []);
+    } catch (err) {
+      console.error('Error fetching graffitis:', err);
+    } finally {
+      setLoadingGraffitis(false);
+    }
+  }, []);
+
+  const handleSubmitGraffiti = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        ...formGraffiti,
+        latitud: parseFloat(formGraffiti.latitud),
+        longitud: parseFloat(formGraffiti.longitud),
+      };
+      if (editingGraffiti) {
+        const updated = await api.adminActualizarGraffiti(editingGraffiti.id, payload);
+        setGraffitis(prev => prev.map(g => g.id === editingGraffiti.id ? updated : g));
+      } else {
+        const created = await api.adminCrearGraffiti(payload);
+        setGraffitis(prev => [created, ...prev]);
+      }
+      setShowGraffitiForm(false);
+      setEditingGraffiti(null);
+      setFormGraffiti({ titulo: '', artista: '', descripcion: '', imagenUrl: '', ubicacion: '', latitud: '', longitud: '', tags: '', activo: true });
+    } catch (err) {
+      setError('Error al guardar el graffiti.');
+    }
+  };
+
+  const handleEditGraffiti = (g) => {
+    setEditingGraffiti(g);
+    setFormGraffiti({
+      titulo: g.titulo || '',
+      artista: g.artista || '',
+      descripcion: g.descripcion || '',
+      imagenUrl: g.imagenUrl || '',
+      ubicacion: g.ubicacion || '',
+      latitud: g.latitud || '',
+      longitud: g.longitud || '',
+      tags: g.tags || '',
+      activo: g.activo !== false,
+    });
+    setShowGraffitiForm(true);
+  };
+
+  const handleDeleteGraffiti = async (id) => {
+    if (!window.confirm('¿Desactivar este graffiti?')) return;
+    try {
+      await api.adminDeleteGraffiti(id);
+      fetchGraffitis();
+    } catch (err) {
+      setError('Error al desactivar el graffiti.');
     }
   };
 
@@ -858,7 +929,8 @@ export default function AdminDashboard() {
     if (activeTab === 'promotores') fetchPromotores();
     if (activeTab === 'campanas') fetchRetoActivo();
     if (activeTab === 'combos') fetchCombos();
-  }, [activeTab, fetchPwaStats, fetchVisitStats, fetchSets, fetchSugerencias, fetchPromotores, fetchRetoActivo, fetchCombos]);
+    if (activeTab === 'graffiti') fetchGraffitis();
+  }, [activeTab, fetchPwaStats, fetchVisitStats, fetchSets, fetchSugerencias, fetchPromotores, fetchRetoActivo, fetchCombos, fetchGraffitis]);
 
   // ── Derived chart data ──
   const comprasConEvento = useMemo(() => compras.filter(c => c.eventoNombre), [compras]);
@@ -870,9 +942,12 @@ export default function AdminDashboard() {
         c.usuarioNombre?.toLowerCase().includes(searchCompra.toLowerCase()) ||
         String(c.id).includes(searchCompra);
       const matchEstado = filtroEstadoCompra === 'TODOS' || c.estado === filtroEstadoCompra;
-      return matchSearch && matchEstado;
+      const matchTipo = filtroTipoCompra === 'TODOS' ||
+        (filtroTipoCompra === 'COMBO' && c.comboNombre) ||
+        (filtroTipoCompra === 'INDIVIDUAL' && !c.comboNombre);
+      return matchSearch && matchEstado && matchTipo;
     });
-  }, [compras, searchCompra, filtroEstadoCompra]);
+  }, [compras, searchCompra, filtroEstadoCompra, filtroTipoCompra]);
   const filteredUsuarios = usuarios.filter(u =>
     u.email?.toLowerCase().includes(searchUser.toLowerCase()) ||
     u.nombre?.toLowerCase().includes(searchUser.toLowerCase())
@@ -895,9 +970,9 @@ export default function AdminDashboard() {
 
   // ── Handlers ──
   const exportComprasToCSV = () => {
-    const headers = ['ID,Usuario,Email,Evento,Cantidad,Subtotal,Descuento,Total,Cupon,Estado,QR,Fecha'];
+    const headers = ['ID,Usuario,Email,Evento,Tipo,Cantidad,Subtotal,Descuento,Total,Cupon,Estado,QR,Fecha'];
     const rows = filteredCompras.map(c => 
-      `"${c.id}","${c.usuarioNombre}","${c.usuarioEmail}","${c.eventoNombre || 'General'}","${c.cantidad}","${c.subtotal || 0}","${c.descuento || 0}","${c.total || 0}","${c.codigoCupon || ''}","${c.estado}","${c.codigoQr || ''}","${c.createdAt || ''}"`
+      `"${c.id}","${c.usuarioNombre}","${c.usuarioEmail}","${c.eventoNombre || 'General'}","${c.comboNombre || 'Individual'}","${c.cantidad}","${c.subtotal || 0}","${c.descuento || 0}","${c.total || 0}","${c.codigoCupon || ''}","${c.estado}","${c.codigoQr || ''}","${c.createdAt || ''}"`
     );
     const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers, ...rows].join("\n");
     const encodedUri = encodeURI(csvContent);
@@ -1068,17 +1143,29 @@ export default function AdminDashboard() {
   const startCamera = async () => {
     setCameraError('');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } });
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
       streamRef.current = stream;
-      if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
       setCameraActive(true);
+      await new Promise(r => setTimeout(r, 100));
+      const v = videoRef.current;
+      if (v) {
+        v.srcObject = stream;
+        await new Promise((resolve) => {
+          v.onloadedmetadata = () => { v.play().then(resolve).catch(resolve); };
+        });
+      }
       const scanFrame = () => {
         if (!videoRef.current || !canvasRef.current) return;
         const video = videoRef.current;
         const canvas = canvasRef.current;
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-          canvas.height = video.videoHeight;
-          canvas.width = video.videoWidth;
+        if (video.readyState >= video.HAVE_CURRENT_DATA) {
+          canvas.height = video.videoHeight || 720;
+          canvas.width = video.videoWidth || 1280;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -1468,11 +1555,31 @@ export default function AdminDashboard() {
             <option value="PENDIENTE">PENDIENTE</option>
             <option value="RECHAZADO">RECHAZADO</option>
           </select>
+          <select
+            value={filtroTipoCompra}
+            onChange={(e) => setFiltroTipoCompra(e.target.value)}
+            style={{
+              background: 'rgba(255,255,255,0.04)',
+              border: `1px solid ${theme.border}`,
+              borderRadius: '8px',
+              color: theme.text,
+              fontSize: '0.85rem',
+              padding: '10px 16px',
+              cursor: 'pointer',
+              outline: 'none',
+              minWidth: '160px'
+            }}
+          >
+            <option value="TODOS">Todos los Tipos</option>
+            <option value="COMBO">Combos</option>
+            <option value="INDIVIDUAL">Individuales</option>
+          </select>
+          <span style={{ fontSize: '0.75rem', color: theme.textMuted, alignSelf: 'center', fontFamily: "'JetBrains Mono', monospace" }}>{filteredCompras.length} resultado{filteredCompras.length !== 1 ? 's' : ''}</span>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
             <thead><tr>
-              {['#', 'Usuario', 'Email', 'Evento', 'Cant.', 'Subtotal', 'Descuento', 'Total', 'Cupón', 'Estado', 'Código QR', 'Fecha', 'Acción'].map(h => <th key={h} style={thStyle}>{h}</th>)}
+              {['#', 'Usuario', 'Email', 'Evento', 'Tipo', 'Cant.', 'Subtotal', 'Descuento', 'Total', 'Cupón', 'Estado', 'Código QR', 'Fecha', 'Acción'].map(h => <th key={h} style={thStyle}>{h}</th>)}
             </tr></thead>
             <tbody>
               {filteredCompras.map(c => (
@@ -1484,6 +1591,7 @@ export default function AdminDashboard() {
                   <td style={{ ...tdStyle, fontWeight: 600, color: theme.text }}>{c.usuarioNombre}</td>
                   <td style={{ ...tdStyle, color: theme.textMuted, fontSize: '0.8rem' }}>{c.usuarioEmail}</td>
                   <td style={{ ...tdStyle, fontWeight: 600, color: theme.info }}>{c.eventoNombre || 'General'}</td>
+                  <td style={tdStyle}>{c.comboNombre ? <span style={{ ...badgeStyle('#f59e0b'), fontSize: '0.7rem' }}>Combo: {c.comboNombre}</span> : <span style={{ color: theme.textMuted, fontSize: '0.8rem' }}>Individual</span>}</td>
                   <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700 }}>{c.cantidad}</td>
                   <td style={tdStyle}>{c.subtotal ? `$${c.subtotal.toLocaleString('es-CO')}` : '—'}</td>
                   <td style={{ ...tdStyle, color: c.descuento > 0 ? theme.success : theme.textMuted }}>{c.descuento > 0 ? `-$${c.descuento.toLocaleString('es-CO')}` : '—'}</td>
@@ -1700,7 +1808,7 @@ export default function AdminDashboard() {
               <div style={{ position: 'relative', height: '320px', background: 'rgba(0,0,0,0.5)', border: `1px dashed ${theme.accent}44`, borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: '20px' }}>
                 {cameraActive ? (
                   <>
-                    <video ref={videoRef} style={{ width: '100%', height: '100%', objectFit: 'cover' }} playsInline muted />
+                    <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} />
                     <canvas ref={canvasRef} style={{ display: 'none' }} />
                     <div style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 10 }}>
                       <button type="button" onClick={stopCamera} style={{ background: 'rgba(239,68,68,0.8)', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '0.75rem', cursor: 'pointer' }}>Apagar</button>
@@ -1755,13 +1863,65 @@ export default function AdminDashboard() {
                           padding: '16px',
                           marginTop: '8px'
                         }}>
-                          <span style={{ fontSize: '0.7rem', color: theme.accentLight, textTransform: 'uppercase', fontWeight: 900, display: 'block', letterSpacing: '1px' }}>🎁 COMBO ADQUIRIDO</span>
+                          <span style={{ fontSize: '0.7rem', color: theme.accentLight, textTransform: 'uppercase', fontWeight: 900, display: 'block', letterSpacing: '1px' }}>COMBO ADQUIRIDO</span>
                           <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff', display: 'block', marginTop: '4px' }}>{scanResult.boleta.comboNombre}</span>
                           
-                          <div style={{ marginTop: '10px', background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '6px' }}>
-                            <span style={{ fontSize: '0.65rem', color: theme.textMuted, textTransform: 'uppercase', display: 'block', fontWeight: 700 }}>Entregar en barra:</span>
-                            <span style={{ fontSize: '0.9rem', color: '#4ade80', fontWeight: 800 }}>{scanResult.boleta.comboItems || 'Sin ítems adicionales registrados.'}</span>
-                          </div>
+                          {scanResult.boleta.comboItemClaims && scanResult.boleta.comboItemClaims.length > 0 ? (
+                            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <span style={{ fontSize: '0.65rem', color: theme.textMuted, textTransform: 'uppercase', fontWeight: 700 }}>Entrega de items en barra:</span>
+                              {scanResult.boleta.comboItemClaims.map((claim) => (
+                                <div key={claim.id} style={{
+                                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                  background: claim.reclamado ? 'rgba(16,185,129,0.1)' : 'rgba(0,0,0,0.3)',
+                                  border: `1px solid ${claim.reclamado ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                                  borderRadius: '6px', padding: '10px 12px'
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ fontSize: '1.1rem' }}>{claim.reclamado ? '✅' : '⬜'}</span>
+                                    <div>
+                                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: claim.reclamado ? '#4ade80' : '#fff' }}>{claim.itemNombre}</span>
+                                      {claim.reclamado && (
+                                        <span style={{ fontSize: '0.65rem', color: theme.textMuted, display: 'block', marginTop: '2px' }}>
+                                          Entregado por {claim.reclamadoPorNombre} {claim.reclamadoAt ? new Date(claim.reclamadoAt).toLocaleTimeString('es-CO') : ''}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        if (claim.reclamado) {
+                                          await api.adminUnclaimComboItem(scanResult.boleta.compraId, claim.itemNombre);
+                                        } else {
+                                          await api.adminClaimComboItem(scanResult.boleta.compraId, claim.itemNombre);
+                                        }
+                                        const updatedClaims = await api.adminGetComboClaims(scanResult.boleta.compraId);
+                                        setScanResult(prev => ({
+                                          ...prev,
+                                          boleta: { ...prev.boleta, comboItemClaims: updatedClaims }
+                                        }));
+                                      } catch (e) {
+                                        alert('Error actualizando item: ' + (e.message || 'Error'));
+                                      }
+                                    }}
+                                    style={{
+                                      padding: '6px 12px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+                                      fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase',
+                                      background: claim.reclamado ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)',
+                                      color: claim.reclamado ? '#f87171' : '#4ade80'
+                                    }}
+                                  >
+                                    {claim.reclamado ? 'Desmarcar' : 'Entregado'}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div style={{ marginTop: '10px', background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '6px' }}>
+                              <span style={{ fontSize: '0.65rem', color: theme.textMuted, textTransform: 'uppercase', display: 'block', fontWeight: 700 }}>Entregar en barra:</span>
+                              <span style={{ fontSize: '0.9rem', color: '#4ade80', fontWeight: 800 }}>{scanResult.boleta.comboItems || 'Sin ítems adicionales registrados.'}</span>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -1796,7 +1956,7 @@ export default function AdminDashboard() {
                     <p style={{ color: theme.textSec, fontSize: '0.9rem', marginTop: '16px' }}>{scanResult.message}</p>
                   </div>
                 )}
-                <button onClick={() => { setScanResult(null); if(inputRef.current) inputRef.current.focus(); }}
+                <button onClick={() => { setScanResult(null); if (cameraMode) { startCamera(); } else if(inputRef.current) inputRef.current.focus(); }}
                   style={{ marginTop: '24px', background: `1px solid ${theme.border}`, border: `1px solid ${theme.borderLight}`, color: theme.text, borderRadius: '8px', padding: '10px 24px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
                   Siguiente Escaneo
                 </button>
@@ -1814,7 +1974,16 @@ export default function AdminDashboard() {
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '480px', overflowY: 'auto' }}>
               {recentScans.map(scan => (
-                <div key={scan.id} style={{ padding: '14px', borderRadius: '10px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${scan.estado === 'SUCCESS' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                <div key={scan.id} onClick={async () => {
+                  if (!scan.codigoQr || scanning) return;
+                  setScanning(true); setScanResult(null);
+                  try {
+                    const res = await api.adminGetBoletaByQr(scan.codigoQr);
+                    setScanResult({ success: true, message: scan.estado === 'SUCCESS' ? 'ACCESO PERMITIDO' : 'ACCESO DENEGADO', boleta: res });
+                  } catch (err) {
+                    setScanResult({ success: false, message: err.message || 'No se pudo cargar la info.' });
+                  } finally { setScanning(false); }
+                }} style={{ padding: '14px', borderRadius: '10px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${scan.estado === 'SUCCESS' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', cursor: 'pointer', transition: 'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
                       <span style={{ fontWeight: 700, fontSize: '0.85rem', color: theme.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{scan.usuarioNombre || 'Desconocido'}</span>
@@ -3454,6 +3623,132 @@ export default function AdminDashboard() {
     </motion.div>
   );
 
+  const renderGraffiti = () => (
+    <motion.div key="graffiti" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      {showGraffitiForm ? (
+        <Section icon="🎨" title={editingGraffiti ? 'Editar Graffiti' : 'Nuevo Graffiti'}>
+          <form onSubmit={handleSubmitGraffiti} style={{ display: 'grid', gap: '16px', gridTemplateColumns: '1fr 1fr' }}>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>TÍTULO</label>
+              <input required style={inputStyle} value={formGraffiti.titulo} onChange={e => setFormGraffiti({ ...formGraffiti, titulo: e.target.value })} placeholder="Ej. Neon Dreams" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>ARTISTA</label>
+              <input style={inputStyle} value={formGraffiti.artista} onChange={e => setFormGraffiti({ ...formGraffiti, artista: e.target.value })} placeholder="Ej. Dopamina Crew" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>UBICACIÓN</label>
+              <input required style={inputStyle} value={formGraffiti.ubicacion} onChange={e => setFormGraffiti({ ...formGraffiti, ubicacion: e.target.value })} placeholder="Ej. Centro, esquina Principal" />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>DESCRIPCIÓN</label>
+              <textarea style={{ ...inputStyle, height: '80px', resize: 'none', padding: '10px 16px' }} value={formGraffiti.descripcion} onChange={e => setFormGraffiti({ ...formGraffiti, descripcion: e.target.value })} placeholder="Describe el grafiti..." />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>LATITUD</label>
+              <input type="number" step="any" required style={inputStyle} value={formGraffiti.latitud} onChange={e => setFormGraffiti({ ...formGraffiti, latitud: e.target.value })} placeholder="Ej. 4.8133" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>LONGITUD</label>
+              <input type="number" step="any" required style={inputStyle} value={formGraffiti.longitud} onChange={e => setFormGraffiti({ ...formGraffiti, longitud: e.target.value })} placeholder="Ej. -75.6961" />
+              <span style={{ fontSize: '10px', color: theme.textMuted, marginTop: '4px', display: 'block' }}>Busca las coordenadas en Google Maps: click derecho → "¿Qué hay aquí?"</span>
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>IMAGEN (URL)</label>
+              <input style={inputStyle} value={formGraffiti.imagenUrl} onChange={e => setFormGraffiti({ ...formGraffiti, imagenUrl: e.target.value })} placeholder="https://ejemplo.com/foto-graffiti.jpg" />
+              <span style={{ fontSize: '10px', color: theme.textMuted, marginTop: '4px', display: 'block' }}>Pega la URL de la foto del grafiti</span>
+              {formGraffiti.imagenUrl && (
+                <div style={{ marginTop: '10px', borderRadius: '10px', overflow: 'hidden', border: `1px solid ${theme.border}`, maxWidth: '280px' }}>
+                  <img src={formGraffiti.imagenUrl} alt="Preview" style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }} onError={e => { e.target.style.display = 'none'; }} />
+                </div>
+              )}
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>TAGS (separados por coma)</label>
+              <input style={inputStyle} value={formGraffiti.tags} onChange={e => setFormGraffiti({ ...formGraffiti, tags: e.target.value })} placeholder="Ej. mural, neon, abstracto" />
+            </div>
+            <div style={{ display: 'flex', gap: '20px', gridColumn: 'span 2', marginBottom: '16px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                <input type="checkbox" checked={formGraffiti.activo} onChange={e => setFormGraffiti({ ...formGraffiti, activo: e.target.checked })} style={{ accentColor: theme.accent }} />
+                <span>Graffiti Activo (visible públicamente)</span>
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', gridColumn: 'span 2', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => { setShowGraffitiForm(false); setEditingGraffiti(null); }} style={btnGhost}>Cancelar</button>
+              <button type="submit" style={btnPrimary}>Guardar Graffiti</button>
+            </div>
+          </form>
+        </Section>
+      ) : (
+        <Section icon="🎨" title="Catálogo de Graffiti Trail"
+          extra={
+            <button onClick={() => {
+              setEditingGraffiti(null);
+              setFormGraffiti({ titulo: '', artista: '', descripcion: '', imagenUrl: '', ubicacion: '', latitud: '', longitud: '', tags: '', activo: true });
+              setShowGraffitiForm(true);
+            }} style={btnPrimary}>+ Nuevo Graffiti</button>
+          }
+        >
+          <input style={inputStyle} placeholder="Buscar graffiti por título, artista o ubicación..." value={searchGraffiti} onChange={e => setSearchGraffiti(e.target.value)} />
+          <div style={{ overflowX: 'auto' }}>
+            <table style={tableStyle}>
+              <thead><tr>
+                {['#', 'Imagen', 'Título / Artista', 'Ubicación', 'Coords', 'Tags', 'Estado', 'Acciones'].map(h => <th key={h} style={thStyle}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {graffitis.filter(g =>
+                  !searchGraffiti ||
+                  g.titulo?.toLowerCase().includes(searchGraffiti.toLowerCase()) ||
+                  g.artista?.toLowerCase().includes(searchGraffiti.toLowerCase()) ||
+                  g.ubicacion?.toLowerCase().includes(searchGraffiti.toLowerCase())
+                ).map(g => (
+                  <tr key={g.id}
+                    onMouseEnter={e => e.currentTarget.style.background = theme.cardHover}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <td style={{ ...tdStyle, color: theme.accent, fontFamily: "'JetBrains Mono', monospace" }}>#{g.id}</td>
+                    <td style={tdStyle}>
+                      {g.imagenUrl ? (
+                        <img src={g.imagenUrl} alt={g.titulo} style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover', border: `1px solid ${theme.border}` }} />
+                      ) : (
+                        <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: theme.card, border: `1px dashed ${theme.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>🎨</div>
+                      )}
+                    </td>
+                    <td style={tdStyle}>
+                      <div style={{ fontWeight: 700, color: theme.text }}>{g.titulo}</div>
+                      <div style={{ fontSize: '11px', color: theme.textMuted }}>{g.artista || 'Anónimo'}</div>
+                    </td>
+                    <td style={{ ...tdStyle, fontSize: '11px', color: theme.textSec }}>{g.ubicacion}</td>
+                    <td style={{ ...tdStyle, fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: theme.textMuted }}>
+                      {g.latitud?.toFixed(4)}, {g.longitud?.toFixed(4)}
+                    </td>
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                        {(g.tags || '').split(',').filter(Boolean).slice(0, 3).map(tag => (
+                          <span key={tag} style={{ fontSize: '9px', padding: '2px 6px', borderRadius: '4px', background: `${theme.accent}20`, color: theme.accentLight, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>{tag.trim()}</span>
+                        ))}
+                      </div>
+                    </td>
+                    <td><span style={badgeStyle(g.activo !== false ? theme.success : theme.danger)}>{g.activo !== false ? 'ACTIVO' : 'INACTIVO'}</span></td>
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button onClick={() => handleEditGraffiti(g)} style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', background: 'rgba(96,165,250,0.1)', color: theme.info, cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700 }}>Editar</button>
+                        <button onClick={() => handleDeleteGraffiti(g.id)} style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', background: 'rgba(239,68,68,0.1)', color: theme.danger, cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700 }}>Desactivar</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {graffitis.length === 0 && (
+                  <tr><td colSpan={8} style={{ ...tdStyle, textAlign: 'center', color: theme.textMuted, padding: '30px' }}>No hay grafitis registrados. ¡Agrega el primero!</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      )}
+    </motion.div>
+  );
+
   const renderVisitas = () => (
     <motion.div key="visitas" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       {loadingVisits ? (
@@ -3870,6 +4165,7 @@ export default function AdminDashboard() {
           {activeTab === 'visitas' && renderVisitas()}
           {activeTab === 'sets' && renderSets()}
           {activeTab === 'combos' && renderCombos()}
+          {activeTab === 'graffiti' && renderGraffiti()}
           {activeTab === 'sugerencias' && renderSugerencias()}
           {activeTab === 'seguridad' && api.getUser()?.rol === 'ROLE_ADMIN' && renderSeguridad()}
         </AnimatePresence>

@@ -3,10 +3,13 @@ package com.dopaminacrew.backend.controller;
 import com.dopaminacrew.backend.dto.CheckoutRequest;
 import com.dopaminacrew.backend.dto.CompraResponse;
 import com.dopaminacrew.backend.dto.BoletaResponse;
+import com.dopaminacrew.backend.dto.ComboItemClaimResponse;
 import com.dopaminacrew.backend.dto.MessageResponse;
 import com.dopaminacrew.backend.model.Compra;
 import com.dopaminacrew.backend.model.Boleta;
+import com.dopaminacrew.backend.model.ComboItemClaim;
 import com.dopaminacrew.backend.repository.BoletaRepository;
+import com.dopaminacrew.backend.repository.ComboItemClaimRepository;
 import com.dopaminacrew.backend.security.UserPrincipal;
 import com.dopaminacrew.backend.service.CompraService;
 import jakarta.validation.Valid;
@@ -38,6 +41,9 @@ public class CompraController {
 
     @Autowired
     private BoletaRepository boletaRepository;
+
+    @Autowired
+    private ComboItemClaimRepository comboItemClaimRepository;
 
     @Autowired
     private com.dopaminacrew.backend.repository.UserRepository userRepository;
@@ -117,6 +123,26 @@ public class CompraController {
                     boleta.setEstado("ACTIVA");
                     boleta.setNumeroSorteo(nextSorteo++);
                     boletaRepository.save(boleta);
+                }
+            }
+        }
+
+        // Retroactivamente crear combo_item_claims para compras de combo que no los tengan
+        for (Compra compra : compras) {
+            if (compra.getComboItems() != null && !compra.getComboItems().isBlank()) {
+                long existingClaims = comboItemClaimRepository.findByCompraId(compra.getId()).size();
+                if (existingClaims == 0) {
+                    String[] items = compra.getComboItems().split(",");
+                    for (String item : items) {
+                        String nombre = item.trim();
+                        if (!nombre.isEmpty()) {
+                            ComboItemClaim claim = new ComboItemClaim();
+                            claim.setCompra(compra);
+                            claim.setItemNombre(nombre);
+                            claim.setReclamado(false);
+                            comboItemClaimRepository.save(claim);
+                        }
+                    }
                 }
             }
         }
@@ -251,7 +277,7 @@ public class CompraController {
             requiereVerificacionCumple = compra.getRequiereVerificacionCumple() != null ? compra.getRequiereVerificacionCumple() : false;
         }
 
-        return new BoletaResponse(
+        BoletaResponse response = new BoletaResponse(
                 boleta.getId(),
                 evNombre,
                 evFecha,
@@ -267,6 +293,42 @@ public class CompraController {
                 comboItems,
                 requiereVerificacionCumple
         );
+
+        if (compra != null) {
+            response.setCompraId(compra.getId());
+        }
+
+        if (compra != null) {
+            // Retroactivamente crear claims si la compra tiene comboItems pero no claims (boletas transferidas)
+            if (compra.getComboItems() != null && !compra.getComboItems().isBlank()) {
+                long existingClaims = comboItemClaimRepository.findByCompraId(compra.getId()).size();
+                if (existingClaims == 0) {
+                    String[] items = compra.getComboItems().split(",");
+                    for (String item : items) {
+                        String nombre = item.trim();
+                        if (!nombre.isEmpty()) {
+                            ComboItemClaim claim = new ComboItemClaim();
+                            claim.setCompra(compra);
+                            claim.setItemNombre(nombre);
+                            claim.setReclamado(false);
+                            comboItemClaimRepository.save(claim);
+                        }
+                    }
+                }
+            }
+            List<ComboItemClaim> claims = comboItemClaimRepository.findByCompraId(compra.getId());
+            List<ComboItemClaimResponse> claimResponses = claims.stream()
+                    .map(c -> new ComboItemClaimResponse(
+                            c.getId(),
+                            c.getItemNombre(),
+                            c.getReclamado(),
+                            c.getReclamadoPorNombre(),
+                            c.getReclamadoAt()))
+                    .collect(Collectors.toList());
+            response.setComboItemClaims(claimResponses);
+        }
+
+        return response;
     }
 
     private CompraResponse mapToResponse(Compra compra) {

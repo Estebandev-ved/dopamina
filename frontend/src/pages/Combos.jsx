@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../services/api';
 import PageTransition from '../components/PageTransition';
-import { Ticket, Gift, Sparkles, AlertCircle, Calendar, ShieldCheck, Flame, Info, Check, X, CreditCard, Sparkle } from 'lucide-react';
+import { Ticket, Gift, Sparkles, AlertCircle, Calendar, ShieldCheck, Flame, Info, Check, X, CreditCard, Sparkle, MapPin } from 'lucide-react';
 
 export default function Combos() {
   const navigate = useNavigate();
@@ -23,6 +23,11 @@ export default function Combos() {
   const [documentNumber, setDocumentNumber] = useState('');
   const [birthdayError, setBirthdayError] = useState('');
   const [validatingBirthday, setValidatingBirthday] = useState(false);
+
+  // Terms Modal State (for combo purchases)
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [pendingCombo, setPendingCombo] = useState(null);
 
   // Load events and combos
   useEffect(() => {
@@ -121,17 +126,10 @@ export default function Combos() {
       setDocumentNumber('');
       setShowBirthdayModal(true);
     } else {
-      // Redirect straight to Checkout
-      navigate('/checkout', {
-        state: {
-          evento: selectedEvento,
-          cantidad: combo.cantidadBoletas,
-          comboId: combo.id,
-          comboNombre: combo.nombre,
-          comboPrecio: combo.precio,
-          comboItems: combo.itemsAdicionales
-        }
-      });
+      // Show Terms & Conditions modal before checkout
+      setPendingCombo(combo);
+      setTermsAccepted(false);
+      setShowTermsModal(true);
     }
   };
 
@@ -183,6 +181,22 @@ export default function Combos() {
     } finally {
       setValidatingBirthday(false);
     }
+  };
+
+  // Proceed to checkout after accepting combo terms
+  const handleAcceptTerms = () => {
+    if (!pendingCombo) return;
+    setShowTermsModal(false);
+    navigate('/checkout', {
+      state: {
+        evento: selectedEvento,
+        cantidad: pendingCombo.cantidadBoletas,
+        comboId: pendingCombo.id,
+        comboNombre: pendingCombo.nombre,
+        comboPrecio: pendingCombo.precio,
+        comboItems: pendingCombo.itemsAdicionales
+      }
+    });
   };
 
   // Helper to format currency
@@ -405,6 +419,132 @@ export default function Combos() {
           )}
         </div>
       </div>
+
+      {/* Terms & Conditions Modal for Combos */}
+      <AnimatePresence>
+        {showTermsModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowTermsModal(false)}
+              className="absolute inset-0 bg-black/85 backdrop-blur-sm"
+            />
+
+            {/* Modal Body */}
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-industrial-900 border border-industrial-800 rounded-lg p-6 max-w-lg w-full relative z-10 overflow-hidden shadow-neon-sm max-h-[85vh] flex flex-col"
+            >
+              <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-neon-purple to-neon-violet" style={{ backgroundImage: 'linear-gradient(to right, var(--color-neon), var(--color-neon-light))' }} />
+
+              <div className="flex justify-between items-start mb-4 flex-shrink-0">
+                <h3 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5" style={{ color: 'var(--color-neon)' }} />
+                  <span>Términos del Combo</span>
+                </h3>
+                <button
+                  onClick={() => setShowTermsModal(false)}
+                  className="text-gray-500 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Combo name badge */}
+              <div className="bg-neon-purple/10 border border-neon-purple/20 rounded p-3 mb-4 text-center flex-shrink-0" style={{ borderColor: 'rgba(var(--color-neon), 0.2)', backgroundColor: 'rgba(var(--color-neon), 0.08)' }}>
+                <span className="text-[10px] font-mono text-gray-500 uppercase block">Vas a adquirir</span>
+                <span className="text-sm font-black text-white uppercase tracking-wider" style={{ color: 'var(--color-neon)' }}>{pendingCombo?.nombre}</span>
+              </div>
+
+              {/* Scrollable terms content */}
+              <div className="flex-1 overflow-y-auto space-y-4 mb-5 pr-1">
+                <div className="bg-industrial-950 border border-industrial-850/60 rounded p-4 text-xs text-gray-300 space-y-3">
+                  <div className="flex items-start space-x-3">
+                    <Ticket className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--color-neon)' }} />
+                    <div>
+                      <strong className="text-white block mb-1 uppercase tracking-wider text-[11px]">Boletas Digitales</strong>
+                      <span className="text-gray-400 leading-relaxed">Las entradas incluidas en el combo son <strong className="text-white">100% digitales</strong>. Se guardarán automáticamente en tu perfil web y se enviarán a tu correo electrónico. No se emiten boletas físicas.</span>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-industrial-850/60" />
+
+                  <div className="flex items-start space-x-3">
+                    <MapPin className="w-5 h-5 flex-shrink-0 mt-0.5 text-rose-400" />
+                    <div>
+                      <strong className="text-white block mb-1 uppercase tracking-wider text-[11px]">Redención Exclusiva en Evento</strong>
+                      <span className="text-gray-400 leading-relaxed">Los combos son <strong className="text-white">redimibles únicamente en el lugar del evento</strong>. No es posible canjearlos en otra ubicación ni en línea. Debes presentar tu boleta digital en la puerta de acceso.</span>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-industrial-850/60" />
+
+                  <div className="flex items-start space-x-3">
+                    <Gift className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-400" />
+                    <div>
+                      <strong className="text-white block mb-1 uppercase tracking-wider text-[11px]">Entrega de Items Adicionales</strong>
+                      <span className="text-gray-400 leading-relaxed">Los productos adicionales del combo (botellas, vapes, etc.) se <strong className="text-white">entregan el día del evento en la barra oficial</strong>. Debes presentar tu boleta digital y el código de reclamo visible en tu perfil para recoger tu producto.</span>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-industrial-850/60" />
+
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-white block mb-1 uppercase tracking-wider text-[11px]">Importante</strong>
+                      <span className="text-gray-400 leading-relaxed">Una vez realizada la compra, <strong className="text-white">no se aceptan devoluciones ni cancelaciones</strong>, salvo cancelación oficial del evento por parte de Dopamina. Los productos adicionales están sujetos a disponibilidad en el evento.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Checkbox + Actions */}
+              <div className="flex-shrink-0 border-t border-industrial-800 pt-4 space-y-4">
+                <label className="flex items-start space-x-3 cursor-pointer group">
+                  <div className="relative flex-shrink-0 mt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${termsAccepted ? 'border-emerald-500 bg-emerald-500/20' : 'border-industrial-700 bg-black group-hover:border-industrial-600'}`}>
+                      {termsAccepted && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                    </div>
+                  </div>
+                  <span className="text-xs text-gray-400 leading-relaxed">
+                    He leído y acepto los <strong className="text-white">términos y condiciones</strong> de este combo: las entradas son digitales, el combo es redimible solo en el evento, y los productos adicionales se entregan en la barra el día del evento.
+                  </span>
+                </label>
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowTermsModal(false)}
+                    className="flex-1 py-2.5 bg-industrial-850 hover:bg-industrial-800 text-gray-400 hover:text-white rounded text-xs font-bold uppercase transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleAcceptTerms}
+                    disabled={!termsAccepted}
+                    className="flex-1 py-2.5 bg-neon-purple hover:bg-neon-purple-dark text-white rounded text-xs font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:pointer-events-none"
+                    style={{ backgroundColor: termsAccepted ? 'var(--color-neon)' : undefined, boxShadow: termsAccepted ? '0 0 10px var(--color-neon-shadow-sm)' : undefined }}
+                  >
+                    Aceptar y Pagar →
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Birthday Modal */}
       <AnimatePresence>

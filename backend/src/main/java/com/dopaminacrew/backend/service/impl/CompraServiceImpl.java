@@ -20,7 +20,9 @@ import java.util.UUID;
 import com.dopaminacrew.backend.model.PromotorBono;
 import com.dopaminacrew.backend.repository.PromotorBonoRepository;
 import com.dopaminacrew.backend.model.Combo;
+import com.dopaminacrew.backend.model.ComboItemClaim;
 import com.dopaminacrew.backend.repository.ComboRepository;
+import com.dopaminacrew.backend.repository.ComboItemClaimRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -57,6 +59,9 @@ public class CompraServiceImpl implements CompraService {
 
     @Autowired
     private ComboRepository comboRepository;
+
+    @Autowired
+    private ComboItemClaimRepository comboItemClaimRepository;
 
     @Override
     @Transactional
@@ -290,6 +295,24 @@ public class CompraServiceImpl implements CompraService {
             boleta.setEstado("ACTIVA");
             boleta.setNumeroSorteo(nextSorteo++);
             boletaRepository.save(boleta);
+        }
+
+        // Crear registros de reclamo para items del combo (si aplica)
+        if (compra.getComboItems() != null && !compra.getComboItems().isBlank()) {
+            long existingClaims = comboItemClaimRepository.findByCompraId(compraId).size();
+            if (existingClaims == 0) {
+                String[] items = compra.getComboItems().split(",");
+                for (String item : items) {
+                    String nombre = item.trim();
+                    if (!nombre.isEmpty()) {
+                        ComboItemClaim claim = new ComboItemClaim();
+                        claim.setCompra(compra);
+                        claim.setItemNombre(nombre);
+                        claim.setReclamado(false);
+                        comboItemClaimRepository.save(claim);
+                    }
+                }
+            }
         }
 
         emailService.sendPurchaseConfirmation(compra);

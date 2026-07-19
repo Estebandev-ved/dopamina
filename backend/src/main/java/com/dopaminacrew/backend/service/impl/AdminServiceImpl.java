@@ -127,7 +127,8 @@ public class AdminServiceImpl implements AdminService {
                 c.getEstado(),
                 c.getCodigoQr(),
                 c.getCreatedAt() != null ? c.getCreatedAt().toString() : null,
-                c.getEvento() != null ? c.getEvento().getNombre() : "General"
+                c.getEvento() != null ? c.getEvento().getNombre() : "General",
+                c.getComboNombre()
         );
     }
 

@@ -41,17 +41,33 @@ public class EfipayService {
             @Value("${efipay.commerce-id}") String commerceId,
             @Value("${efipay.checkout-template-id}") String checkoutTemplateId,
             @Value("${efipay.redirect-base-url}") String redirectBaseUrl,
-            @Value("${efipay.backend-base-url}") String backendBaseUrl) {
+            @Value("${efipay.backend-base-url}") String backendBaseUrl,
+            @Value("${spring.profiles.active:dev}") String activeProfile) {
         this.apiUrl = apiUrl;
         this.accessToken = accessToken;
         this.officeId = officeId;
         this.webhookToken = webhookToken;
         this.commerceId = commerceId;
         this.checkoutTemplateId = checkoutTemplateId;
-        this.redirectBaseUrl = redirectBaseUrl;
-        this.backendBaseUrl = backendBaseUrl;
         this.restTemplate = new RestTemplate();
         this.objectMapper = new ObjectMapper();
+
+        // Auto-detección de entorno:
+        // Si el perfil es "dev" → siempre forzar localhost (ignorar el .env)
+        // Si el perfil es "prod" → usar las URLs del .env tal cual
+        boolean isDevProfile = "dev".equals(activeProfile);
+
+        if (isDevProfile) {
+            this.redirectBaseUrl = "http://localhost:5173";
+            this.backendBaseUrl = "http://localhost:8080";
+            System.out.println("[EfipayService] Modo DEV detectado — URLs de redirección forzadas a localhost");
+            System.out.println("[EfipayService]   Frontend: http://localhost:5173");
+            System.out.println("[EfipayService]   Backend:  http://localhost:8080");
+        } else {
+            this.redirectBaseUrl = redirectBaseUrl;
+            this.backendBaseUrl = backendBaseUrl;
+            System.out.println("[EfipayService] Modo PROD — URLs de redirección: " + redirectBaseUrl);
+        }
     }
 
     public static class EfipayPaymentResult {

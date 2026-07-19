@@ -54,3 +54,9 @@ resend:
     general: ${RESEND_FROM_GENERAL:"Dopamina Crew" <noreply@dopaminacrew.com>}
     facturas: ${RESEND_FROM_FACTURAS:"Tribu Facturación" <facturas@tribucol.shop>}
     seguridad: ${RESEND_FROM_SEGURIDAD:"Tribu Seguridad" <seguridad@tribucol.shop>}
+
+facebook:
+  pixel:
+    id: ${FACEBOOK_PIXEL_ID:1667872257652141}
+  access:
+    token: ${FACEBOOK_ACCESS_TOKEN:}

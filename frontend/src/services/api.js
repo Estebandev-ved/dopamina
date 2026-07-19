@@ -207,6 +207,22 @@ class ApiService {
     return this.delete('/api/admin/boletas/logs-acceso');
   }
 
+  adminGetBoletaByQr(codigoQr) {
+    return this.get(`/api/admin/boletas/por-qr?codigoQr=${encodeURIComponent(codigoQr)}`);
+  }
+
+  adminClaimComboItem(compraId, itemNombre, reclamadoPorNombre = 'Barra') {
+    return this.post(`/api/admin/boletas/combo-claims/${compraId}/claim`, { itemNombre, reclamadoPorNombre });
+  }
+
+  adminUnclaimComboItem(compraId, itemNombre) {
+    return this.post(`/api/admin/boletas/combo-claims/${compraId}/unclaim`, { itemNombre });
+  }
+
+  adminGetComboClaims(compraId) {
+    return this.get(`/api/admin/boletas/combo-claims/${compraId}`);
+  }
+
   // ── Eventos Públicos ──────────────────────────────────────────────────────
   getEventos() {
     return this.get('/api/public/eventos');
@@ -422,6 +438,11 @@ class ApiService {
     return this.get('/api/public/visitas');
   }
 
+  // Arcade rewards
+  arcadeClaimReward(juego, puntaje) {
+    return this.post('/api/arcade/reward', { juego, puntaje });
+  }
+
   // Cupones Public
   publicValidarCupon(codigo, cantidad = '') {
     const qtyParam = cantidad !== '' ? `&cantidad=${cantidad}` : '';
@@ -526,6 +547,41 @@ class ApiService {
 
   adminDeleteCombo(id) {
     return this.delete(`/api/admin/combos/${id}`);
+  }
+
+  // ===== GRAFFITI =====
+  getGraffiti() {
+    return this.get('/api/public/graffiti');
+  }
+
+  adminGetGraffiti() {
+    return this.get('/api/admin/graffiti');
+  }
+
+  adminCrearGraffiti(data) {
+    return this.post('/api/admin/graffiti', data);
+  }
+
+  adminActualizarGraffiti(id, data) {
+    return this.request(`/api/admin/graffiti/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  adminDeleteGraffiti(id) {
+    return this.delete(`/api/admin/graffiti/${id}`);
+  }
+
+  // ── Facebook Conversions API (CAPI) ──────────────────────────────────────
+  sendCAPIEvent(eventName, eventParams, userData) {
+    return this.post('/api/public/facebook/capi', {
+      eventName,
+      eventParams,
+      userData,
+      pageUrl: window.location.href,
+      referrer: document.referrer || '',
+    });
   }
 }
 
