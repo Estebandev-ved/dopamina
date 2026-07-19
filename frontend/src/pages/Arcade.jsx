@@ -1,6 +1,207 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Play, Square, RefreshCw, Volume2, VolumeX, Copy, Check, Info, Award } from 'lucide-react';
+import { Trophy, Play, Square, RefreshCw, Volume2, VolumeX, Copy, Check, Info, Award, Ticket, Lock, Loader2 } from 'lucide-react';
 import PageTransition from '../components/PageTransition';
+import { api } from '../services/api';
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ARCADE REWARDS — score tiers → discount coupons / free ticket
+   Thresholds must match the backend (ArcadeController.THRESHOLDS).
+   ───────────────────────────────────────────────────────────────────────────── */
+export const GAME_THRESHOLDS = {
+  catch:    [80, 200, 400, 1000],
+  runner:   [80, 200, 400, 1000],
+  snake:    [50, 120, 250, 500],
+  beattap:  [300, 700, 1200, 2500],
+  sequence: [120, 300, 600, 1000],
+};
+
+const TIER_LABELS = ['5% OFF', '10% OFF', '20% OFF', 'BOLETA GRATIS'];
+
+/** Local (display-only) tier for a score; the backend is the source of truth. */
+function localTier(juego, score) {
+  const th = GAME_THRESHOLDS[juego] || [];
+  let tier = 0;
+  for (const t of th) if (score >= t) tier++;
+  return tier;
+}
+
+/** Shows the reward tier thresholds for a given game. */
+function TierInfo({ juego }) {
+  const th = GAME_THRESHOLDS[juego] || [];
+  if (th.length === 0) return null;
+  const tierColors = ['#60A5FA', '#b14eff', '#FF6B00', '#4ADE80'];
+  const tierLabels = ['5% OFF', '10% OFF', '20% OFF', 'BOLETA GRATIS'];
+  return (
+    <div className="flex flex-wrap justify-center gap-2 mt-2">
+      {th.map((target, i) => (
+        <span key={i} className="text-[9px] font-mono px-2 py-0.5 rounded border" style={{ color: tierColors[i], borderColor: `${tierColors[i]}40`, backgroundColor: `${tierColors[i]}10` }}>
+          {target}+ pts → {tierLabels[i]}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * ArcadeReward — mounted inside a game's end screen. Claims the reward from the
+ * backend (which validates the score, applies anti-farming + the lifetime free
+ * ticket cap) and shows the resulting coupon.
+ */
+function ArcadeReward({ juego, puntaje }) {
+  const [status, setStatus] = useState('loading'); // loading | needLogin | done | error
+  const [data, setData] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const claimedRef = useRef(false);
+
+  useEffect(() => {
+    if (claimedRef.current) return;
+    claimedRef.current = true;
+
+    if (!api.isAuthenticated()) {
+      setStatus('needLogin');
+      return;
+    }
+    api.arcadeClaimReward(juego, puntaje)
+      .then((res) => { setData(res); setStatus('done'); })
+      .catch((err) => { setData({ mensaje: err.message || 'No se pudo reclamar el premio.' }); setStatus('error'); });
+  }, [juego, puntaje]);
+
+  const copyCode = () => {
+    if (!data?.codigo) return;
+    navigator.clipboard.writeText(data.codigo);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (status === 'loading') {
+    return (
+      <div className="flex items-center gap-2 text-xs font-mono text-gray-400 py-3">
+        <Loader2 className="w-4 h-4 animate-spin" /> Calculando tu premio…
+      </div>
+    );
+  }
+
+  if (status === 'needLogin') {
+    const tier = localTier(juego, puntaje);
+    return (
+      <div className="bg-industrial-950/80 border border-neon-purple/30 rounded-lg p-4 w-full max-w-xs text-center" style={{ borderColor: 'var(--color-neon-shadow-sm)' }}>
+        <Lock className="w-6 h-6 mx-auto text-neon-purple mb-2" style={{ color: 'var(--color-neon)' }} />
+        <p className="text-xs text-gray-300 mb-1">
+          {tier > 0 ? `¡Alcanzaste ${TIER_LABELS[tier - 1]}!` : 'Juega para ganar premios.'}
+        </p>
+        <p className="text-[11px] text-gray-500 mb-3">Inicia sesión para reclamar tu premio.</p>
+        <a href="/login" className="inline-block px-4 py-2 text-[11px] font-mono font-bold uppercase tracking-wider bg-neon-purple text-white rounded" style={{ backgroundColor: 'var(--color-neon)' }}>
+          Iniciar sesión
+        </a>
+      </div>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="bg-red-950/30 border border-red-500/30 rounded-lg p-4 w-full max-w-xs text-center">
+        <p className="text-xs font-mono text-red-400">{data?.mensaje || 'Error al reclamar premio.'}</p>
+        <p className="text-[10px] text-gray-500 mt-2">Tu puntaje: <span className="text-white font-bold">{puntaje}</span> pts</p>
+      </div>
+    );
+  }
+
+  // status === 'done'
+  if (!data?.premio) {
+    const th = GAME_THRESHOLDS[juego] || [];
+    const nextTarget = data?.siguienteNivelEn;
+    const progressPct = nextTarget && th[0] ? Math.min(1, (puntaje / th[0]) * 100) : 0;
+
+    return (
+      <div className="bg-industrial-950/80 border border-industrial-800 rounded-lg p-4 w-full max-w-xs text-center">
+        <p className="text-[10px] font-mono text-gray-500 uppercase mb-1">Tu puntaje</p>
+        <p className="text-lg font-black text-white font-mono mb-2">{puntaje} <span className="text-xs text-gray-500">pts</span></p>
+        <p className="text-[10px] text-gray-400 mb-3">{data?.mensaje || 'Aún no alcanzas un premio.'}</p>
+
+        {/* Mini tier progress */}
+        <div className="space-y-2">
+          {th.map((target, i) => {
+            const reached = puntaje >= target;
+            const pct = Math.min(100, (puntaje / target) * 100);
+            const tierColors = ['#60A5FA', '#b14eff', '#FF6B00', '#4ADE80'];
+            return (
+              <div key={i} className="flex items-center gap-2">
+                <span className="text-[9px] font-mono w-16 text-right" style={{ color: reached ? tierColors[i] : '#555' }}>
+                  {TIER_LABELS[i]}
+                </span>
+                <div className="flex-1 h-1.5 bg-industrial-900 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${pct}%`,
+                      backgroundColor: tierColors[i],
+                      boxShadow: reached ? `0 0 6px ${tierColors[i]}60` : 'none',
+                    }}
+                  />
+                </div>
+                <span className="text-[9px] font-mono w-10 text-right" style={{ color: reached ? '#fff' : '#666' }}>
+                  {target}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {nextTarget != null && (
+          <p className="text-[10px] text-gray-500 mt-2 font-mono">
+            Llega a <span className="text-white font-bold">{nextTarget}</span> pts para el siguiente nivel.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const esGratis = data.boletaGratis;
+  const accent = esGratis ? '#4ADE80' : 'var(--color-neon)';
+  const yaReclamado = data.yaReclamado;
+
+  return (
+    <div
+      className="bg-industrial-950/80 border rounded-lg p-5 w-full max-w-xs flex flex-col items-center shadow-lg"
+      style={{ borderColor: yaReclamado ? 'rgba(255,255,255,0.1)' : esGratis ? 'rgba(74,222,128,0.4)' : 'var(--color-neon-shadow-sm)' }}
+    >
+      {yaReclamado && (
+        <span className="text-[9px] font-mono text-gray-400 uppercase tracking-wider bg-white/5 px-2 py-0.5 rounded mb-2 border border-white/10">
+          Ya reclamado hoy
+        </span>
+      )}
+      {esGratis
+        ? <Ticket className="w-8 h-8 mb-2" style={{ color: yaReclamado ? '#888' : accent }} />
+        : <Award className="w-8 h-8 mb-2" style={{ color: yaReclamado ? '#888' : accent }} />}
+      <span className="text-[9px] font-mono text-gray-500 uppercase mb-1 text-center">
+        {esGratis ? 'CUPÓN DE BOLETA GRATIS' : `CUPÓN DE ${data.descuentoPorcentaje}% DE DESCUENTO`}
+      </span>
+      <div className={`text-base font-black tracking-widest font-mono select-all bg-black/60 px-4 py-2 border border-industrial-800 rounded text-center break-all ${yaReclamado ? 'text-gray-500' : 'text-white'}`}>
+        {data.codigo}
+      </div>
+      <button
+        onClick={copyCode}
+        className="mt-3 flex items-center gap-1.5 text-[10px] font-mono text-gray-400 hover:text-white transition-colors uppercase cursor-pointer"
+      >
+        {copied
+          ? <><Check className="w-3.5 h-3.5 text-green-400" /> Copiado</>
+          : <><Copy className="w-3.5 h-3.5" /> Copiar código</>}
+      </button>
+      {data.mensaje && (
+        <p className="text-[10px] text-gray-500 mt-2 text-center leading-relaxed">{data.mensaje}</p>
+      )}
+      {!yaReclamado && (
+        <a
+          href="/eventos"
+          className="mt-4 px-5 py-2 font-mono font-black uppercase tracking-wider text-[11px] rounded cursor-pointer transition-all text-black"
+          style={{ backgroundColor: esGratis ? '#4ADE80' : 'var(--color-neon)' }}
+        >
+          {esGratis ? 'Reclamar boleta' : 'Usar en checkout'}
+        </a>
+      )}
+    </div>
+  );
+}
 
 export default function Arcade() {
   const [activeTab, setActiveTab] = useState('catch'); // 'catch','runner','beatmaker','snake','beattap','sequence'
@@ -14,7 +215,7 @@ export default function Arcade() {
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 z-10">
           
           {/* Header */}
-          <div className="text-center mb-10">
+          <div className="text-center mb-8">
             <span className="text-xs font-mono font-bold tracking-[0.3em] text-neon-purple uppercase bg-neon-purple/10 px-3 py-1 rounded-full border border-neon-purple/20" style={{ color: 'var(--color-neon)', borderColor: 'var(--color-neon-shadow-sm)', backgroundColor: 'var(--color-neon-shadow-sm)' }}>
               Zona Recreativa & Recompensas
             </span>
@@ -23,8 +224,33 @@ export default function Arcade() {
             </h1>
             <div className="w-16 h-[2px] bg-neon-purple mx-auto mt-4" style={{ backgroundColor: 'var(--color-neon)' }} />
             <p className="text-xs text-gray-400 mt-3 max-w-md mx-auto">
-              Experimenta con ritmos industriales u obtén más de 100 puntos en el arcade para reclamar tu cupón de descuento.
+              Juega, suma puntos y gana premios reales. ¡El nivel más alto te da una <span className="text-green-400 font-bold">boleta gratis</span>!
             </p>
+          </div>
+
+          {/* Reward Tiers Showcase */}
+          <div className="flex flex-wrap justify-center gap-3 mb-8">
+            {[
+              { tier: 1, label: '5% OFF', icon: '🎟️', color: '#60A5FA', desc: 'Primer descuento' },
+              { tier: 2, label: '10% OFF', icon: '🎫', color: '#b14eff', desc: 'Descuento medio' },
+              { tier: 3, label: '20% OFF', icon: '💎', color: '#FF6B00', desc: 'Gran descuento' },
+              { tier: 4, label: 'BOLETA GRATIS', icon: '🏆', color: '#4ADE80', desc: '1 por cuenta', highlight: true },
+            ].map(({ tier, label, icon, color, desc, highlight }) => (
+              <div
+                key={tier}
+                className={`flex items-center gap-2.5 px-4 py-2.5 rounded-lg border transition-all ${
+                  highlight
+                    ? 'bg-green-500/10 border-green-500/30 shadow-[0_0_15px_rgba(74,222,128,0.15)]'
+                    : 'bg-industrial-950/60 border-industrial-800/80'
+                }`}
+              >
+                <span className="text-lg">{icon}</span>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider" style={{ color }}>{label}</span>
+                  <span className="text-[9px] text-gray-500 font-mono">{desc}</span>
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Navigation Tabs */}
@@ -80,9 +306,8 @@ function DopamineCatchGame() {
   const audioCtxRef = useRef(null);
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
-  const [gameState, setGameState] = useState('idle'); // 'idle', 'playing', 'won', 'lost'
+  const [gameState, setGameState] = useState('idle'); // 'idle', 'playing', 'lost'
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [copied, setCopied] = useState(false);
 
   // References for keeping track of fast mutations in game loop
   const stateRef = useRef({
@@ -91,7 +316,7 @@ function DopamineCatchGame() {
     gameState: 'idle',
     soundEnabled: true,
     playerX: 0,
-    playerWidth: 90,
+    playerWidth: 65,
     playerHeight: 18,
     keys: { left: false, right: false },
     fallingObjects: [],
@@ -199,7 +424,6 @@ function DopamineCatchGame() {
     setScore(0);
     setLives(3);
     setGameState('playing');
-    setCopied(false);
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -283,12 +507,12 @@ function DopamineCatchGame() {
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.fillRect(px + pw / 2 - 5, py + 3, 10, ph - 6);
 
-    // Difficulty scaling
-    stateRef.current.speedMultiplier = 1.0 + (stateRef.current.score / 150);
+    // Difficulty scaling — ramps up slowly
+    stateRef.current.speedMultiplier = 1.0 + (stateRef.current.score / 250);
 
-    // Spawn falling objects
+    // Spawn falling objects — slower spawn rate
     stateRef.current.spawnTimer++;
-    const spawnRate = Math.max(25, 55 - Math.floor(stateRef.current.score / 10));
+    const spawnRate = Math.max(35, 70 - Math.floor(stateRef.current.score / 15));
     if (stateRef.current.spawnTimer >= spawnRate) {
       stateRef.current.spawnTimer = 0;
 
@@ -300,17 +524,17 @@ function DopamineCatchGame() {
       let scoreVal = 10;
       let size = 10;
 
-      if (rand < 0.2) {
+      if (rand < 0.15) {
         type = 'ticket';
         color = '#FFC800'; // Gold ticket
-        scoreVal = 20;
-        size = 12;
-      } else if (rand < 0.45) {
+        scoreVal = 25;
+        size = 11;
+      } else if (rand < 0.38) {
         type = 'vinyl';
         color = '#00D8FF'; // Cyan vinyl
         scoreVal = 15;
-        size = 11;
-      } else if (rand < 0.65) {
+        size = 10;
+      } else if (rand < 0.62) {
         type = 'distort';
         color = '#FF3E3E'; // Red damage
         scoreVal = -25;
@@ -320,7 +544,7 @@ function DopamineCatchGame() {
       stateRef.current.fallingObjects.push({
         x: Math.random() * (canvas.width - 40) + 20,
         y: -20,
-        vy: (Math.random() * 2 + 3) * stateRef.current.speedMultiplier,
+        vy: (Math.random() * 1.5 + 2) * stateRef.current.speedMultiplier,
         type,
         color,
         scoreVal,
@@ -413,14 +637,7 @@ function DopamineCatchGame() {
       }
     }
 
-    // Check game conditions
-    if (stateRef.current.score >= 100) {
-      setGameState('won');
-      playSynthSound('win');
-      cancelAnimationFrame(stateRef.current.animationId);
-      return;
-    }
-
+    // Game ends only when lives run out — the final score decides the reward tier.
     if (stateRef.current.lives <= 0) {
       setGameState('lost');
       playSynthSound('damage');
@@ -441,12 +658,6 @@ function DopamineCatchGame() {
     stateRef.current.keys.right = false;
   };
 
-  const copyCoupon = () => {
-    navigator.clipboard.writeText('DOPA-ARCADE-10');
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   return (
     <div className="flex flex-col items-center">
       {/* Game controls and score header */}
@@ -457,7 +668,7 @@ function DopamineCatchGame() {
           <div className="flex flex-col">
             <span className="text-[10px] font-mono text-gray-500 uppercase">PUNTOS</span>
             <span className="text-xl font-black text-neon-glow font-mono" style={{ textShadow: '0 0 6px var(--color-neon)' }}>
-              {score} <span className="text-xs text-gray-500">/ 100</span>
+              {score} <span className="text-xs text-gray-500">pts</span>
             </span>
           </div>
 
@@ -526,9 +737,10 @@ function DopamineCatchGame() {
           <div className="absolute inset-0 bg-black/85 backdrop-blur-sm flex flex-col justify-center items-center text-center p-6 z-10 animate-fadeIn">
             <Trophy className="w-12 h-12 text-neon-purple mb-4 animate-bounce" style={{ color: 'var(--color-neon)' }} />
             <h3 className="text-xl font-black text-white uppercase tracking-wider mb-2">Desafío Dopamina</h3>
-            <p className="text-xs text-gray-400 max-w-sm mb-6 leading-relaxed">
+            <p className="text-xs text-gray-400 max-w-sm mb-3 leading-relaxed">
               Atrapa las moléculas de dopamina, vinilos y boletas VIP. Evita a toda costa las malas vibras (rojas) que dañan tu sistema de audio.
             </p>
+            <TierInfo juego="catch" />
             <button
               onClick={startGame}
               className="px-8 py-3 font-mono font-black uppercase tracking-widest text-xs bg-neon-purple text-white border border-neon-purple rounded cursor-pointer shadow-neon-md transition-all hover:scale-105"
@@ -540,63 +752,20 @@ function DopamineCatchGame() {
         )}
 
         {gameState === 'lost' && (
-          <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex flex-col justify-center items-center text-center p-6 z-10">
-            <span className="text-4xl mb-4">🔇</span>
-            <h3 className="text-xl font-black text-red-500 uppercase tracking-wider mb-2">Se apagó la pista</h3>
-            <p className="text-xs text-gray-500 max-w-sm mb-6">
-              Las vibras negativas distorsionaron el sistema de audio. ¡Vuelve a intentarlo para ganarte la recompensa!
+          <div className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col justify-center items-center text-center p-6 z-10 animate-fadeIn overflow-y-auto">
+            <h3 className="text-xl font-black text-white uppercase tracking-wider mb-1">Se apagó la pista</h3>
+            <p className="text-[11px] font-mono text-gray-400 mb-4">
+              Puntaje final: <span className="text-neon-glow font-bold" style={{ color: 'var(--color-neon)' }}>{score}</span> pts
             </p>
+
+            <ArcadeReward juego="catch" puntaje={score} />
+
             <button
               onClick={startGame}
-              className="px-6 py-2.5 font-mono font-bold uppercase tracking-wider text-xs border border-red-500 bg-red-950/20 text-red-400 rounded cursor-pointer hover:bg-red-500 hover:text-white transition-all flex items-center gap-2"
+              className="mt-5 px-6 py-2.5 font-mono font-bold uppercase tracking-wider text-xs border border-red-500 bg-red-950/20 text-red-400 rounded cursor-pointer hover:bg-red-500 hover:text-white transition-all flex items-center gap-2"
             >
               <RefreshCw className="w-3.5 h-3.5" /> REINTENTAR
             </button>
-          </div>
-        )}
-
-        {gameState === 'won' && (
-          <div className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col justify-center items-center text-center p-8 z-10 animate-fadeIn">
-            <Award className="w-14 h-14 text-green-400 mb-3 animate-pulse" style={{ filter: 'drop-shadow(0 0 8px rgba(74,222,128,0.4))' }} />
-            <h3 className="text-2xl font-black text-white uppercase tracking-wider mb-1">¡Sobredosis de Ritmo!</h3>
-            <p className="text-[10px] font-mono text-green-400 uppercase tracking-widest mb-6">LOGRO DESBLOQUEADO: MASTER RAver</p>
-            
-            {/* Reward Coupon Card */}
-            <div className="bg-industrial-950/80 border border-green-500/30 rounded-lg p-5 w-full max-w-xs mb-8 flex flex-col items-center shadow-lg relative">
-              <span className="text-[9px] font-mono text-gray-500 uppercase mb-1">CUPÓN DE 10% DE DESCUENTO</span>
-              <div className="text-lg font-black text-white tracking-widest font-mono select-all bg-black/60 px-4 py-2 border border-industrial-800 rounded">
-                DOPA-ARCADE-10
-              </div>
-              <button
-                onClick={copyCoupon}
-                className="mt-3.5 flex items-center gap-1.5 text-[10px] font-mono text-gray-400 hover:text-green-400 transition-colors uppercase"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-green-400" /> Copiado con éxito
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" /> Copiar Código
-                  </>
-                )}
-              </button>
-            </div>
-
-            <div className="flex gap-4">
-              <button
-                onClick={startGame}
-                className="px-5 py-2.5 font-mono font-bold uppercase tracking-wider text-xs border border-industrial-800 text-gray-400 hover:text-white rounded cursor-pointer transition-colors"
-              >
-                Volver a Jugar
-              </button>
-              <a
-                href="/eventos"
-                className="px-6 py-2.5 font-mono font-black uppercase tracking-wider text-xs bg-green-500 text-black rounded cursor-pointer shadow-[0_0_10px_rgba(74,222,128,0.45)] hover:bg-green-400 transition-all flex items-center gap-1.5"
-              >
-                Adquirir Boleta
-              </a>
-            </div>
           </div>
         )}
 
@@ -1139,9 +1308,8 @@ function RaveRunnerGame() {
   const canvasRef = useRef(null);
   const audioCtxRef = useRef(null);
   const [score, setScore] = useState(0);
-  const [gameState, setGameState] = useState('idle'); // 'idle', 'playing', 'won', 'lost'
+  const [gameState, setGameState] = useState('idle'); // 'idle', 'playing', 'lost'
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [copied, setCopied] = useState(false);
 
   const stateRef = useRef({
     score: 0,
@@ -1149,14 +1317,14 @@ function RaveRunnerGame() {
     soundEnabled: true,
     playerY: 0,
     playerVy: 0,
-    playerSize: 18,
-    gravity: 0.6,
-    jumpForce: -10,
+    playerSize: 15,
+    gravity: 0.5,
+    jumpForce: -9.5,
     isJumping: false,
     groundY: 0,
     obstacles: [],
     spawnTimer: 0,
-    speed: 5.5,
+    speed: 4.0,
     rotation: 0,
     bgFlash: 0,
     animationId: null
@@ -1249,7 +1417,6 @@ function RaveRunnerGame() {
   const startGame = () => {
     setScore(0);
     setGameState('playing');
-    setCopied(false);
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1261,7 +1428,7 @@ function RaveRunnerGame() {
     stateRef.current.isJumping = false;
     stateRef.current.obstacles = [];
     stateRef.current.spawnTimer = 0;
-    stateRef.current.speed = 5.5;
+    stateRef.current.speed = 4.0;
     stateRef.current.rotation = 0;
     stateRef.current.bgFlash = 0;
 
@@ -1307,7 +1474,7 @@ function RaveRunnerGame() {
     }
 
     // Rotation angle
-    state.rotation += 0.08 * (state.speed / 5.5);
+    state.rotation += 0.06 * (state.speed / 4.0);
 
     // Draw Ground (Equalizer glowing baseline)
     ctx.shadowBlur = 10;
@@ -1380,31 +1547,33 @@ function RaveRunnerGame() {
 
     ctx.restore();
 
-    // Difficulty increases speed
-    state.speed = 5.5 + (state.score / 250);
+    // Difficulty increases speed — slower ramp
+    state.speed = 4.0 + (state.score / 350);
 
     // Distance/Score tick
-    state.score += 0.15;
+    state.score += 0.12;
     const currentIntScore = Math.floor(state.score);
     setScore(currentIntScore);
 
-    // Spawn obstacles
+    // Spawn obstacles — more frequent, more doubles
     state.spawnTimer++;
-    const randomSpawnRate = 75 + Math.random() * 60 - (state.speed * 2);
+    const randomSpawnRate = 65 + Math.random() * 50 - (state.speed * 2.5);
     if (state.spawnTimer >= randomSpawnRate) {
       state.spawnTimer = 0;
 
-      const isDouble = Math.random() < 0.25 && state.score > 25;
-      const w = 24;
-      const h = isDouble ? 42 : 24;
+      const isDouble = Math.random() < 0.35 && state.score > 20;
+      const isTriple = Math.random() < 0.12 && state.score > 60;
+      const w = 22;
+      const h = isTriple ? 60 : isDouble ? 40 : 22;
 
       state.obstacles.push({
         x: canvas.width,
         y: state.groundY - h,
         width: w,
         height: h,
-        color: isDouble ? '#FF3E3E' : '#FF6B00',
-        isDouble
+        color: isTriple ? '#FF3E3E' : isDouble ? '#FF3E3E' : '#FF6B00',
+        isDouble: isDouble || isTriple,
+        isTriple
       });
     }
 
@@ -1430,7 +1599,17 @@ function RaveRunnerGame() {
       // Speaker cones inside
       ctx.shadowBlur = 0;
       ctx.fillStyle = obs.color;
-      if (obs.isDouble) {
+      if (obs.isTriple) {
+        ctx.beginPath();
+        ctx.arc(obs.x + obs.width / 2, obs.y + obs.height * 0.2, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(obs.x + obs.width / 2, obs.y + obs.height * 0.5, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(obs.x + obs.width / 2, obs.y + obs.height * 0.8, 6, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (obs.isDouble) {
         // Double stack - draw two circles
         ctx.beginPath();
         ctx.arc(obs.x + obs.width / 2, obs.y + obs.height * 0.28, 7, 0, Math.PI * 2);
@@ -1470,21 +1649,7 @@ function RaveRunnerGame() {
       }
     }
 
-    // Win condition check
-    if (currentIntScore >= 100) {
-      setGameState('won');
-      playSound('win');
-      cancelAnimationFrame(state.animationId);
-      return;
-    }
-
     state.animationId = requestAnimationFrame(gameLoop);
-  };
-
-  const copyCoupon = () => {
-    navigator.clipboard.writeText('DOPA-ARCADE-10');
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -1556,9 +1721,10 @@ function RaveRunnerGame() {
           <div className="absolute inset-0 bg-black/85 backdrop-blur-sm flex flex-col justify-center items-center text-center p-6 z-10 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
             <span className="text-4xl mb-4 animate-bounce">🏃</span>
             <h3 className="text-xl font-black text-white uppercase tracking-wider mb-2">Rave Runner</h3>
-            <p className="text-xs text-gray-400 max-w-sm mb-6 leading-relaxed">
-              Salta sobre los altavoces de la bodega. Toca cualquier parte del Canvas (o presiona la tecla de Espacio) para saltar. ¡Alcanza los 100 metros para reclamar tu premio!
+            <p className="text-xs text-gray-400 max-w-sm mb-3 leading-relaxed">
+              Salta sobre los altavoces de la bodega. Toca cualquier parte del Canvas (o presiona la tecla de Espacio) para saltar.
             </p>
+            <TierInfo juego="runner" />
             <button
               onClick={startGame}
               className="px-8 py-3 font-mono font-black uppercase tracking-widest text-xs bg-neon-purple text-white border border-neon-purple rounded cursor-pointer shadow-neon-md transition-all hover:scale-105"
@@ -1570,63 +1736,21 @@ function RaveRunnerGame() {
         )}
 
         {gameState === 'lost' && (
-          <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex flex-col justify-center items-center text-center p-6 z-10" onClick={(e) => e.stopPropagation()}>
-            <span className="text-4xl mb-4">💥</span>
-            <h3 className="text-xl font-black text-red-500 uppercase tracking-wider mb-2">¡Chocaste con el Bafle!</h3>
-            <p className="text-xs text-gray-500 max-w-sm mb-6">
-              Has tropezado en el almacén. El sonido se detuvo abruptamente. ¡Vuelve a intentarlo!
+          <div className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col justify-center items-center text-center p-6 z-10 animate-fadeIn overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <span className="text-4xl mb-2">💥</span>
+            <h3 className="text-xl font-black text-red-500 uppercase tracking-wider mb-1">¡Chocaste con el Bafle!</h3>
+            <p className="text-[11px] font-mono text-gray-400 mb-4">
+              Distancia: <span className="font-bold" style={{ color: 'var(--color-neon)' }}>{score}</span>m
             </p>
+
+            <ArcadeReward juego="runner" puntaje={score} />
+
             <button
               onClick={startGame}
-              className="px-6 py-2.5 font-mono font-bold uppercase tracking-wider text-xs border border-red-500 bg-red-950/20 text-red-400 rounded cursor-pointer hover:bg-red-500 hover:text-white transition-all flex items-center gap-2"
+              className="mt-5 px-6 py-2.5 font-mono font-bold uppercase tracking-wider text-xs border border-red-500 bg-red-950/20 text-red-400 rounded cursor-pointer hover:bg-red-500 hover:text-white transition-all flex items-center gap-2"
             >
               <RefreshCw className="w-3.5 h-3.5" /> VOLVER A CORRER
             </button>
-          </div>
-        )}
-
-        {gameState === 'won' && (
-          <div className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col justify-center items-center text-center p-8 z-10 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
-            <Award className="w-14 h-14 text-green-400 mb-3 animate-pulse" style={{ filter: 'drop-shadow(0 0 8px rgba(74,222,128,0.4))' }} />
-            <h3 className="text-2xl font-black text-white uppercase tracking-wider mb-1">¡Sobreviviste al Rave!</h3>
-            <p className="text-[10px] font-mono text-green-400 uppercase tracking-widest mb-6">LOGRO DESBLOQUEADO: UNSTOPPABLE RUNNER</p>
-            
-            {/* Reward Coupon Card */}
-            <div className="bg-industrial-950/80 border border-green-500/30 rounded-lg p-5 w-full max-w-xs mb-8 flex flex-col items-center shadow-lg relative">
-              <span className="text-[9px] font-mono text-gray-500 uppercase mb-1">CUPÓN DE 10% DE DESCUENTO</span>
-              <div className="text-lg font-black text-white tracking-widest font-mono select-all bg-black/60 px-4 py-2 border border-industrial-800 rounded">
-                DOPA-ARCADE-10
-              </div>
-              <button
-                onClick={copyCoupon}
-                className="mt-3.5 flex items-center gap-1.5 text-[10px] font-mono text-gray-400 hover:text-green-400 transition-colors uppercase"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-green-400" /> Copiado con éxito
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" /> Copiar Código
-                  </>
-                )}
-              </button>
-            </div>
-
-            <div className="flex gap-4">
-              <button
-                onClick={startGame}
-                className="px-5 py-2.5 font-mono font-bold uppercase tracking-wider text-xs border border-industrial-800 text-gray-400 hover:text-white rounded cursor-pointer transition-colors"
-              >
-                Volver a Correr
-              </button>
-              <a
-                href="/eventos"
-                className="px-6 py-2.5 font-mono font-black uppercase tracking-wider text-xs bg-green-500 text-black rounded cursor-pointer shadow-[0_0_10px_rgba(74,222,128,0.45)] hover:bg-green-400 transition-all flex items-center gap-1.5"
-              >
-                Adquirir Boleta
-              </a>
-            </div>
           </div>
         )}
       </div>
@@ -1654,9 +1778,9 @@ function NeonSnakeGame() {
     nextDir: { x: 1, y: 0 },
     score: 0,
     gameState: 'idle',
-    cellSize: 20,
-    cols: 20,
-    rows: 20,
+    cellSize: 22,
+    cols: 16,
+    rows: 16,
     tickInterval: null,
     foodHue: 0,
   });
@@ -1735,7 +1859,7 @@ function NeonSnakeGame() {
       spawnFood(); playTone(600 + s.score * 3, 'sine', 0.1);
       if (s.score % 50 === 0 && s.score > 0) {
         clearInterval(s.tickInterval);
-        s.tickInterval = setInterval(tick, Math.max(60, 150 - s.score * 0.4));
+        s.tickInterval = setInterval(tick, Math.max(80, 180 - s.score * 0.5));
       }
     } else { s.snake.pop(); }
     drawCanvas();
@@ -1744,10 +1868,10 @@ function NeonSnakeGame() {
   const startGame = () => {
     const s = stateRef.current;
     clearInterval(s.tickInterval);
-    s.snake = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
+    s.snake = [{ x: 8, y: 8 }, { x: 7, y: 8 }, { x: 6, y: 8 }, { x: 5, y: 8 }];
     s.dir = { x: 1, y: 0 }; s.nextDir = { x: 1, y: 0 }; s.score = 0; s.gameState = 'playing';
     setScore(0); setGameState('playing'); spawnFood(); drawCanvas();
-    s.tickInterval = setInterval(tick, 150);
+    s.tickInterval = setInterval(tick, 180);
   };
 
   const changeDir = (dx, dy) => {
@@ -1794,14 +1918,20 @@ function NeonSnakeGame() {
           touchStart.current = null;
         }}
       >
-        <canvas ref={canvasRef} width={400} height={400} className="w-full border border-industrial-800 rounded-lg" style={{ imageRendering: 'pixelated' }} />
+        <canvas ref={canvasRef} width={352} height={352} className="w-full border border-industrial-800 rounded-lg" style={{ imageRendering: 'pixelated', maxWidth: '352px' }} />
         {(gameState === 'idle' || gameState === 'lost') && (
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg gap-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg gap-3 overflow-y-auto">
             <span className="text-4xl">{gameState === 'lost' ? '💀' : '🐍'}</span>
             <h3 className="text-lg font-black text-white uppercase tracking-widest">{gameState === 'lost' ? '¡Chocaste!' : 'Neon Snake'}</h3>
             {gameState === 'idle' && <p className="text-xs text-gray-400 text-center max-w-[220px]">Desliza en pantalla o usa WASD/flechas. ¡Come los orbes sin chocar contra ti mismo!</p>}
-            {gameState === 'lost' && <p className="text-xs text-gray-400">Puntuación: <span className="text-white font-bold">{score}</span></p>}
-            <button onClick={startGame} className="px-6 py-2 font-mono font-bold uppercase text-xs text-black rounded cursor-pointer" style={{ backgroundColor: 'var(--color-neon)' }}>
+            {gameState === 'idle' && <TierInfo juego="snake" />}
+            {gameState === 'lost' && (
+              <>
+                <p className="text-[11px] font-mono text-gray-400">Puntaje: <span className="text-white font-bold">{score}</span></p>
+                <ArcadeReward juego="snake" puntaje={score} />
+              </>
+            )}
+            <button onClick={startGame} className="mt-2 px-6 py-2 font-mono font-bold uppercase text-xs text-black rounded cursor-pointer" style={{ backgroundColor: 'var(--color-neon)' }}>
               {gameState === 'lost' ? 'Volver a Jugar' : 'Empezar'}
             </button>
           </div>
@@ -1867,10 +1997,10 @@ function BeatTapGame() {
   const startGame = () => {
     stopAll();
     const r = refs.current;
-    r.score = 0; r.combo = 0; r.missed = 0; r.maxCombo = 0; r.tLeft = 30; idRef.current = 0;
-    setScore(0); setCombo(0); setMissed(0); setMaxCombo(0); setTimeLeft(30); setCircles([]); setGameState('playing');
+    r.score = 0; r.combo = 0; r.missed = 0; r.maxCombo = 0; r.tLeft = 40; idRef.current = 0;
+    setScore(0); setCombo(0); setMissed(0); setMaxCombo(0); setTimeLeft(40); setCircles([]); setGameState('playing');
 
-    let t = 30;
+    let t = 40;
     const timer = setInterval(() => {
       t--; r.tLeft = t; setTimeLeft(t);
       if (t <= 0) { clearInterval(timer); stopAll(); setGameState('done'); }
@@ -1881,8 +2011,8 @@ function BeatTapGame() {
       if (r.tLeft <= 0) return;
       const id = idRef.current++;
       const color = COLORS[Math.floor(Math.random() * COLORS.length)];
-      const size = 52 + Math.random() * 28;
-      const duration = 1800 + Math.random() * 700;
+      const size = 40 + Math.random() * 25;
+      const duration = 1200 + Math.random() * 600;
       setCircles(prev => [...prev, { id, x: 8 + Math.random() * 84, y: 10 + Math.random() * 80, size, color, born: Date.now(), duration }]);
       const remove = setTimeout(() => {
         setCircles(prev => {
@@ -1892,7 +2022,7 @@ function BeatTapGame() {
         });
       }, duration);
       timersRef.current.push(remove);
-      const next = setTimeout(scheduleSpawn, 600 + Math.random() * 400);
+      const next = setTimeout(scheduleSpawn, 700 + Math.random() * 500);
       timersRef.current.push(next);
     };
     const first = setTimeout(scheduleSpawn, 300);
@@ -1901,7 +2031,7 @@ function BeatTapGame() {
 
   const tapCircle = (id, born, duration) => {
     const ratio = Math.min(1, (Date.now() - born) / duration);
-    const quality = ratio < 0.35 ? 'perfect' : ratio < 0.65 ? 'good' : 'ok';
+    const quality = ratio < 0.30 ? 'perfect' : ratio < 0.60 ? 'good' : 'ok';
     const pts = quality === 'perfect' ? 30 : quality === 'good' ? 20 : 10;
     refs.current.combo++;
     const earned = pts * Math.min(refs.current.combo, 5);
@@ -1963,12 +2093,13 @@ function BeatTapGame() {
           <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center gap-4 text-center p-6">
             <span className="text-5xl">🎯</span>
             <h3 className="text-xl font-black text-white uppercase tracking-widest">Beat Tap</h3>
-            <p className="text-xs text-gray-400 max-w-xs">Toca los círculos antes de que se esfumen. ¡Los combos multiplican tus puntos hasta x5! 30 segundos.</p>
+            <p className="text-xs text-gray-400 max-w-xs">Toca los círculos antes de que se esfumen. ¡Los combos multiplican tus puntos hasta x5!</p>
+            <TierInfo juego="beattap" />
             <button onClick={startGame} className="px-8 py-3 font-mono font-black uppercase text-xs text-black rounded cursor-pointer" style={{ backgroundColor: '#b14eff' }}>¡Empezar!</button>
           </div>
         )}
         {gameState === 'done' && (
-          <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center gap-3 text-center p-6">
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center gap-3 text-center p-6 overflow-y-auto">
             <Trophy className="w-12 h-12 text-yellow-400" />
             <h3 className="text-xl font-black text-white uppercase">¡Tiempo!</h3>
             <div className="grid grid-cols-3 gap-6 my-2">
@@ -1976,7 +2107,8 @@ function BeatTapGame() {
               <div><div className="text-2xl font-black" style={{ color: '#b14eff' }}>x{maxCombo}</div><div className="text-[10px] text-gray-500 uppercase font-mono">Max Combo</div></div>
               <div><div className="text-2xl font-black text-red-400">{missed}</div><div className="text-[10px] text-gray-500 uppercase font-mono">Perdidos</div></div>
             </div>
-            <button onClick={startGame} className="px-6 py-2.5 font-mono font-bold uppercase text-xs text-black rounded cursor-pointer" style={{ backgroundColor: '#b14eff' }}>Jugar de Nuevo</button>
+            <ArcadeReward juego="beattap" puntaje={score} />
+            <button onClick={startGame} className="mt-2 px-6 py-2.5 font-mono font-bold uppercase text-xs text-black rounded cursor-pointer" style={{ backgroundColor: '#b14eff' }}>Jugar de Nuevo</button>
           </div>
         )}
       </div>
@@ -2100,6 +2232,10 @@ function SequenceSyncGame() {
         </div>
       )}
 
+      {(phase === 'fail' || phase === 'win') && (
+        <ArcadeReward juego="sequence" puntaje={score} />
+      )}
+
       <div className="flex gap-4">
         {(phase === 'idle' || phase === 'fail' || phase === 'win') && (
           <button onClick={startGame} className="px-8 py-3 font-mono font-black uppercase tracking-widest text-xs text-black rounded cursor-pointer" style={{ backgroundColor: '#b14eff' }}>
@@ -2109,6 +2245,7 @@ function SequenceSyncGame() {
         {phase === 'showing' && <div className="px-8 py-3 font-mono text-xs text-gray-500 border border-industrial-800 rounded animate-pulse">Memorizando...</div>}
       </div>
       <p className="text-[10px] text-gray-600 font-mono text-center">Memoriza y repite la secuencia. ¡Ronda 12 = Victoria!</p>
+      {phase === 'idle' && <TierInfo juego="sequence" />}
     </div>
   );
 }

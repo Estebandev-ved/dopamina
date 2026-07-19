@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { MapPin, Clock, Users, Minus, Plus, X, Ticket, BadgePercent, ArrowRight, Play, Pause, Zap, Lightbulb, Gift, Star, Tag } from 'lucide-react';
+import useFacebookPixel from '../services/useFacebookPixel';
 
 /**
  * Página pública de próximos eventos de Dopamina.
@@ -10,6 +11,7 @@ import { MapPin, Clock, Users, Minus, Plus, X, Ticket, BadgePercent, ArrowRight,
  */
 export default function Eventos() {
   const navigate = useNavigate();
+  const { trackEvent } = useFacebookPixel();
   const [eventos, setEventos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -117,6 +119,13 @@ export default function Eventos() {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
+    trackEvent('ViewContent', {
+      content_name: evento.nombre,
+      content_category: 'Evento',
+      content_ids: [String(evento.id)],
+      value: evento.precio || 0,
+      currency: 'COP',
+    });
   };
 
   const handleCloseModal = () => {

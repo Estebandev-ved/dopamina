@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import PageTransition from '../components/PageTransition';
 import { User, Mail, Phone, Lock, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
+import useFacebookPixel from '../services/useFacebookPixel';
 
 function decodeJwtPayload(token) {
   try {
@@ -63,6 +64,7 @@ function GoogleRegisterSection({ loading, setSubmitError, setLoading, navigate }
 
 export default function Register() {
   const navigate = useNavigate();
+  const { trackEvent } = useFacebookPixel();
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
@@ -116,6 +118,10 @@ export default function Register() {
     try {
       await api.register(nombre, email, telefono, password);
       setSuccess(true);
+      trackEvent('Lead', {
+        content_name: 'Registro',
+        content_category: 'Usuario Nuevo',
+      });
       setNombre(''); setEmail(''); setTelefono(''); setPassword('');
       setTimeout(() => navigate('/login'), 3000);
     } catch (err) {

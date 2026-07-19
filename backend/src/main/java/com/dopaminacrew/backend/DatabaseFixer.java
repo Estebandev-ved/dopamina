@@ -228,6 +228,62 @@ public class DatabaseFixer implements CommandLineRunner {
             System.err.println("Error creando o sembrando la tabla combos: " + e.getMessage());
         }
 
+        // ===== GRAFFITI TABLE =====
+        try {
+            jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS `graffiti` (" +
+                "    `id` BIGINT AUTO_INCREMENT PRIMARY KEY," +
+                "    `titulo` VARCHAR(150) NOT NULL," +
+                "    `artista` VARCHAR(100) DEFAULT 'Anónimo'," +
+                "    `descripcion` TEXT," +
+                "    `imagen_url` VARCHAR(500)," +
+                "    `ubicacion` VARCHAR(200) NOT NULL," +
+                "    `latitud` DOUBLE NOT NULL," +
+                "    `longitud` DOUBLE NOT NULL," +
+                "    `tags` VARCHAR(255)," +
+                "    `activo` TINYINT(1) NOT NULL DEFAULT 1," +
+                "    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
+            );
+            System.out.println("✔ Tabla graffiti verificada / creada.");
+        } catch (Exception e) {
+            System.err.println("Error creando la tabla graffiti: " + e.getMessage());
+        }
+
+        // ===== CUPONES: columnas max_usos y min_boletas =====
+        try {
+            jdbcTemplate.execute("ALTER TABLE cupones ADD COLUMN max_usos INT DEFAULT 0;");
+            System.out.println("✔ Columna max_usos agregada a cupones.");
+        } catch (Exception e) {
+            System.out.println("Info: Columna max_usos ya existe: " + e.getMessage());
+        }
+        try {
+            jdbcTemplate.execute("ALTER TABLE cupones ADD COLUMN min_boletas INT DEFAULT 1;");
+            System.out.println("✔ Columna min_boletas agregada a cupones.");
+        } catch (Exception e) {
+            System.out.println("Info: Columna min_boletas ya existe: " + e.getMessage());
+        }
+
+        // ===== ARCADE REWARDS TABLE =====
+        try {
+            jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS `arcade_rewards` (" +
+                "    `id` BIGINT AUTO_INCREMENT PRIMARY KEY," +
+                "    `usuario_id` BIGINT NOT NULL," +
+                "    `juego` VARCHAR(30) NOT NULL," +
+                "    `tier` INT NOT NULL," +
+                "    `puntaje` INT NOT NULL," +
+                "    `codigo_cupon` VARCHAR(50) NOT NULL," +
+                "    `fecha` DATE NOT NULL," +
+                "    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                "    CONSTRAINT fk_arcade_rewards_user FOREIGN KEY (`usuario_id`) REFERENCES `usuarios`(`id`) ON DELETE CASCADE" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
+            );
+            System.out.println("✔ Tabla arcade_rewards verificada / creada.");
+        } catch (Exception e) {
+            System.err.println("Error creando la tabla arcade_rewards: " + e.getMessage());
+        }
+
         System.out.println("====== REPARACION DE BASE DE DATOS FINALIZADA ======");
     }
 }
