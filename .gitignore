@@ -23,11 +23,15 @@ target/
 # IDE settings
 .idea/
 .vscode/
+.settings/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# Windows artifacts
+nul
 
 # React build outputs
 dist/
