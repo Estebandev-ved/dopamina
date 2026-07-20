@@ -23,7 +23,6 @@ import Combos from './pages/Combos';
 import Graffiti from './pages/Graffiti';
 import { api } from './services/api';
 import usePageTracking from './services/usePageTracking';
-import InstallApp from './components/InstallApp';
 import CookiesConsent from './components/CookiesConsent';
 import FloatingHub from './components/FloatingHub';
 
@@ -74,7 +73,7 @@ const PromoterRoute = ({ children }) => {
  * Security Note: Client session states are verified via internal state management.
  */
 export default function App() {
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(() => !sessionStorage.getItem('dopamina_splash_shown'));
   const location = useLocation();
   usePageTracking();
 
@@ -134,7 +133,7 @@ export default function App() {
     <div className="bg-black min-h-screen flex flex-col overflow-x-hidden selection:bg-neon-purple selection:text-white">
       <AnimatePresence mode="wait">
         {showSplash ? (
-          <Splash key="splash" onComplete={() => setShowSplash(false)} />
+          <Splash key="splash" onComplete={() => { sessionStorage.setItem('dopamina_splash_shown', '1'); setShowSplash(false); }} />
         ) : (
           <div key="app-content" className="flex flex-col min-h-screen">
             <Navbar />
@@ -163,7 +162,6 @@ export default function App() {
             </main>
             <Footer />
             <FloatingHub />
-            <InstallApp />
             <CookiesConsent />
           </div>
         )}

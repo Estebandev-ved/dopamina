@@ -382,7 +382,7 @@ export default function ChatbotWidget({ open: openProp, onOpenChange, hideLaunch
       query.includes('reembolso')
     ) {
       return {
-        text: '⚡ Entendemos que los planes cambian. Ofrecemos reembolsos del 100% si lo solicitas hasta 48 horas antes del inicio del evento escribiendo a nuestro soporte. Además, si no puedes asistir, recuerda que nuestras entradas son transferibles digitalmente de forma gratuita.'
+        text: '🎟️ Las entradas no tienen devolución ni cancelación una vez confirmada la compra, salvo que el evento sea cancelado por los organizadores. Si no puedes asistir, sí puedes transferir tu entrada a otra persona sin costo desde tu perfil.'
       };
     }
 

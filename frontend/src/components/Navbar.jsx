@@ -210,36 +210,6 @@ export default function Navbar() {
               ARTISTAS
             </Link>
             <Link
-              to="/combos"
-              className={`text-xs font-bold tracking-wider transition-colors duration-200 ${
-                isActive('/combos') ? 'text-neon-glow' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              COMBOS ⚡
-            </Link>
-            <Link
-              to="/arcade"
-              className={`text-xs font-bold tracking-wider transition-colors duration-200 flex items-center gap-1.5 ${
-                isActive('/arcade') ? 'text-neon-glow' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <span>ARCADE</span>
-              <svg className="w-3.5 h-3.5 fill-current animate-pulse text-neon-purple animate-pulse" viewBox="0 0 24 24" style={{ color: 'var(--color-neon)' }}>
-                <path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2Zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2Zm4.5 3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5Zm4-3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5Z"/>
-              </svg>
-            </Link>
-            <Link
-              to="/graffiti"
-              className={`text-xs font-bold tracking-wider transition-colors duration-200 flex items-center gap-1.5 ${
-                isActive('/graffiti') ? 'text-neon-glow' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <span>GRAFFITI</span>
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--color-neon)' }}>
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-              </svg>
-            </Link>
-            <Link
               to="/about"
               className={`text-xs font-bold tracking-wider transition-colors duration-200 whitespace-nowrap ${
                 isActive('/about') ? 'text-neon-glow' : 'text-gray-400 hover:text-white'
@@ -403,39 +373,6 @@ export default function Navbar() {
               }`}
             >
               ARTISTAS
-            </Link>
-            <Link
-              to="/combos"
-              onClick={() => setIsOpen(false)}
-              className={`text-sm font-bold tracking-widest py-2 ${
-                isActive('/combos') ? 'text-neon-glow' : 'text-gray-400'
-              }`}
-            >
-              COMBOS ⚡
-            </Link>
-            <Link
-              to="/arcade"
-              onClick={() => setIsOpen(false)}
-              className={`text-sm font-bold tracking-widest py-2 flex items-center gap-2 ${
-                isActive('/arcade') ? 'text-neon-glow' : 'text-gray-400'
-              }`}
-            >
-              <span>ARCADE</span>
-              <svg className="w-4 h-4 fill-current text-neon-purple" viewBox="0 0 24 24" style={{ color: 'var(--color-neon)' }}>
-                <path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2Zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2Zm4.5 3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5Zm4-3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5Z"/>
-              </svg>
-            </Link>
-            <Link
-              to="/graffiti"
-              onClick={() => setIsOpen(false)}
-              className={`text-sm font-bold tracking-widest py-2 flex items-center gap-2 ${
-                isActive('/graffiti') ? 'text-neon-glow' : 'text-gray-400'
-              }`}
-            >
-              <span>GRAFFITI</span>
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--color-neon)' }}>
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-              </svg>
             </Link>
             <Link
               to="/about"

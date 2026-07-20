@@ -315,7 +315,9 @@ public class CompraServiceImpl implements CompraService {
             }
         }
 
-        emailService.sendPurchaseConfirmation(compra);
+        java.util.List<com.dopaminacrew.backend.model.Boleta> boletasCompra =
+                boletaRepository.findByCompraIdOrderByNumeroSorteoAsc(compraId);
+        emailService.sendPurchaseConfirmation(compra, boletasCompra);
     }
 
     @Override

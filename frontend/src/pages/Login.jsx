@@ -222,7 +222,7 @@ export default function Login() {
             <div className="text-center mt-6 pt-6 border-t border-industrial-800">
               <p className="text-xs text-gray-500">
                 ¿No tienes cuenta?{' '}
-                <Link to="/register" className="text-neon-glow hover:underline font-bold">Regístrate aquí</Link>
+                <Link to="/register" state={location.state} className="text-neon-glow hover:underline font-bold">Regístrate aquí</Link>
               </p>
             </div>
           </div>

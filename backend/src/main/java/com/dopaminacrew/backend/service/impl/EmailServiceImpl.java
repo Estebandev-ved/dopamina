@@ -1,16 +1,27 @@
 package com.dopaminacrew.backend.service.impl;
 
+import com.dopaminacrew.backend.model.Boleta;
 import com.dopaminacrew.backend.model.Compra;
+import com.dopaminacrew.backend.model.Evento;
 import com.dopaminacrew.backend.model.ReporteSeguridad;
 import com.dopaminacrew.backend.model.User;
 import com.dopaminacrew.backend.service.EmailService;
+import com.dopaminacrew.backend.util.TicketPdfGenerator;
 import com.resend.Resend;
 import com.resend.core.exception.ResendException;
+import com.resend.services.emails.model.Attachment;
 import com.resend.services.emails.model.CreateEmailOptions;
 import com.resend.services.emails.model.CreateEmailResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.format.DateTimeFormatter;
+import java.util.Base64;
+import java.util.List;
+import java.util.Locale;
 
 @Service
 public class EmailServiceImpl implements EmailService {
@@ -39,6 +50,15 @@ public class EmailServiceImpl implements EmailService {
     @Value("${efipay.redirect-base-url}")
     private String frontendUrl;
 
+    @Value("${efipay.backend-base-url}")
+    private String backendBaseUrl;
+
+    private static final Locale ES = new Locale("es", "CO");
+    private static final DateTimeFormatter FECHA_FMT =
+            DateTimeFormatter.ofPattern("EEEE d 'de' MMMM 'de' yyyy", ES);
+    private static final DateTimeFormatter HORA_FMT =
+            DateTimeFormatter.ofPattern("h:mm a", ES);
+
     private Resend resend;
 
     @PostConstruct
@@ -55,17 +75,23 @@ public class EmailServiceImpl implements EmailService {
     }
 
     private void sendSafe(String from, String to, String subject, String html) {
+        sendSafe(from, to, subject, html, null);
+    }
+
+    private void sendSafe(String from, String to, String subject, String html, List<Attachment> attachments) {
         if (!isAvailable()) return;
         String recipient = testMode ? testEmail : to;
         String tag = testMode ? "[PRUEBA → " + to + "] " : "";
         try {
-            CreateEmailOptions params = CreateEmailOptions.builder()
+            CreateEmailOptions.Builder builder = CreateEmailOptions.builder()
                     .from(from)
                     .to(recipient)
                     .subject(tag + subject)
-                    .html(html)
-                    .build();
-            CreateEmailResponse response = resend.emails().send(params);
+                    .html(html);
+            if (attachments != null && !attachments.isEmpty()) {
+                builder.attachments(attachments);
+            }
+            CreateEmailResponse response = resend.emails().send(builder.build());
             System.out.println("Email sent to " + recipient + (testMode ? " (redirected from " + to + ")" : "") + " | ID: " + response.getId());
         } catch (ResendException e) {
             System.err.println("Failed to send email to " + recipient + ": " + e.getMessage());
@@ -98,40 +124,98 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
-    public void sendPurchaseConfirmation(Compra compra) {
+    public void sendPurchaseConfirmation(Compra compra, List<Boleta> boletas) {
         User user = compra.getUsuario();
-        String evento = compra.getEvento() != null ? compra.getEvento().getNombre() : "Evento General";
-        String html = """
-            <div style="font-family: 'Inter', sans-serif; max-width: 600px; margin: 0 auto; background: #0A0A0F; padding: 40px; border-radius: 16px; border: 1px solid #222;">
-                <div style="text-align: center; margin-bottom: 32px;">
-                    <h1 style="color: #B14EFF; font-size: 28px; font-weight: 900; margin: 0; letter-spacing: 2px;">DOPAMINA</h1>
-                    <p style="color: #666; font-size: 12px; letter-spacing: 1px;">CREW</p>
+        Evento ev = compra.getEvento();
+        String eventoNombre = ev != null ? ev.getNombre() : "Evento Dopamina Crew";
+        String fecha = ev != null && ev.getFecha() != null
+                ? capitalize(ev.getFecha().format(FECHA_FMT)) : "Por confirmar";
+        String hora = ev != null && ev.getHora() != null
+                ? ev.getHora().format(HORA_FMT).toUpperCase(ES) : "Por confirmar";
+        String lugar = ev != null
+                ? safe(ev.getLugar()) + (ev.getCiudad() != null ? ", " + ev.getCiudad() : "")
+                : "Por confirmar";
+
+        // Tarjeta-boleta por cada entrada, con su QR incrustado (imagen remota servida
+        // por el endpoint público /api/public/qr). Así el cliente ve la boleta en el correo.
+        StringBuilder ticketsHtml = new StringBuilder();
+        int total = boletas != null ? boletas.size() : 0;
+        for (int i = 0; boletas != null && i < total; i++) {
+            Boleta b = boletas.get(i);
+            String qrUrl = backendBaseUrl + "/api/public/qr?code="
+                    + URLEncoder.encode(b.getCodigoQr(), StandardCharsets.UTF_8);
+            String sorteo = b.getNumeroSorteo() != null ? " · N° sorteo " + b.getNumeroSorteo() : "";
+            ticketsHtml.append("""
+                <div style="background:#111118;border:1px solid #2A2A38;border-radius:14px;padding:24px;margin-bottom:16px;text-align:center;">
+                    <p style="color:#B14EFF;font-size:12px;font-weight:800;letter-spacing:1px;margin:0 0 4px;">ENTRADA %d DE %d%s</p>
+                    <p style="color:#F2F0F5;font-size:15px;font-weight:700;margin:0 0 16px;">%s</p>
+                    <img src="%s" alt="Código QR de tu boleta" width="200" height="200" style="width:200px;height:200px;background:#fff;padding:10px;border-radius:12px;" />
+                    <p style="color:#666;font-size:11px;font-family:monospace;margin:12px 0 0;word-break:break-all;">%s</p>
                 </div>
-                <h2 style="color: #F2F0F5; font-size: 20px; margin-bottom: 16px;">✅ ¡Compra Confirmada!</h2>
-                <p style="color: #9A9A9A; font-size: 14px; line-height: 1.6; margin-bottom: 24px;">
-                    Hola <strong style="color: #F2F0F5;">%s</strong>, tu compra ha sido procesada con éxito.
+            """.formatted(i + 1, total, sorteo, eventoNombre, qrUrl, b.getCodigoQr()));
+        }
+
+        String html = """
+            <div style="font-family:'Inter',Arial,sans-serif;max-width:600px;margin:0 auto;background:#0A0A0F;padding:40px;border-radius:16px;border:1px solid #222;">
+                <div style="text-align:center;margin-bottom:28px;">
+                    <h1 style="color:#B14EFF;font-size:28px;font-weight:900;margin:0;letter-spacing:2px;">DOPAMINA</h1>
+                    <p style="color:#666;font-size:12px;letter-spacing:1px;margin:2px 0 0;">CREW</p>
+                </div>
+                <h2 style="color:#F2F0F5;font-size:20px;margin:0 0 12px;text-align:center;">🎟️ ¡Tu boleta está lista!</h2>
+                <p style="color:#9A9A9A;font-size:14px;line-height:1.6;margin:0 0 24px;text-align:center;">
+                    Hola <strong style="color:#F2F0F5;">%s</strong>, tu compra fue confirmada. Aquí tienes tu %s. También la adjuntamos en PDF para que la descargues o imprimas.
                 </p>
-                <div style="background: #18181F; border: 1px solid #222; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                    <table style="width: 100%%; border-collapse: collapse;">
-                        <tr><td style="color: #666; font-size: 12px; padding: 6px 0;">Evento</td><td style="color: #F2F0F5; font-size: 14px; font-weight: 700; text-align: right;">%s</td></tr>
-                        <tr><td style="color: #666; font-size: 12px; padding: 6px 0;">Cantidad</td><td style="color: #F2F0F5; font-size: 14px; font-weight: 700; text-align: right;">%d boletas</td></tr>
-                        <tr><td style="color: #666; font-size: 12px; padding: 6px 0;">Total</td><td style="color: #4ade80; font-size: 14px; font-weight: 700; text-align: right;">$%,.0f COP</td></tr>
-                        <tr><td style="color: #666; font-size: 12px; padding: 6px 0;">Referencia</td><td style="color: #B14EFF; font-size: 12px; font-weight: 700; text-align: right; font-family: monospace;">%s</td></tr>
+                <div style="background:#18181F;border:1px solid #222;border-radius:12px;padding:20px;margin-bottom:24px;">
+                    <table style="width:100%%;border-collapse:collapse;">
+                        <tr><td style="color:#666;font-size:12px;padding:6px 0;">Evento</td><td style="color:#F2F0F5;font-size:14px;font-weight:700;text-align:right;">%s</td></tr>
+                        <tr><td style="color:#666;font-size:12px;padding:6px 0;">Fecha</td><td style="color:#F2F0F5;font-size:14px;font-weight:700;text-align:right;">%s</td></tr>
+                        <tr><td style="color:#666;font-size:12px;padding:6px 0;">Hora</td><td style="color:#F2F0F5;font-size:14px;font-weight:700;text-align:right;">%s</td></tr>
+                        <tr><td style="color:#666;font-size:12px;padding:6px 0;">Lugar</td><td style="color:#F2F0F5;font-size:14px;font-weight:700;text-align:right;">%s</td></tr>
+                        <tr><td style="color:#666;font-size:12px;padding:6px 0;">Total</td><td style="color:#4ade80;font-size:14px;font-weight:700;text-align:right;">$%,.0f COP</td></tr>
                     </table>
                 </div>
-                <p style="color: #9A9A9A; font-size: 13px; line-height: 1.5;">
-                    Tus boletas con códigos QR únicos ya están disponibles en tu perfil. Preséntalas en la entrada del evento para ingresar.
+                %s
+                <p style="color:#9A9A9A;font-size:13px;line-height:1.5;text-align:center;">
+                    Presenta el código QR en la entrada del evento. Si no ves las imágenes, abre el PDF adjunto o revisa tus boletas en tu cuenta.
                 </p>
-                <div style="text-align: center; margin-top: 32px;">
-                    <a href="%s/dashboard" style="display: inline-block; background: #B14EFF; color: #fff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 14px;">Ver mis boletas</a>
+                <div style="text-align:center;margin-top:24px;">
+                    <a href="%s/dashboard" style="display:inline-block;background:#B14EFF;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:14px;">Ver mis boletas</a>
                 </div>
-                <div style="text-align: center; margin-top: 32px; padding-top: 24px; border-top: 1px solid #222;">
-                    <p style="color: #555; font-size: 12px;">Dopamina Crew — Facturación</p>
+                <div style="text-align:center;margin-top:32px;padding-top:24px;border-top:1px solid #222;">
+                    <p style="color:#555;font-size:12px;">Dopamina Crew — Boletería oficial</p>
                 </div>
             </div>
-        """.formatted(user.getNombre(), evento, compra.getCantidad(), compra.getTotal(), compra.getCodigoQr(), frontendUrl);
+        """.formatted(
+                user.getNombre(),
+                total == 1 ? "boleta" : "boletas (" + total + ")",
+                eventoNombre, fecha, hora, lugar, compra.getTotal(),
+                ticketsHtml.toString(), frontendUrl);
 
-        sendSafe(fromFacturas, user.getEmail(), "✅ Compra confirmada — Dopamina Crew", html);
+        // PDF adjunto con todas las boletas
+        List<Attachment> attachments = null;
+        try {
+            if (boletas != null && !boletas.isEmpty()) {
+                byte[] pdf = TicketPdfGenerator.generate(compra, boletas);
+                Attachment pdfAtt = Attachment.builder()
+                        .fileName("Boletas-Dopamina.pdf")
+                        .content(Base64.getEncoder().encodeToString(pdf))
+                        .build();
+                attachments = List.of(pdfAtt);
+            }
+        } catch (Exception e) {
+            System.err.println("No se pudo generar el PDF de boleta, se envía correo sin adjunto: " + e.getMessage());
+        }
+
+        sendSafe(fromFacturas, user.getEmail(), "🎟️ Tu boleta — Dopamina Crew", html, attachments);
+    }
+
+    private static String safe(String s) {
+        return s != null ? s : "";
+    }
+
+    private static String capitalize(String s) {
+        if (s == null || s.isEmpty()) return s;
+        return s.substring(0, 1).toUpperCase(ES) + s.substring(1);
     }
 
     @Override

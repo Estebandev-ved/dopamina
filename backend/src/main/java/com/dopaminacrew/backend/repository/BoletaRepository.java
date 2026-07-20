@@ -18,6 +18,8 @@ public interface BoletaRepository extends JpaRepository<Boleta, Long> {
 
     long countByCompraId(Long compraId);
 
+    List<Boleta> findByCompraIdOrderByNumeroSorteoAsc(Long compraId);
+
     @Query("SELECT b FROM Boleta b JOIN b.compra c WHERE (b.usuario IS NULL AND c.usuario.id = :userId) OR (b.usuario.id = :userId) ORDER BY b.createdAt DESC")
     List<Boleta> findByUsuarioIdOrderByCreatedAtDesc(@Param("userId") Long userId);
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { api } from '../services/api';
 import PageTransition from '../components/PageTransition';
 import { User, Mail, Phone, Lock, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -19,7 +19,7 @@ function decodeJwtPayload(token) {
   }
 }
 
-function GoogleRegisterSection({ loading, setSubmitError, setLoading, navigate }) {
+function GoogleRegisterSection({ loading, setSubmitError, setLoading, navigate, location }) {
   const googleLogin = useGoogleLogin({
     flow: 'implicit',
     onSuccess: async (tokenResponse) => {
@@ -31,9 +31,10 @@ function GoogleRegisterSection({ loading, setSubmitError, setLoading, navigate }
         });
         const payload = await userInfoRes.json();
         if (!payload || !payload.email) throw new Error('No se pudo obtener la información de Google.');
-        
+
         await api.loginWithGoogle(payload.email, payload.name, payload.sub);
-        navigate('/');
+        const destination = location.state?.from || '/';
+        navigate(destination, { state: location.state?.eventoState, replace: true });
       } catch (err) {
         setSubmitError(err.message || 'Error al registrarse con Google.');
       } finally { setLoading(false); }
@@ -64,6 +65,7 @@ function GoogleRegisterSection({ loading, setSubmitError, setLoading, navigate }
 
 export default function Register() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { trackEvent } = useFacebookPixel();
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
@@ -123,7 +125,7 @@ export default function Register() {
         content_category: 'Usuario Nuevo',
       });
       setNombre(''); setEmail(''); setTelefono(''); setPassword('');
-      setTimeout(() => navigate('/login'), 3000);
+      setTimeout(() => navigate('/login', { state: location.state }), 1200);
     } catch (err) {
       setSubmitError(err.message || 'Error al procesar el registro.');
     } finally { setLoading(false); }
@@ -289,11 +291,12 @@ export default function Register() {
                   <span className="relative z-10 uppercase">{loading ? 'CREANDO CUENTA...' : 'REGISTRARME'}</span>
                 </button>
 
-                <GoogleRegisterSection 
+                <GoogleRegisterSection
                   loading={loading}
                   setSubmitError={setSubmitError}
                   setLoading={setLoading}
                   navigate={navigate}
+                  location={location}
                 />
               </form>
             )}

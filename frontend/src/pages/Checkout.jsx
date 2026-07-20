@@ -17,27 +17,40 @@ export default function Checkout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { trackEvent } = useFacebookPixel();
-  const selectedEvento = location.state?.evento;
+
+  // Si el usuario llega sin state (ej. "Intentar de Nuevo" tras un pago rechazado,
+  // o volvió de registrarse), recuperamos la última orden guardada en sessionStorage
+  // en vez de mandarlo de vuelta al Home y hacerle perder la compra.
+  let recoveredState = null;
+  if (!location.state?.evento) {
+    try {
+      const saved = sessionStorage.getItem('dopamina_checkout_state');
+      if (saved) recoveredState = JSON.parse(saved);
+    } catch { /* ignore */ }
+  }
+  const effectiveState = location.state?.evento ? location.state : recoveredState;
+
+  const selectedEvento = effectiveState?.evento;
   const currentUser = api.getUser();
 
   // Guard: If not logged in or token expired, redirect to login with return state
   useEffect(() => {
     if (!currentUser || api.isTokenExpired()) {
       if (api.isTokenExpired()) api.clearAuth();
-      navigate('/login', { state: { from: '/checkout', eventoState: { evento: selectedEvento, cantidad: location.state?.cantidad || 1 } } });
+      navigate('/login', { state: { from: '/checkout', eventoState: { evento: selectedEvento, cantidad: effectiveState?.cantidad || 1 } } });
     } else if (!selectedEvento) {
       navigate('/');
     }
   }, [currentUser, selectedEvento, navigate]);
 
-  const comboId = location.state?.comboId || null;
-  const comboNombre = location.state?.comboNombre || null;
-  const comboPrecio = location.state?.comboPrecio !== undefined ? location.state.comboPrecio : null;
-  const comboItems = location.state?.comboItems || null;
-  const fechaNacimientoCumpleanero = location.state?.fechaNacimientoCumpleanero || null;
+  const comboId = effectiveState?.comboId || null;
+  const comboNombre = effectiveState?.comboNombre || null;
+  const comboPrecio = effectiveState?.comboPrecio !== undefined ? effectiveState.comboPrecio : null;
+  const comboItems = effectiveState?.comboItems || null;
+  const fechaNacimientoCumpleanero = effectiveState?.fechaNacimientoCumpleanero || null;
   const esCombo = !!comboId;
 
-  const [cantidad, setCantidad] = useState(location.state?.cantidad || 1);
+  const [cantidad, setCantidad] = useState(effectiveState?.cantidad || 1);
   const [couponCode, setCouponCode] = useState('');
   const [couponDiscountPercent, setCouponDiscountPercent] = useState(0);
   const [couponApplied, setCouponApplied] = useState(false);
@@ -105,24 +118,14 @@ export default function Checkout() {
     });
   }, []);
 
-  const [socialData, setSocialData] = useState({ vendidas24h: 0, minutosDesdeUltimaCompra: 0, activeViewers: 0 });
+  const [socialData, setSocialData] = useState({ vendidas24h: 0, minutosDesdeUltimaCompra: 0 });
 
   useEffect(() => {
     if (!selectedEvento) return;
-    // Usar datos REALES del backend en vez de datos falsos
-    const baseViewers = Math.max(3, Math.floor((selectedEvento.capacidad || 100) * 0.05));
     setSocialData({
       vendidas24h: selectedEvento.vendidasUltimas24h || 0,
       minutosDesdeUltimaCompra: selectedEvento.minutosDesdeUltimaCompra || 0,
-      activeViewers: baseViewers + Math.floor(Math.random() * 4),
     });
-    const interval = setInterval(() => {
-      setSocialData(prev => ({
-        ...prev,
-        activeViewers: baseViewers + Math.floor(Math.random() * 4),
-      }));
-    }, 8000);
-    return () => clearInterval(interval);
   }, [selectedEvento]);
 
   if (!currentUser || api.isTokenExpired()) {
@@ -408,19 +411,9 @@ export default function Checkout() {
                      <Zap className="w-3.5 h-3.5 text-neon-glow" />
                      <span>Compra Segura en Progreso</span>
                    </span>
-                   <span className="text-[9px] bg-rose-500/10 border border-rose-500/20 text-rose-400 px-1.5 py-0.5 rounded font-mono uppercase animate-pulse">Alta Demanda</span>
                  </h4>
-                 
+
                   <div className="bg-industrial-950/40 border border-industrial-850 rounded-lg p-3.5 space-y-2 font-mono text-[10px] leading-relaxed">
-                   <div className="flex items-center space-x-2 text-rose-400 font-bold uppercase tracking-wider">
-                     <span className="flex h-1.5 w-1.5 relative">
-                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                       <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
-                     </span>
-                     <Flame className="w-3.5 h-3.5 text-rose-400 fill-rose-400/20" />
-                     <span>{socialData.activeViewers} personas están viendo esta página ahora mismo</span>
-                   </div>
- 
                    <div className="space-y-1.5 text-gray-400">
                      {socialData.vendidas24h > 0 && (
                        <p className="flex items-center gap-1.5">

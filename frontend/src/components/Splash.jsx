@@ -13,7 +13,7 @@ export default function Splash({ onComplete }) {
   useEffect(() => {
     const timer = setTimeout(() => {
       onComplete();
-    }, 2800); // Display for 2.8 seconds
+    }, 800);
     return () => clearTimeout(timer);
   }, [onComplete]);
 

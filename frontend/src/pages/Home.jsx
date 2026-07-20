@@ -33,10 +33,6 @@ export default function Home() {
   const [suggestionSubmitted, setSuggestionSubmitted] = useState(false);
   const [submittingSuggestion, setSubmittingSuggestion] = useState(false);
 
-  // Countdown state
-  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-  const PARTY_DATE = new Date(2026, 6, 25, 22, 0, 0); // July 25, 2026 10:00 PM
-
   const [featuredEvent, setFeaturedEvent] = useState(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
 
@@ -44,31 +40,6 @@ export default function Home() {
   const [sets, setSets] = useState([]);
   const [currentSetIdx, setCurrentSetIdx] = useState(0);
   const [showSetSelector, setShowSetSelector] = useState(false);
-  const [onlineUsers, setOnlineUsers] = useState(24);
-
-  // Live active users fluctuation
-  useEffect(() => {
-    const getSeededUsers = () => {
-      const now = new Date();
-      const minute = now.getMinutes();
-      const hour = now.getHours();
-      let mult = 1.0;
-      if (hour >= 18 && hour <= 23) mult = 2.4;
-      else if (hour >= 12 && hour < 18) mult = 1.6;
-      else if (hour >= 0 && hour < 4) mult = 1.9;
-      else mult = 0.7;
-
-      const base = ((minute % 7) * 4) + 22; // 22 to 46 base
-      const fluctuation = (now.getSeconds() % 6) - 3; // -3 to +2
-      return Math.round(base * mult + fluctuation);
-    };
-
-    setOnlineUsers(getSeededUsers());
-    const interval = setInterval(() => {
-      setOnlineUsers(getSeededUsers());
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
   const playerRef = useRef(null);
   const playerReadyRef = useRef(false);
   const containerRefPlayer = useRef(null);
@@ -89,36 +60,21 @@ export default function Home() {
   const [contactSuccess, setContactSuccess] = useState(false);
   const [submittingContact, setSubmittingContact] = useState(false);
 
-  const handleContactSubmit = (e) => {
+  const handleContactSubmit = async (e) => {
     e.preventDefault();
     if (!contactForm.nombre || !contactForm.email || !contactForm.mensaje) return;
     setSubmittingContact(true);
-    setTimeout(() => {
-      setSubmittingContact(false);
+    try {
+      await api.enviarSugerencia(contactForm.mensaje, contactForm.nombre, contactForm.email);
       setContactSuccess(true);
       setContactForm({ nombre: '', email: '', mensaje: '' });
       setTimeout(() => setContactSuccess(false), 5000);
-    }, 1200);
+    } catch (err) {
+      console.error('Error al enviar mensaje de contacto:', err);
+    } finally {
+      setSubmittingContact(false);
+    }
   };
-
-  // Countdown effect
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const now = new Date();
-      const diff = PARTY_DATE - now;
-      if (diff <= 0) {
-        setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-        return;
-      }
-      setCountdown({
-        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
-        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
-        minutes: Math.floor((diff / (1000 * 60)) % 60),
-        seconds: Math.floor((diff / 1000) % 60),
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   // Suggestion box handler
   const handleSuggestionSubmit = async (e) => {
@@ -388,22 +344,22 @@ export default function Home() {
             {featuredEvent ? (
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full sm:w-auto">
                 <button
-                  onClick={handleVerCombos}
+                  onClick={handleBuyTicket}
                   className="group relative overflow-hidden rounded-md bg-neon-purple w-full sm:w-auto px-8 sm:px-10 py-4 sm:py-5 text-sm font-black tracking-[0.2em] sm:tracking-[0.25em] text-white shadow-neon-md hover:shadow-neon-lg transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 min-h-[52px] touch-manipulation"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-neon-purple via-neon-glow to-neon-violet opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   <span className="relative z-10 flex items-center space-x-3 justify-center">
-                    <Gift className="w-5 h-5 group-hover:rotate-12 transition-transform duration-300 flex-shrink-0" />
-                    <span>VER COMBOS</span>
+                    <Ticket className="w-5 h-5 group-hover:rotate-12 transition-transform duration-300 flex-shrink-0" />
+                    <span>ADQUIRIR ENTRADA</span>
                   </span>
                 </button>
                 <button
-                  onClick={handleBuyTicket}
+                  onClick={handleVerCombos}
                   className="group relative overflow-hidden rounded-md border-2 border-neon-purple/40 bg-transparent w-full sm:w-auto px-8 sm:px-10 py-4 sm:py-5 text-sm font-black tracking-[0.2em] sm:tracking-[0.25em] text-neon-glow hover:bg-neon-purple/10 hover:border-neon-purple/70 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 min-h-[52px] touch-manipulation"
                 >
                   <span className="relative z-10 flex items-center space-x-3 justify-center">
-                    <Ticket className="w-5 h-5 group-hover:rotate-12 transition-transform duration-300 flex-shrink-0" />
-                    <span>ADQUIRIR ENTRADA</span>
+                    <Gift className="w-5 h-5 group-hover:rotate-12 transition-transform duration-300 flex-shrink-0" />
+                    <span>VER COMBOS</span>
                   </span>
                 </button>
               </div>
@@ -428,19 +384,9 @@ export default function Home() {
 
             {/* FOMO activity banner */}
             {featuredEvent && (
-              <div className="flex items-center justify-center gap-3 text-[10px] font-mono text-gray-400 mt-2 bg-black/45 px-4 py-1.5 rounded-full border border-industrial-850 max-w-sm mx-auto shadow-neon-sm">
-                <span className="flex items-center gap-1.5 text-rose-400 font-bold uppercase tracking-wider">
-                  <span className="flex h-1.5 w-1.5 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
-                  </span>
-                  {onlineUsers} en línea
-                </span>
-                <span className="text-gray-600 font-bold">•</span>
-                <span className="flex items-center gap-1 text-gray-300 font-bold uppercase tracking-wider">
-                  <Flame className="w-3.5 h-3.5 text-rose-500 fill-rose-500/20" />
-                  <span>¡Boletería de lanzamiento activa!</span>
-                </span>
+              <div className="flex items-center justify-center gap-2 text-[10px] font-mono text-gray-300 mt-2 bg-black/45 px-4 py-1.5 rounded-full border border-industrial-850 max-w-sm mx-auto shadow-neon-sm">
+                <Flame className="w-3.5 h-3.5 text-rose-500 fill-rose-500/20" />
+                <span className="font-bold uppercase tracking-wider">¡Boletería de lanzamiento activa!</span>
               </div>
             )}
 
@@ -766,7 +712,7 @@ export default function Home() {
                 </div>
                 <h4 className="text-xs font-black text-white uppercase tracking-wider">Compra 100% Segura</h4>
                 <p className="text-xs text-gray-400 leading-relaxed">
-                  Cifrado SSL de 256 bits y pasarela simulada con cumplimiento PCI-DSS. Tus datos personales y de pago están completamente resguardados de extremo a extremo.
+                  Cifrado SSL de 256 bits y pasarela de pagos Efipay con cumplimiento PCI-DSS. Tus datos personales y de pago están completamente resguardados de extremo a extremo.
                 </p>
               </div>
 

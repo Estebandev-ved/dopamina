@@ -27,24 +27,14 @@ export default function Eventos() {
   // muestra como disponible (verán el estado real al pagar tras iniciar sesión).
   const [promoParcheDisponible, setPromoParcheDisponible] = useState(true);
   const audioRef = useRef(null);
-  const [socialData, setSocialData] = useState({ vendidas24h: 0, minutosDesdeUltimaCompra: 0, activeViewers: 0 });
+  const [socialData, setSocialData] = useState({ vendidas24h: 0, minutosDesdeUltimaCompra: 0 });
 
   useEffect(() => {
     if (!selectedEvento) return;
-    // Usar datos REALES del backend en vez de datos falsos
-    const baseViewers = Math.max(3, Math.floor((selectedEvento.capacidad || 100) * 0.05));
     setSocialData({
       vendidas24h: selectedEvento.vendidasUltimas24h || 0,
       minutosDesdeUltimaCompra: selectedEvento.minutosDesdeUltimaCompra || 0,
-      activeViewers: baseViewers + Math.floor(Math.random() * 4),
     });
-    const interval = setInterval(() => {
-      setSocialData(prev => ({
-        ...prev,
-        activeViewers: baseViewers + Math.floor(Math.random() * 4),
-      }));
-    }, 8000);
-    return () => clearInterval(interval);
   }, [selectedEvento]);
   useEffect(() => {
     api.getEventos()
@@ -656,14 +646,6 @@ export default function Eventos() {
 
                     {/* FOMO Box — datos REALES del backend */}
                     <div className="bg-industrial-950/40 border border-industrial-850 rounded-lg p-3 space-y-2 font-mono text-[9px] leading-relaxed">
-                      <div className="flex items-center space-x-2 text-rose-400 font-bold uppercase tracking-wider">
-                        <span className="flex h-1.5 w-1.5 relative">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
-                        </span>
-                        <span>🔥 {socialData.activeViewers} personas están viendo esta página ahora mismo</span>
-                      </div>
-
                       <div className="space-y-1.5 text-gray-400">
                         {socialData.vendidas24h > 0 && (
                           <p className="flex items-center gap-1.5">
