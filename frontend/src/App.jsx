@@ -23,10 +23,9 @@ import Combos from './pages/Combos';
 import Graffiti from './pages/Graffiti';
 import { api } from './services/api';
 import usePageTracking from './services/usePageTracking';
-import ChatbotWidget from './components/ChatbotWidget';
 import InstallApp from './components/InstallApp';
 import CookiesConsent from './components/CookiesConsent';
-import WhatsAppButton from './components/WhatsAppButton';
+import FloatingHub from './components/FloatingHub';
 
 /**
  * Route guard: only allows access if user is authenticated.
@@ -163,8 +162,7 @@ export default function App() {
               </AnimatePresence>
             </main>
             <Footer />
-            <ChatbotWidget />
-            <WhatsAppButton />
+            <FloatingHub />
             <InstallApp />
             <CookiesConsent />
           </div>

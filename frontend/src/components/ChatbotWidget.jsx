@@ -15,7 +15,7 @@ import {
  * Se adapta al tema activo en el root del HTML usando variables de CSS de Dopamina Crew.
  * Cambia los gráficos del visor según el estado emocional o funcional.
  */
-function DopaRaverAvatar({ state, size = 64 }) {
+export function DopaRaverAvatar({ state, size = 64 }) {
   // state: 'idle' | 'thinking' | 'secure' | 'speaking'
   
   // Determina el color de neón activo. Si está en secure, usamos verde esmeralda.
@@ -123,11 +123,19 @@ function DopaRaverAvatar({ state, size = 64 }) {
  * 3. Enlace Seguro: Los enlaces generados por el bot se sanitizan y apuntan estrictamente
  *    a rutas internas del portal, impidiendo ataques de redirección abierta (Open Redirect).
  */
-export default function ChatbotWidget() {
+export default function ChatbotWidget({ open: openProp, onOpenChange, hideLauncher = false } = {}) {
   const location = useLocation();
   const isCheckoutPage = location.pathname === '/checkout';
 
-  const [isOpen, setIsOpen] = useState(false);
+  // Soporta uso controlado (desde FloatingHub) o autónomo (launcher propio).
+  const isControlled = openProp !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isOpen = isControlled ? openProp : internalOpen;
+  const setIsOpen = (value) => {
+    const next = typeof value === 'function' ? value(isOpen) : value;
+    if (!isControlled) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
   const [characterState, setCharacterState] = useState('idle');
   const [speechBubbleText, setSpeechBubbleText] = useState('');
   const [inputMessage, setInputMessage] = useState('');
@@ -446,7 +454,8 @@ export default function ChatbotWidget() {
 
   return (
     <>
-      {/* Botón flotante del Personaje Mascota */}
+      {/* Botón flotante del Personaje Mascota (se oculta cuando el FAB lo controla) */}
+      {!hideLauncher && (
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
         {/* Globo de texto contextual flotante */}
         {speechBubbleText && !isOpen && (
@@ -504,6 +513,7 @@ export default function ChatbotWidget() {
           )}
         </button>
       </div>
+      )}
 
       {/* Panel del Chatbot */}
       {isOpen && (
