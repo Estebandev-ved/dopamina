@@ -320,6 +320,18 @@ export default function Home() {
     }
   };
 
+  const handleVerCombos = () => {
+    if (!featuredEvent) {
+      navigate('/eventos');
+      return;
+    }
+    if (!api.getUser()) {
+      navigate('/login', { state: { from: '/combos', eventoState: { evento: featuredEvent } } });
+    } else {
+      navigate('/combos', { state: { evento: featuredEvent } });
+    }
+  };
+
   return (
     <PageTransition>
       <div ref={homeContainerRef} className="relative min-h-screen bg-black flex flex-col overflow-x-hidden">
@@ -371,18 +383,42 @@ export default function Home() {
             )}
           </h1>
 
-          {/* CTA TICKET BUTTON — full-width on mobile */}
+          {/* CTA BUTTONS — full-width on mobile */}
           <div className="flex flex-col items-center justify-center space-y-3 px-4 sm:px-0">
-            <button
-              onClick={handleBuyTicket}
-              className="group relative overflow-hidden rounded-md bg-neon-purple w-full sm:w-auto px-8 sm:px-10 py-4 sm:py-5 text-sm font-black tracking-[0.2em] sm:tracking-[0.25em] text-white shadow-neon-md hover:shadow-neon-lg transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 min-h-[52px] touch-manipulation"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-neon-purple via-neon-glow to-neon-violet opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <span className="relative z-10 flex items-center space-x-3 justify-center">
-                <Ticket className="w-5 h-5 group-hover:rotate-12 transition-transform duration-300 flex-shrink-0" />
-                <span>{featuredEvent ? "ADQUIRIR ENTRADA" : "VER CARTELERA"}</span>
-              </span>
-            </button>
+            {featuredEvent ? (
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full sm:w-auto">
+                <button
+                  onClick={handleVerCombos}
+                  className="group relative overflow-hidden rounded-md bg-neon-purple w-full sm:w-auto px-8 sm:px-10 py-4 sm:py-5 text-sm font-black tracking-[0.2em] sm:tracking-[0.25em] text-white shadow-neon-md hover:shadow-neon-lg transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 min-h-[52px] touch-manipulation"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-neon-purple via-neon-glow to-neon-violet opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <span className="relative z-10 flex items-center space-x-3 justify-center">
+                    <Gift className="w-5 h-5 group-hover:rotate-12 transition-transform duration-300 flex-shrink-0" />
+                    <span>VER COMBOS</span>
+                  </span>
+                </button>
+                <button
+                  onClick={handleBuyTicket}
+                  className="group relative overflow-hidden rounded-md border-2 border-neon-purple/40 bg-transparent w-full sm:w-auto px-8 sm:px-10 py-4 sm:py-5 text-sm font-black tracking-[0.2em] sm:tracking-[0.25em] text-neon-glow hover:bg-neon-purple/10 hover:border-neon-purple/70 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 min-h-[52px] touch-manipulation"
+                >
+                  <span className="relative z-10 flex items-center space-x-3 justify-center">
+                    <Ticket className="w-5 h-5 group-hover:rotate-12 transition-transform duration-300 flex-shrink-0" />
+                    <span>ADQUIRIR ENTRADA</span>
+                  </span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleBuyTicket}
+                className="group relative overflow-hidden rounded-md bg-neon-purple w-full sm:w-auto px-8 sm:px-10 py-4 sm:py-5 text-sm font-black tracking-[0.2em] sm:tracking-[0.25em] text-white shadow-neon-md hover:shadow-neon-lg transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 min-h-[52px] touch-manipulation"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-neon-purple via-neon-glow to-neon-violet opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <span className="relative z-10 flex items-center space-x-3 justify-center">
+                  <Ticket className="w-5 h-5 group-hover:rotate-12 transition-transform duration-300 flex-shrink-0" />
+                  <span>VER CARTELERA</span>
+                </span>
+              </button>
+            )}
             <p className="text-[10px] text-gray-500 font-mono text-center px-2">
               {featuredEvent
                 ? `LUGAR: ${featuredEvent.lugar.toUpperCase()}, ${featuredEvent.ciudad.toUpperCase()} • VALOR ENTRADA: ${featuredEvent.precio === 0 ? 'GRATIS' : `$${Number(featuredEvent.precio).toLocaleString('es-CO')} COP`}`
