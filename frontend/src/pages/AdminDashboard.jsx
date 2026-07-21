@@ -50,6 +50,7 @@ const SIDEBAR_ITEMS = [
   { id: 'visitas', label: 'Visitas', icon: 'V' },
   { id: 'sets', label: 'Sets', icon: 'M' },
   { id: 'graffiti', label: 'Graffiti', icon: '🎨' },
+  { id: 'gastos', label: 'Gastos Evento', icon: '$' },
   { id: 'seguridad', label: 'Seguridad', icon: 'S' },
 ];
 
@@ -4042,6 +4043,321 @@ export default function AdminDashboard() {
     </motion.div>
   );
 
+  // ── Gastos Evento ──
+  const gastosRef = useRef(null);
+  const [gastos, setGastos] = useState([
+    { id: 1, item: 'Salón / lugar del evento', valorTotal: 1500000, pagado: 750000, estado: 'Abono' },
+    { id: 2, item: 'Sonido', valorTotal: 3000000, pagado: 1500000, estado: 'Abono' },
+    { id: 3, item: 'Manillas (200 unds.)', valorTotal: 80000, pagado: 80000, estado: 'Pagado' },
+    { id: 4, item: 'DJ Villota', valorTotal: 0, pagado: 0, estado: 'N/A' },
+    { id: 5, item: 'DJ Juan Pablo', valorTotal: 200000, pagado: 200000, estado: 'Pagado' },
+    { id: 6, item: 'Host / animación', valorTotal: 100000, pagado: 0, estado: 'Pendiente' },
+    { id: 7, item: 'Diseño de flyer', valorTotal: 200000, pagado: 100000, estado: 'Abono' },
+    { id: 8, item: 'Globos metalizados', valorTotal: 37600, pagado: 0, estado: 'Pendiente' },
+    { id: 9, item: 'Personal de seguridad', valorTotal: 360000, pagado: 0, estado: 'Pendiente' },
+    { id: 10, item: 'Botellas de cortesía', valorTotal: 170000, pagado: 0, estado: 'Pendiente' },
+    { id: 11, item: 'Insumos varios', valorTotal: 40000, pagado: 0, estado: 'Pendiente' },
+    { id: 12, item: 'Pendones', valorTotal: 64000, pagado: 64000, estado: 'Pagado' },
+    { id: 13, item: 'Videos publicitarios', valorTotal: 300000, pagado: 300000, estado: 'Pagado' },
+    { id: 14, item: 'Granizados (para video)', valorTotal: 69000, pagado: 69000, estado: 'Pagado' },
+    { id: 15, item: 'Botellas Smirnoff', valorTotal: 55000, pagado: 55000, estado: 'Pagado' },
+    { id: 16, item: 'Spray para grafitis', valorTotal: 21000, pagado: 21000, estado: 'Pagado' },
+    { id: 17, item: 'Bisturí', valorTotal: 12000, pagado: 12000, estado: 'Pagado' },
+    { id: 18, item: 'Anuncios Facebook Ads', valorTotal: 50000, pagado: 50000, estado: 'Pagado' },
+    { id: 19, item: 'Baile show', valorTotal: 150000, pagado: 0, estado: 'Pendiente' },
+    { id: 20, item: 'Uniformes baile show', valorTotal: 459000, pagado: 0, estado: 'Pendiente' },
+    { id: 21, item: 'Videos Final Noche', valorTotal: 500000, pagado: 0, estado: 'Pendiente' },
+    { id: 22, item: 'DJ Becerra', valorTotal: 180000, pagado: 100000, estado: 'Abono' },
+    { id: 23, item: 'Comida grabaciones', valorTotal: 37000, pagado: 37000, estado: 'Pagado' },
+    { id: 24, item: 'Granizados sorteo (parchados)', valorTotal: 36000, pagado: 36000, estado: 'Pagado' },
+  ]);
+  const [cajaDisponible, setCajaDisponible] = useState(1120000);
+  const [gastosEditando, setGastosEditando] = useState(null);
+  const [gastosEditForm, setGastosEditForm] = useState({ item: '', valorTotal: 0, pagado: 0, estado: 'Pendiente' });
+  const [gastosFiltro, setGastosFiltro] = useState('TODOS');
+  const [videoDanielaActivo, setVideoDanielaActivo] = useState(false);
+
+  const fmt = (n) => '$' + Number(n).toLocaleString('es-CO');
+  const gastosTotales = gastos.reduce((s, g) => s + g.valorTotal, 0);
+  const gastosPagados = gastos.reduce((s, g) => s + g.pagado, 0);
+  const gastosSaldo = gastosTotales - gastosPagados;
+  const faltanteNeto = gastosSaldo - cajaDisponible;
+  const cuotaSocio = Math.ceil(faltanteNeto / 4);
+
+  const gastosFiltrados = gastosFiltro === 'TODOS' ? gastos : gastos.filter(g => g.estado === gastosFiltro);
+
+  const handleGastoEdit = (g) => {
+    setGastosEditando(g.id);
+    setGastosEditForm({ item: g.item, valorTotal: g.valorTotal, pagado: g.pagado, estado: g.estado });
+  };
+
+  const handleGastoSave = (id) => {
+    setGastos(prev => prev.map(g => g.id === id ? { ...g, ...gastosEditForm, valorTotal: Number(gastosEditForm.valorTotal), pagado: Number(gastosEditForm.pagado) } : g));
+    setGastosEditando(null);
+  };
+
+  const handleGastoDelete = (id) => {
+    setGastos(prev => prev.filter(g => g.id !== id));
+  };
+
+  const handleAddGasto = () => {
+    const newId = Math.max(0, ...gastos.map(g => g.id)) + 1;
+    setGastos(prev => [...prev, { id: newId, item: 'Nuevo gasto', valorTotal: 0, pagado: 0, estado: 'Pendiente' }]);
+    setGastosEditando(newId);
+    setGastosEditForm({ item: 'Nuevo gasto', valorTotal: 0, pagado: 0, estado: 'Pendiente' });
+  };
+
+  const estadoBadgeColor = (estado) => {
+    switch (estado) {
+      case 'Pagado': return theme.success;
+      case 'Abono': return theme.warning;
+      case 'Pendiente': return theme.danger;
+      case 'N/A': return theme.textMuted;
+      default: return theme.textMuted;
+    }
+  };
+
+  const exportGastosCSV = () => {
+    const headers = ['Ítem', 'Valor Total', 'Pagado', 'Saldo', 'Estado'];
+    const rows = gastos.map(g => [g.item, g.valorTotal, g.pagado, g.valorTotal - g.pagado, g.estado]);
+    rows.push([]);
+    rows.push(['TOTAL', gastosTotales, gastosPagados, gastosSaldo, '']);
+    rows.push([]);
+    rows.push(['Video Daniela (condicional)', videoDanielaActivo ? 450000 : 0, '', '', videoDanielaActivo ? 'Activo' : 'No activo']);
+    rows.push([]);
+    rows.push(['Plata disponible en caja', cajaDisponible]);
+    rows.push(['Total pendiente a proveedores', gastosSaldo]);
+    rows.push(['Faltante neto por conseguir', faltanteNeto]);
+    rows.push(['Cuota por socio (4 socios)', cuotaSocio]);
+    const csvContent = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'Gastos_Evento_Borrachos_nunca_fachos.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  const exportGastosPDF = async () => {
+    const { default: jsPDF } = await import('jspdf');
+    const { default: html2canvas } = await import('html2canvas');
+    const element = gastosRef.current;
+    if (!element) return;
+    const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#0A0A0F', useCORS: true });
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pdfWidth - 20;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    if (imgHeight > pdfHeight - 20) {
+      const scale = (pdfHeight - 20) / imgHeight;
+      pdf.addImage(imgData, 'PNG', 10, 10, imgWidth * scale, imgHeight * scale);
+    } else {
+      pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+    }
+    pdf.save('Gastos_Evento_Borrachos_nunca_fachos.pdf');
+  };
+
+  const renderGastos = () => (
+    <motion.div key="gastos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} ref={gastosRef}>
+      {/* Summary Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        {[
+          { label: 'Total Evento', value: fmt(gastosTotales), color: theme.accent },
+          { label: 'Ya Pagado', value: fmt(gastosPagados), color: theme.success },
+          { label: 'Pendiente', value: fmt(gastosSaldo), color: theme.danger },
+          { label: 'Caja Disponible', value: fmt(cajaDisponible), color: theme.info },
+          { label: 'Faltante Neto', value: fmt(faltanteNeto), color: faltanteNeto > 0 ? theme.danger : theme.success },
+          { label: 'Cuota Socio (4)', value: fmt(cuotaSocio), color: theme.warning },
+        ].map((c, i) => (
+          <div key={i} style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '18px 20px' }}>
+            <div style={{ fontSize: '0.7rem', color: theme.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>{c.label}</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: c.color }}>{c.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Video Daniela toggle */}
+      <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '18px 24px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: theme.text }}>Video Daniela (condicional)</div>
+          <div style={{ fontSize: '0.75rem', color: theme.textMuted }}>Solo se paga si el evento da plata — {fmt(450000)}</div>
+        </div>
+        <button onClick={() => setVideoDanielaActivo(!videoDanielaActivo)}
+          style={{ padding: '8px 20px', borderRadius: '8px', border: `1px solid ${videoDanielaActivo ? theme.success : theme.border}`, background: videoDanielaActivo ? 'rgba(74,222,128,0.12)' : 'transparent', color: videoDanielaActivo ? theme.success : theme.textMuted, cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}>
+          {videoDanielaActivo ? '✓ Activo' : 'Inactivo'}
+        </button>
+      </div>
+
+      {/* Caja input */}
+      <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '18px 24px', marginBottom: '24px' }}>
+        <label style={{ fontSize: '0.7rem', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>Plata disponible en caja</label>
+        <input type="number" value={cajaDisponible} onChange={e => setCajaDisponible(Number(e.target.value) || 0)}
+          style={{ ...inputStyle, width: '250px', marginBottom: 0, fontSize: '1.1rem', fontWeight: 700 }} />
+      </div>
+
+      {/* Toolbar */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: '0.7rem', color: theme.textMuted, fontWeight: 600, textTransform: 'uppercase', marginRight: '4px' }}>Filtrar:</span>
+        {['TODOS', 'Pagado', 'Abono', 'Pendiente', 'N/A'].map(f => (
+          <button key={f} onClick={() => setGastosFiltro(f)}
+            style={{ padding: '6px 14px', borderRadius: '6px', border: gastosFiltro === f ? `1px solid ${theme.accent}` : `1px solid ${theme.border}`, background: gastosFiltro === f ? 'rgba(177,78,255,0.12)' : 'transparent', color: gastosFiltro === f ? theme.accentLight : theme.textMuted, cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>
+            {f}
+          </button>
+        ))}
+        <div style={{ flex: 1 }} />
+        <button onClick={handleAddGasto} style={{ ...btnPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Icon name="plus" size={14} /> Agregar
+        </button>
+        <button onClick={exportGastosCSV} style={{ ...btnGhost, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          📊 Excel / CSV
+        </button>
+        <button onClick={exportGastosPDF} style={{ ...btnGhost, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          📄 Descargar PDF
+        </button>
+      </div>
+
+      {/* Table */}
+      <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '14px', overflow: 'hidden', marginBottom: '24px' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={tableStyle}>
+            <thead>
+              <tr>
+                <th style={thStyle}>#</th>
+                <th style={thStyle}>Ítem</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>Valor Total</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>Pagado</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>Saldo</th>
+                <th style={thStyle}>Estado</th>
+                <th style={{ ...thStyle, textAlign: 'center' }}>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {gastosFiltrados.map((g, idx) => {
+                const saldo = g.valorTotal - g.pagado;
+                const isEditing = gastosEditando === g.id;
+                return (
+                  <tr key={g.id} style={{ background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)' }}>
+                    <td style={tdStyle}>{idx + 1}</td>
+                    <td style={{ ...tdStyle, color: theme.text, fontWeight: 600 }}>
+                      {isEditing ? (
+                        <input value={gastosEditForm.item} onChange={e => setGastosEditForm(p => ({ ...p, item: e.target.value }))}
+                          style={{ ...inputStyle, marginBottom: 0, width: '100%', padding: '6px 10px' }} />
+                      ) : g.item}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                      {isEditing ? (
+                        <input type="number" value={gastosEditForm.valorTotal} onChange={e => setGastosEditForm(p => ({ ...p, valorTotal: e.target.value }))}
+                          style={{ ...inputStyle, marginBottom: 0, width: '120px', textAlign: 'right', padding: '6px 10px' }} />
+                      ) : fmt(g.valorTotal)}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                      {isEditing ? (
+                        <input type="number" value={gastosEditForm.pagado} onChange={e => setGastosEditForm(p => ({ ...p, pagado: e.target.value }))}
+                          style={{ ...inputStyle, marginBottom: 0, width: '120px', textAlign: 'right', padding: '6px 10px' }} />
+                      ) : fmt(g.pagado)}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: saldo > 0 ? theme.danger : theme.success, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                      {fmt(saldo)}
+                    </td>
+                    <td style={tdStyle}>
+                      {isEditing ? (
+                        <select value={gastosEditForm.estado} onChange={e => setGastosEditForm(p => ({ ...p, estado: e.target.value }))}
+                          style={{ ...inputStyle, marginBottom: 0, width: '120px', padding: '6px 10px' }}>
+                          <option value="Pagado">Pagado</option>
+                          <option value="Abono">Abono</option>
+                          <option value="Pendiente">Pendiente</option>
+                          <option value="N/A">N/A</option>
+                        </select>
+                      ) : (
+                        <span style={badgeStyle(estadoBadgeColor(g.estado))}>{g.estado}</span>
+                      )}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      {isEditing ? (
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                          <button onClick={() => handleGastoSave(g.id)} style={{ ...btnPrimary, padding: '5px 12px', fontSize: '0.7rem' }}>Guardar</button>
+                          <button onClick={() => setGastosEditando(null)} style={{ ...btnGhost, padding: '5px 12px', fontSize: '0.7rem' }}>Cancelar</button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                          <button onClick={() => handleGastoEdit(g)} style={{ ...btnGhost, padding: '5px 10px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Icon name="edit" size={12} /> Editar
+                          </button>
+                          <button onClick={() => handleGastoDelete(g.id)} style={{ ...btnGhost, padding: '5px 10px', fontSize: '0.7rem', borderColor: 'rgba(239,68,68,0.3)', color: theme.danger, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Icon name="trash" size={12} />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: `2px solid ${theme.borderLight}` }}>
+                <td style={{ ...tdStyle, fontWeight: 800, color: theme.text }}></td>
+                <td style={{ ...tdStyle, fontWeight: 800, color: theme.text, fontSize: '0.9rem' }}>TOTAL</td>
+                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 800, color: theme.accent, fontSize: '0.9rem' }}>{fmt(gastosTotales)}</td>
+                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 800, color: theme.success, fontSize: '0.9rem' }}>{fmt(gastosPagados)}</td>
+                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 800, color: theme.danger, fontSize: '0.9rem' }}>{fmt(gastosSaldo)}</td>
+                <td style={tdStyle}></td>
+                <td style={tdStyle}></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {/* Caja & Faltante */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '14px', padding: '24px' }}>
+          <h3 style={{ color: theme.text, fontSize: '0.85rem', fontWeight: 700, margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Caja y Faltante</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {[
+              { label: 'Plata disponible en caja', value: fmt(cajaDisponible), color: theme.info },
+              { label: 'Total pendiente a proveedores', value: fmt(gastosSaldo), color: theme.danger },
+              { label: 'Faltante neto por conseguir', value: fmt(faltanteNeto), color: faltanteNeto > 0 ? theme.danger : theme.success },
+              { label: 'Cuota por socio (4 socios)', value: fmt(cuotaSocio), color: theme.warning },
+            ].map((r, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < 3 ? `1px solid ${theme.border}` : 'none' }}>
+                <span style={{ fontSize: '0.8rem', color: theme.textSec }}>{r.label}</span>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: r.color, fontVariantNumeric: 'tabular-nums' }}>{r.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '14px', padding: '24px' }}>
+          <h3 style={{ color: theme.text, fontSize: '0.85rem', fontWeight: 700, margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Resumen por Estado</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {['Pagado', 'Abono', 'Pendiente', 'N/A'].map(estado => {
+              const items = gastos.filter(g => g.estado === estado);
+              const total = items.reduce((s, g) => s + g.valorTotal, 0);
+              return (
+                <div key={estado} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: estado !== 'N/A' ? `1px solid ${theme.border}` : 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={badgeStyle(estadoBadgeColor(estado))}>{estado}</span>
+                    <span style={{ fontSize: '0.75rem', color: theme.textMuted }}>{items.length} ítems</span>
+                  </div>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: theme.text, fontVariantNumeric: 'tabular-nums' }}>{fmt(total)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Title */}
+      <div style={{ textAlign: 'center', padding: '16px 0 0', borderTop: `1px solid ${theme.border}` }}>
+        <span style={{ fontSize: '0.7rem', color: theme.textMuted, fontWeight: 600, letterSpacing: '2px', textTransform: 'uppercase' }}>
+          GASTOS EVENTO BORRACHOS PERO NUNCA FACHOS
+        </span>
+      </div>
+    </motion.div>
+  );
+
   // ── Main Layout ──
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: theme.bg, color: theme.text, fontFamily: "'Outfit', 'Inter', sans-serif", position: 'relative' }}>
@@ -4167,6 +4483,7 @@ export default function AdminDashboard() {
           {activeTab === 'combos' && renderCombos()}
           {activeTab === 'graffiti' && renderGraffiti()}
           {activeTab === 'sugerencias' && renderSugerencias()}
+          {activeTab === 'gastos' && renderGastos()}
           {activeTab === 'seguridad' && api.getUser()?.rol === 'ROLE_ADMIN' && renderSeguridad()}
         </AnimatePresence>
       </main>
