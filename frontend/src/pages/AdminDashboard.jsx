@@ -416,6 +416,40 @@ export default function AdminDashboard() {
 
   const [subTabSeguridad, setSubTabSeguridad] = useState('alertas');
 
+  // Gastos Evento
+  const gastosRef = useRef(null);
+  const [gastos, setGastos] = useState([
+    { id: 1, item: 'Salón / lugar del evento', valorTotal: 1500000, pagado: 750000, estado: 'Abono' },
+    { id: 2, item: 'Sonido', valorTotal: 3000000, pagado: 1500000, estado: 'Abono' },
+    { id: 3, item: 'Manillas (200 unds.)', valorTotal: 80000, pagado: 80000, estado: 'Pagado' },
+    { id: 4, item: 'DJ Villota', valorTotal: 0, pagado: 0, estado: 'N/A' },
+    { id: 5, item: 'DJ Juan Pablo', valorTotal: 200000, pagado: 200000, estado: 'Pagado' },
+    { id: 6, item: 'Host / animación', valorTotal: 100000, pagado: 0, estado: 'Pendiente' },
+    { id: 7, item: 'Diseño de flyer', valorTotal: 200000, pagado: 100000, estado: 'Abono' },
+    { id: 8, item: 'Globos metalizados', valorTotal: 37600, pagado: 0, estado: 'Pendiente' },
+    { id: 9, item: 'Personal de seguridad', valorTotal: 360000, pagado: 0, estado: 'Pendiente' },
+    { id: 10, item: 'Botellas de cortesía', valorTotal: 170000, pagado: 0, estado: 'Pendiente' },
+    { id: 11, item: 'Insumos varios', valorTotal: 40000, pagado: 0, estado: 'Pendiente' },
+    { id: 12, item: 'Pendones', valorTotal: 64000, pagado: 64000, estado: 'Pagado' },
+    { id: 13, item: 'Videos publicitarios', valorTotal: 300000, pagado: 300000, estado: 'Pagado' },
+    { id: 14, item: 'Granizados (para video)', valorTotal: 69000, pagado: 69000, estado: 'Pagado' },
+    { id: 15, item: 'Botellas Smirnoff', valorTotal: 55000, pagado: 55000, estado: 'Pagado' },
+    { id: 16, item: 'Spray para grafitis', valorTotal: 21000, pagado: 21000, estado: 'Pagado' },
+    { id: 17, item: 'Bisturí', valorTotal: 12000, pagado: 12000, estado: 'Pagado' },
+    { id: 18, item: 'Anuncios Facebook Ads', valorTotal: 50000, pagado: 50000, estado: 'Pagado' },
+    { id: 19, item: 'Baile show', valorTotal: 150000, pagado: 0, estado: 'Pendiente' },
+    { id: 20, item: 'Uniformes baile show', valorTotal: 459000, pagado: 0, estado: 'Pendiente' },
+    { id: 21, item: 'Videos Final Noche', valorTotal: 500000, pagado: 0, estado: 'Pendiente' },
+    { id: 22, item: 'DJ Becerra', valorTotal: 180000, pagado: 100000, estado: 'Abono' },
+    { id: 23, item: 'Comida grabaciones', valorTotal: 37000, pagado: 37000, estado: 'Pagado' },
+    { id: 24, item: 'Granizados sorteo (parchados)', valorTotal: 36000, pagado: 36000, estado: 'Pagado' },
+  ]);
+  const [cajaDisponible, setCajaDisponible] = useState(1120000);
+  const [gastosEditando, setGastosEditando] = useState(null);
+  const [gastosEditForm, setGastosEditForm] = useState({ item: '', valorTotal: 0, pagado: 0, estado: 'Pendiente' });
+  const [gastosFiltro, setGastosFiltro] = useState('TODOS');
+  const [videoDanielaActivo, setVideoDanielaActivo] = useState(false);
+
   const [showForm, setShowForm] = useState(false);
   const [editingEvento, setEditingEvento] = useState(null);
   const [formEvento, setFormEvento] = useState({
@@ -4044,39 +4078,6 @@ export default function AdminDashboard() {
   );
 
   // ── Gastos Evento ──
-  const gastosRef = useRef(null);
-  const [gastos, setGastos] = useState([
-    { id: 1, item: 'Salón / lugar del evento', valorTotal: 1500000, pagado: 750000, estado: 'Abono' },
-    { id: 2, item: 'Sonido', valorTotal: 3000000, pagado: 1500000, estado: 'Abono' },
-    { id: 3, item: 'Manillas (200 unds.)', valorTotal: 80000, pagado: 80000, estado: 'Pagado' },
-    { id: 4, item: 'DJ Villota', valorTotal: 0, pagado: 0, estado: 'N/A' },
-    { id: 5, item: 'DJ Juan Pablo', valorTotal: 200000, pagado: 200000, estado: 'Pagado' },
-    { id: 6, item: 'Host / animación', valorTotal: 100000, pagado: 0, estado: 'Pendiente' },
-    { id: 7, item: 'Diseño de flyer', valorTotal: 200000, pagado: 100000, estado: 'Abono' },
-    { id: 8, item: 'Globos metalizados', valorTotal: 37600, pagado: 0, estado: 'Pendiente' },
-    { id: 9, item: 'Personal de seguridad', valorTotal: 360000, pagado: 0, estado: 'Pendiente' },
-    { id: 10, item: 'Botellas de cortesía', valorTotal: 170000, pagado: 0, estado: 'Pendiente' },
-    { id: 11, item: 'Insumos varios', valorTotal: 40000, pagado: 0, estado: 'Pendiente' },
-    { id: 12, item: 'Pendones', valorTotal: 64000, pagado: 64000, estado: 'Pagado' },
-    { id: 13, item: 'Videos publicitarios', valorTotal: 300000, pagado: 300000, estado: 'Pagado' },
-    { id: 14, item: 'Granizados (para video)', valorTotal: 69000, pagado: 69000, estado: 'Pagado' },
-    { id: 15, item: 'Botellas Smirnoff', valorTotal: 55000, pagado: 55000, estado: 'Pagado' },
-    { id: 16, item: 'Spray para grafitis', valorTotal: 21000, pagado: 21000, estado: 'Pagado' },
-    { id: 17, item: 'Bisturí', valorTotal: 12000, pagado: 12000, estado: 'Pagado' },
-    { id: 18, item: 'Anuncios Facebook Ads', valorTotal: 50000, pagado: 50000, estado: 'Pagado' },
-    { id: 19, item: 'Baile show', valorTotal: 150000, pagado: 0, estado: 'Pendiente' },
-    { id: 20, item: 'Uniformes baile show', valorTotal: 459000, pagado: 0, estado: 'Pendiente' },
-    { id: 21, item: 'Videos Final Noche', valorTotal: 500000, pagado: 0, estado: 'Pendiente' },
-    { id: 22, item: 'DJ Becerra', valorTotal: 180000, pagado: 100000, estado: 'Abono' },
-    { id: 23, item: 'Comida grabaciones', valorTotal: 37000, pagado: 37000, estado: 'Pagado' },
-    { id: 24, item: 'Granizados sorteo (parchados)', valorTotal: 36000, pagado: 36000, estado: 'Pagado' },
-  ]);
-  const [cajaDisponible, setCajaDisponible] = useState(1120000);
-  const [gastosEditando, setGastosEditando] = useState(null);
-  const [gastosEditForm, setGastosEditForm] = useState({ item: '', valorTotal: 0, pagado: 0, estado: 'Pendiente' });
-  const [gastosFiltro, setGastosFiltro] = useState('TODOS');
-  const [videoDanielaActivo, setVideoDanielaActivo] = useState(false);
-
   const fmt = (n) => '$' + Number(n).toLocaleString('es-CO');
   const gastosTotales = gastos.reduce((s, g) => s + g.valorTotal, 0);
   const gastosPagados = gastos.reduce((s, g) => s + g.pagado, 0);
