@@ -418,7 +418,7 @@ export default function AdminDashboard() {
 
   // Gastos Evento
   const gastosRef = useRef(null);
-  const [gastos, setGastos] = useState([
+  const GASTOS_DEFAULTS = [
     { id: 1, item: 'Salón / lugar del evento', valorTotal: 1500000, pagado: 750000, estado: 'Abono' },
     { id: 2, item: 'Sonido', valorTotal: 3000000, pagado: 1500000, estado: 'Abono' },
     { id: 3, item: 'Manillas (200 unds.)', valorTotal: 80000, pagado: 80000, estado: 'Pagado' },
@@ -443,12 +443,27 @@ export default function AdminDashboard() {
     { id: 22, item: 'DJ Becerra', valorTotal: 180000, pagado: 100000, estado: 'Abono' },
     { id: 23, item: 'Comida grabaciones', valorTotal: 37000, pagado: 37000, estado: 'Pagado' },
     { id: 24, item: 'Granizados sorteo (parchados)', valorTotal: 36000, pagado: 36000, estado: 'Pagado' },
-  ]);
-  const [cajaDisponible, setCajaDisponible] = useState(1120000);
+  ];
+  const loadGastosFromStorage = () => {
+    try {
+      const saved = localStorage.getItem('dopamina_gastos');
+      const savedCaja = localStorage.getItem('dopamina_gastos_caja');
+      const savedDaniela = localStorage.getItem('dopamina_gastos_daniela');
+      return {
+        gastos: saved ? JSON.parse(saved) : GASTOS_DEFAULTS,
+        caja: savedCaja ? Number(savedCaja) : 1120000,
+        daniela: savedDaniela ? savedDaniela === 'true' : false,
+      };
+    } catch { return { gastos: GASTOS_DEFAULTS, caja: 1120000, daniela: false }; }
+  };
+  const _init = loadGastosFromStorage();
+  const [gastos, setGastos] = useState(_init.gastos);
+  const [cajaDisponible, setCajaDisponible] = useState(_init.caja);
+  const [videoDanielaActivo, setVideoDanielaActivo] = useState(_init.daniela);
   const [gastosEditando, setGastosEditando] = useState(null);
   const [gastosEditForm, setGastosEditForm] = useState({ item: '', valorTotal: 0, pagado: 0, estado: 'Pendiente' });
   const [gastosFiltro, setGastosFiltro] = useState('TODOS');
-  const [videoDanielaActivo, setVideoDanielaActivo] = useState(false);
+  const [gastosGuardado, setGastosGuardado] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
   const [editingEvento, setEditingEvento] = useState(null);
@@ -4101,6 +4116,23 @@ export default function AdminDashboard() {
     setGastos(prev => prev.filter(g => g.id !== id));
   };
 
+  const handleGuardarGastos = () => {
+    localStorage.setItem('dopamina_gastos', JSON.stringify(gastos));
+    localStorage.setItem('dopamina_gastos_caja', String(cajaDisponible));
+    localStorage.setItem('dopamina_gastos_daniela', String(videoDanielaActivo));
+    setGastosGuardado(true);
+    setTimeout(() => setGastosGuardado(false), 2500);
+  };
+
+  const handleResetGastos = () => {
+    setGastos(GASTOS_DEFAULTS);
+    setCajaDisponible(1120000);
+    setVideoDanielaActivo(false);
+    localStorage.removeItem('dopamina_gastos');
+    localStorage.removeItem('dopamina_gastos_caja');
+    localStorage.removeItem('dopamina_gastos_daniela');
+  };
+
   const handleAddGasto = () => {
     const newId = Math.max(0, ...gastos.map(g => g.id)) + 1;
     setGastos(prev => [...prev, { id: newId, item: 'Nuevo gasto', valorTotal: 0, pagado: 0, estado: 'Pendiente' }]);
@@ -4210,6 +4242,12 @@ export default function AdminDashboard() {
         <div style={{ flex: 1 }} />
         <button onClick={handleAddGasto} style={{ ...btnPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Icon name="plus" size={14} /> Agregar
+        </button>
+        <button onClick={handleGuardarGastos} style={{ padding: '10px 24px', borderRadius: '8px', border: `1px solid ${gastosGuardado ? theme.success : theme.border}`, background: gastosGuardado ? 'rgba(74,222,128,0.12)' : 'rgba(74,222,128,0.06)', color: gastosGuardado ? theme.success : theme.text, cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.3s' }}>
+          {gastosGuardado ? '✓ Guardado' : '💾 Guardar Cambios'}
+        </button>
+        <button onClick={handleResetGastos} style={{ ...btnGhost, borderColor: 'rgba(239,68,68,0.3)', color: theme.danger, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          ↺ Restaurar
         </button>
         <button onClick={exportGastosCSV} style={{ ...btnGhost, display: 'flex', alignItems: 'center', gap: '6px' }}>
           📊 Excel / CSV
