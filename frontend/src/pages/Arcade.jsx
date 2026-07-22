@@ -8,11 +8,11 @@ import { api } from '../services/api';
    Thresholds must match the backend (ArcadeController.THRESHOLDS).
    ───────────────────────────────────────────────────────────────────────────── */
 export const GAME_THRESHOLDS = {
-  catch:    [80, 200, 400, 1000],
-  runner:   [80, 200, 400, 1000],
-  snake:    [50, 120, 250, 500],
-  beattap:  [300, 700, 1200, 2500],
-  sequence: [120, 300, 600, 1000],
+  catch:    [80, 200, 400, 3000],
+  runner:   [80, 200, 400, 3000],
+  snake:    [50, 120, 250, 3000],
+  beattap:  [300, 700, 1200, 3000],
+  sequence: [120, 300, 600, 3000],
 };
 
 const TIER_LABELS = ['5% OFF', '10% OFF', '20% OFF', 'BOLETA GRATIS'];

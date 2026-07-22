@@ -52,11 +52,11 @@ public class ArcadeController {
 
     /** Score needed to reach tiers 1..4, per game key. */
     private static final Map<String, int[]> THRESHOLDS = Map.of(
-            "catch",    new int[] { 80, 200, 400, 1000 },
-            "runner",   new int[] { 80, 200, 400, 1000 },
-            "snake",    new int[] { 50, 120, 250, 500 },
-            "beattap",  new int[] { 300, 700, 1200, 2500 },
-            "sequence", new int[] { 120, 300, 600, 1000 }
+            "catch",    new int[] { 80, 200, 400, 3000 },
+            "runner",   new int[] { 80, 200, 400, 3000 },
+            "snake",    new int[] { 50, 120, 250, 3000 },
+            "beattap",  new int[] { 300, 700, 1200, 3000 },
+            "sequence", new int[] { 120, 300, 600, 3000 }
     );
 
     /** Human-friendly game names for the coupon description. */
