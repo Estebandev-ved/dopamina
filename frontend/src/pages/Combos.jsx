@@ -309,6 +309,13 @@ export default function Combos() {
                       transition={{ duration: 0.2 }}
                       className="bg-industrial-900 border border-industrial-800 rounded-lg p-6 flex flex-col justify-between relative overflow-hidden transition-all duration-300 group hover:border-neon-purple/50"
                     >
+                      {combo.agotado && (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none bg-black/40">
+                          <div className="text-red-500 text-3xl font-black uppercase tracking-[0.3em] -rotate-12 border-4 border-red-500 px-5 py-2 rounded-sm opacity-90" style={{ textShadow: '0 0 20px rgba(239,68,68,0.6)' }}>
+                            AGOTADO
+                          </div>
+                        </div>
+                      )}
                       {/* Top diagonal stripe for branding */}
                       <div className={`absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r ${esCumple ? 'from-pink-500 to-neon-purple' : 'from-neon-purple to-neon-violet'}`} style={{ backgroundImage: `linear-gradient(to right, ${esCumple ? '#EC4899' : 'var(--color-neon)'}, var(--color-neon-light))` }} />
                       
@@ -389,6 +396,11 @@ export default function Combos() {
                           )}
                         </div>
 
+                        {combo.agotado ? (
+                          <div className="w-full py-2.5 rounded font-black text-xs uppercase tracking-widest bg-red-900/30 text-red-400 border border-red-500/30 text-center">
+                            AGOTADO
+                          </div>
+                        ) : (
                         <button
                           onClick={() => handleBuyCombo(combo)}
                           disabled={!selectedEvento}
@@ -401,6 +413,7 @@ export default function Combos() {
                         >
                           Adquirir Combo →
                         </button>
+                        )}
                       </div>
                     </motion.div>
                   );

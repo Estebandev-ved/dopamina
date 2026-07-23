@@ -97,9 +97,28 @@ public class ComboController {
         if (comboDetails.getEsCumpleanero() != null) {
             combo.setEsCumpleanero(comboDetails.getEsCumpleanero());
         }
+        if (comboDetails.getAgotado() != null) {
+            combo.setAgotado(comboDetails.getAgotado());
+        }
 
         Combo updatedCombo = comboRepository.save(combo);
         return ResponseEntity.ok(updatedCombo);
+    }
+
+    /**
+     * Admin endpoint: toggle agotado status.
+     */
+    @PatchMapping("/api/admin/combos/{id}/toggle-agotado")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
+    public ResponseEntity<?> toggleAgotado(@PathVariable Long id) {
+        Optional<Combo> comboOpt = comboRepository.findById(id);
+        if (comboOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(new MessageResponse("Combo no encontrado."));
+        }
+        Combo combo = comboOpt.get();
+        combo.setAgotado(!combo.getAgotado());
+        Combo updated = comboRepository.save(combo);
+        return ResponseEntity.ok(updated);
     }
 
     /**

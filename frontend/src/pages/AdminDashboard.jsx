@@ -668,6 +668,15 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleToggleAgotado = async (id) => {
+    try {
+      const updated = await api.adminToggleAgotadoCombo(id);
+      setCombos(prev => prev.map(c => c.id === id ? updated : c));
+    } catch (err) {
+      setError('Error al cambiar estado agotado.');
+    }
+  };
+
   // ===== GRAFFITI =====
   const [graffitis, setGraffitis] = useState([]);
   const [loadingGraffitis, setLoadingGraffitis] = useState(false);
@@ -3619,7 +3628,7 @@ export default function AdminDashboard() {
           <div style={{ overflowX: 'auto' }}>
             <table style={tableStyle}>
               <thead><tr>
-                {['#', 'Nombre / Descripción', 'P. Original', 'P. Combo', 'Ahorro', 'Boletas', 'Ítems', 'Tipo', 'Estado', 'Acciones'].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                {['#', 'Nombre / Descripción', 'P. Original', 'P. Combo', 'Ahorro', 'Boletas', 'Ítems', 'Tipo', 'Estado', 'Agotado', 'Acciones'].map(h => <th key={h} style={thStyle}>{h}</th>)}
               </tr></thead>
               <tbody>
                 {combos.filter(c =>
@@ -3675,6 +3684,12 @@ export default function AdminDashboard() {
                       )}
                     </td>
                     <td><span style={badgeStyle(c.activo ? theme.success : theme.danger)}>{c.activo ? 'ACTIVO' : 'INACTIVO'}</span></td>
+                    <td>
+                      <button onClick={() => handleToggleAgotado(c.id)}
+                        style={{ padding: '4px 10px', borderRadius: '6px', border: 'none', background: c.agotado ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)', color: c.agotado ? theme.danger : theme.textMuted, cursor: 'pointer', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        {c.agotado ? 'AGOTADO' : 'Disponible'}
+                      </button>
+                    </td>
                     <td style={tdStyle}>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button onClick={() => handleEditCombo(c)} style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', background: 'rgba(96,165,250,0.1)', color: theme.info, cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700 }}>Editar</button>
@@ -3684,7 +3699,7 @@ export default function AdminDashboard() {
                   </tr>
                 ))}
                 {combos.length === 0 && (
-                  <tr><td colSpan={8} style={{ ...tdStyle, textAlign: 'center', color: theme.textMuted, padding: '30px' }}>No hay combos registrados.</td></tr>
+                  <tr><td colSpan={11} style={{ ...tdStyle, textAlign: 'center', color: theme.textMuted, padding: '30px' }}>No hay combos registrados.</td></tr>
                 )}
               </tbody>
             </table>

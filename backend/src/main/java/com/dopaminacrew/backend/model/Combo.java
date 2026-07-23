@@ -47,6 +47,9 @@ public class Combo {
     @Column(name = "es_cumpleanero", nullable = false)
     private Boolean esCumpleanero = false;
 
+    @Column(nullable = false)
+    private Boolean agotado = false;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

@@ -577,6 +577,12 @@ class ApiService {
     return this.delete(`/api/admin/combos/${id}`);
   }
 
+  adminToggleAgotadoCombo(id) {
+    return this.request(`/api/admin/combos/${id}/toggle-agotado`, {
+      method: 'PATCH',
+    });
+  }
+
   // ===== GRAFFITI =====
   getGraffiti() {
     return this.get('/api/public/graffiti');
