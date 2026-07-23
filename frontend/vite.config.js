@@ -42,7 +42,7 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
-            urlPattern: /^https?:\/\/.*\/api\/.*/i,
+            urlPattern: /^https?:\/\/.*\/api\/(?!admin\/).*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',

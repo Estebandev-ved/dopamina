@@ -449,21 +449,38 @@ export default function AdminDashboard() {
       const saved = localStorage.getItem('dopamina_gastos');
       const savedCaja = localStorage.getItem('dopamina_gastos_caja');
       const savedDaniela = localStorage.getItem('dopamina_gastos_daniela');
+      const savedSocios = localStorage.getItem('dopamina_gastos_socios_pagaron');
       return {
         gastos: saved ? JSON.parse(saved) : GASTOS_DEFAULTS,
         caja: savedCaja ? Number(savedCaja) : 1120000,
         daniela: savedDaniela ? savedDaniela === 'true' : false,
+        sociosPagaron: savedSocios ? Number(savedSocios) : 0,
       };
-    } catch { return { gastos: GASTOS_DEFAULTS, caja: 1120000, daniela: false }; }
+    } catch { return { gastos: GASTOS_DEFAULTS, caja: 1120000, daniela: false, sociosPagaron: 0 }; }
   };
   const _init = loadGastosFromStorage();
   const [gastos, setGastos] = useState(_init.gastos);
   const [cajaDisponible, setCajaDisponible] = useState(_init.caja);
   const [videoDanielaActivo, setVideoDanielaActivo] = useState(_init.daniela);
+  const [sociosQuePagaron, setSociosQuePagaron] = useState(_init.sociosPagaron);
   const [gastosEditando, setGastosEditando] = useState(null);
   const [gastosEditForm, setGastosEditForm] = useState({ item: '', valorTotal: 0, pagado: 0, estado: 'Pendiente' });
   const [gastosFiltro, setGastosFiltro] = useState('TODOS');
   const [gastosGuardado, setGastosGuardado] = useState(false);
+  const [eventoSeleccionadoGastos, setEventoSeleccionadoGastos] = useState('');
+  const [gastosFromAPI, setGastosFromAPI] = useState([]);
+  const [gastosLoading, setGastosLoading] = useState(false);
+  const [gananciasWeb, setGananciasWeb] = useState(() => {
+    try { return Number(localStorage.getItem('dopamina_ganancias_web') || 0); } catch { return 0; }
+  });
+  const [gananciasFisico, setGananciasFisico] = useState(() => {
+    try { return Number(localStorage.getItem('dopamina_ganancias_fisico') || 0); } catch { return 0; }
+  });
+  const [entradasPagadas, setEntradasPagadas] = useState(0);
+  const [entradasRegaladas, setEntradasRegaladas] = useState(0);
+  const [showCopyDialog, setShowCopyDialog] = useState(false);
+  const [copyFromEvento, setCopyFromEvento] = useState('');
+  const [copyTargetEventoId, setCopyTargetEventoId] = useState(null);
 
   const [showForm, setShowForm] = useState(false);
   const [editingEvento, setEditingEvento] = useState(null);
@@ -1160,6 +1177,10 @@ export default function AdminDashboard() {
       } else {
         const created = await api.adminCrearEvento(data);
         setEventos(prev => [...prev, created]);
+        if (eventos.length > 0) {
+          setCopyTargetEventoId(created.id);
+          setShowCopyDialog(true);
+        }
       }
       setShowForm(false); setEditingEvento(null);
       setFormEvento({ nombre: '', descripcion: '', fecha: '', hora: '', lugar: '', ciudad: 'Medellín', precio: 0, capacidad: 100, imagenUrl: '', lineup: '', activo: true, destacado: false, precioPreventa: '', cantidadPreventa: '' });
@@ -4094,11 +4115,13 @@ export default function AdminDashboard() {
 
   // ── Gastos Evento ──
   const fmt = (n) => '$' + Number(n).toLocaleString('es-CO');
-  const gastosTotales = gastos.reduce((s, g) => s + g.valorTotal, 0);
+  const videoDanielaCosto = videoDanielaActivo ? 450000 : 0;
+  const gastosTotales = gastos.reduce((s, g) => s + g.valorTotal, 0) + videoDanielaCosto;
   const gastosPagados = gastos.reduce((s, g) => s + g.pagado, 0);
   const gastosSaldo = gastosTotales - gastosPagados;
+  const sociosRestantes = 4 - sociosQuePagaron;
   const faltanteNeto = gastosSaldo - cajaDisponible;
-  const cuotaSocio = Math.ceil(faltanteNeto / 4);
+  const cuotaSocio = sociosRestantes > 0 ? Math.ceil(faltanteNeto / sociosRestantes) : 0;
 
   const gastosFiltrados = gastosFiltro === 'TODOS' ? gastos : gastos.filter(g => g.estado === gastosFiltro);
 
@@ -4120,6 +4143,12 @@ export default function AdminDashboard() {
     localStorage.setItem('dopamina_gastos', JSON.stringify(gastos));
     localStorage.setItem('dopamina_gastos_caja', String(cajaDisponible));
     localStorage.setItem('dopamina_gastos_daniela', String(videoDanielaActivo));
+    localStorage.setItem('dopamina_gastos_socios_pagaron', String(sociosQuePagaron));
+    localStorage.setItem('dopamina_ganancias_web', String(gananciasWeb));
+    localStorage.setItem('dopamina_ganancias_fisico', String(gananciasFisico));
+    if (eventoSeleccionadoGastos) {
+      localStorage.setItem(`dopamina_ganancias_fisico_${eventoSeleccionadoGastos}`, String(gananciasFisico));
+    }
     setGastosGuardado(true);
     setTimeout(() => setGastosGuardado(false), 2500);
   };
@@ -4128,16 +4157,74 @@ export default function AdminDashboard() {
     setGastos(GASTOS_DEFAULTS);
     setCajaDisponible(1120000);
     setVideoDanielaActivo(false);
+    setSociosQuePagaron(0);
     localStorage.removeItem('dopamina_gastos');
     localStorage.removeItem('dopamina_gastos_caja');
     localStorage.removeItem('dopamina_gastos_daniela');
+    localStorage.removeItem('dopamina_gastos_socios_pagaron');
   };
 
   const handleAddGasto = () => {
-    const newId = Math.max(0, ...gastos.map(g => g.id)) + 1;
-    setGastos(prev => [...prev, { id: newId, item: 'Nuevo gasto', valorTotal: 0, pagado: 0, estado: 'Pendiente' }]);
-    setGastosEditando(newId);
-    setGastosEditForm({ item: 'Nuevo gasto', valorTotal: 0, pagado: 0, estado: 'Pendiente' });
+    if (eventoSeleccionadoGastos) {
+      api.adminCrearGastoEvento(eventoSeleccionadoGastos, { item: 'Nuevo gasto', valorTotal: 0, pagado: 0, estado: 'Pendiente' })
+        .then(nuevo => setGastosFromAPI(prev => [...prev, nuevo]))
+        .catch(err => setError('Error al crear gasto: ' + err.message));
+    } else {
+      const newId = Math.max(0, ...gastos.map(g => g.id)) + 1;
+      setGastos(prev => [...prev, { id: newId, item: 'Nuevo gasto', valorTotal: 0, pagado: 0, estado: 'Pendiente' }]);
+      setGastosEditando(newId);
+      setGastosEditForm({ item: 'Nuevo gasto', valorTotal: 0, pagado: 0, estado: 'Pendiente' });
+    }
+  };
+
+  const handleAPICreateGasto = async (data) => {
+    if (!eventoSeleccionadoGastos) return;
+    try {
+      const nuevo = await api.adminCrearGastoEvento(eventoSeleccionadoGastos, data);
+      setGastosFromAPI(prev => [...prev, nuevo]);
+    } catch (err) { setError('Error al crear gasto: ' + err.message); }
+  };
+
+  const handleAPIUpdateGasto = async (gastoId, data) => {
+    if (!eventoSeleccionadoGastos) return;
+    try {
+      const actualizado = await api.adminActualizarGastoEvento(eventoSeleccionadoGastos, gastoId, data);
+      setGastosFromAPI(prev => prev.map(g => g.id === gastoId ? actualizado : g));
+    } catch (err) { setError('Error al actualizar gasto: ' + err.message); }
+  };
+
+  const handleAPIDeleteGasto = async (gastoId) => {
+    if (!eventoSeleccionadoGastos) return;
+    try {
+      await api.adminEliminarGastoEvento(eventoSeleccionadoGastos, gastoId);
+      setGastosFromAPI(prev => prev.filter(g => g.id !== gastoId));
+    } catch (err) { setError('Error al eliminar gasto: ' + err.message); }
+  };
+
+  const loadGastosFromAPI = async (eventoId) => {
+    if (!eventoId) { setGastosFromAPI([]); return; }
+    setGastosLoading(true);
+    try {
+      const data = await api.adminGetGastosEvento(eventoId);
+      setGastosFromAPI(data);
+    } catch (err) { setError('Error al cargar gastos: ' + err.message); setGastosFromAPI([]); }
+    setGastosLoading(false);
+  };
+
+  const handleCopyGastos = async () => {
+    if (!copyTargetEventoId || !copyFromEvento) return;
+    try {
+      await api.adminCopiarGastosEvento(copyTargetEventoId, copyFromEvento);
+      setShowCopyDialog(false);
+      if (String(copyTargetEventoId) === eventoSeleccionadoGastos) {
+        loadGastosFromAPI(copyTargetEventoId);
+      }
+    } catch (err) { setError('Error al copiar gastos: ' + err.message); }
+  };
+
+  const saveGanancias = (web, fisico) => {
+    localStorage.setItem('dopamina_ganancias_web', String(web));
+    localStorage.setItem('dopamina_ganancias_fisico', String(fisico));
   };
 
   const estadoBadgeColor = (estado) => {
@@ -4161,7 +4248,7 @@ export default function AdminDashboard() {
     rows.push(['Plata disponible en caja', cajaDisponible]);
     rows.push(['Total pendiente a proveedores', gastosSaldo]);
     rows.push(['Faltante neto por conseguir', faltanteNeto]);
-    rows.push(['Cuota por socio (4 socios)', cuotaSocio]);
+    rows.push([`Cuota por socio (${sociosRestantes > 0 ? sociosRestantes + ' por pagar' : 'todos pagaron'})`, cuotaSocio]);
     const csvContent = [headers, ...rows].map(r => r.join(',')).join('\n');
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -4192,42 +4279,494 @@ export default function AdminDashboard() {
     pdf.save('Gastos_Evento_Borrachos_nunca_fachos.pdf');
   };
 
-  const renderGastos = () => (
+  const renderGastos = () => {
+    const activeGastos = eventoSeleccionadoGastos ? gastosFromAPI : gastos;
+    const gT = activeGastos.reduce((s, g) => s + Number(g.valorTotal || 0), 0);
+    const gP = activeGastos.reduce((s, g) => s + Number(g.pagado || 0), 0);
+    const gS = gT - gP;
+    const sR = 4 - sociosQuePagaron;
+    const fN = gS - cajaDisponible;
+    const cS = sR > 0 ? Math.ceil(fN / sR) : 0;
+    const gastosFilt = gastosFiltro === 'TODOS' ? activeGastos : activeGastos.filter(g => g.estado === gastosFiltro);
+    const totalGanancias = gananciasWeb + gananciasFisico;
+    const gananciaNeta = totalGanancias - gT;
+    const selectedEvento = eventos.find(e => String(e.id) === String(eventoSeleccionadoGastos));
+
+    const chartData = [
+      { label: 'Gastos', value: gT, color: theme.danger },
+      { label: 'Pagado', value: gP, color: theme.success },
+      { label: 'Pendiente', value: gS, color: theme.warning },
+      { label: 'Ganancias', value: totalGanancias, color: theme.info },
+    ];
+    const maxChartVal = Math.max(...chartData.map(d => d.value), 1);
+
+    const guardarGanancias = (web, fisico) => {
+      setGananciasWeb(web);
+      setGananciasFisico(fisico);
+      localStorage.setItem('dopamina_ganancias_web', String(web));
+      localStorage.setItem('dopamina_ganancias_fisico', String(fisico));
+    };
+
+    const handleSelectEvento = (eventoId) => {
+      setEventoSeleccionadoGastos(eventoId);
+      if (eventoId) {
+        loadGastosFromAPI(eventoId);
+        api.adminGetIngresosEvento(eventoId).then(data => {
+          setGananciasWeb(data.web || 0);
+          setEntradasPagadas(data.entradasPagadas || 0);
+          setEntradasRegaladas(data.entradasRegaladas || 0);
+          localStorage.setItem('dopamina_ganancias_web', String(data.web || 0));
+        }).catch(err => {
+          console.error('Error cargando ingresos del evento:', err);
+          if (err.message?.includes('expirada')) {
+            setError('Tu sesión expiró. Inicia sesión de nuevo para ver los ingresos.');
+          }
+        });
+        try {
+          setGananciasFisico(Number(localStorage.getItem(`dopamina_ganancias_fisico_${eventoId}`) || 0));
+        } catch { setGananciasFisico(0); }
+      } else {
+        setGastosFromAPI([]);
+        setGananciasWeb(0);
+        setGananciasFisico(0);
+        setEntradasPagadas(0);
+        setEntradasRegaladas(0);
+      }
+    };
+
+    return (
     <motion.div key="gastos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} ref={gastosRef}>
+
+      {/* Event Selector */}
+      <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '18px 24px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: '250px' }}>
+          <label style={{ fontSize: '0.7rem', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>Seleccionar Evento</label>
+          <select value={eventoSeleccionadoGastos} onChange={e => handleSelectEvento(e.target.value)}
+            style={{ ...inputStyle, width: '100%', marginBottom: 0, fontSize: '0.95rem' }}>
+            <option value="">-- Selecciona un evento --</option>
+            {eventos.map(ev => (
+              <option key={ev.id} value={ev.id}>{ev.nombre} ({ev.fecha})</option>
+            ))}
+          </select>
+        </div>
+        {selectedEvento && (
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '0.7rem', color: theme.textMuted, textTransform: 'uppercase', fontWeight: 600 }}>Precio entrada</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: theme.accent }}>{fmt(selectedEvento.precio)}</div>
+          </div>
+        )}
+      </div>
+
+      {!eventoSeleccionadoGastos && (
+        <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '40px 24px', textAlign: 'center', marginBottom: '24px' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '12px' }}>$</div>
+          <div style={{ color: theme.textMuted, fontSize: '0.9rem' }}>Selecciona un evento para ver y gestionar sus gastos</div>
+        </div>
+      )}
+
+      {eventoSeleccionadoGastos && (<>
       {/* Summary Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
-          { label: 'Total Evento', value: fmt(gastosTotales), color: theme.accent },
-          { label: 'Ya Pagado', value: fmt(gastosPagados), color: theme.success },
-          { label: 'Pendiente', value: fmt(gastosSaldo), color: theme.danger },
+          { label: 'Total Gastos', value: fmt(gT), color: theme.accent },
+          { label: 'Ya Pagado', value: fmt(gP), color: theme.success },
+          { label: 'Pendiente', value: fmt(gS), color: theme.danger },
           { label: 'Caja Disponible', value: fmt(cajaDisponible), color: theme.info },
-          { label: 'Faltante Neto', value: fmt(faltanteNeto), color: faltanteNeto > 0 ? theme.danger : theme.success },
-          { label: 'Cuota Socio (4)', value: fmt(cuotaSocio), color: theme.warning },
+          { label: 'Faltante Neto', value: fmt(fN), color: fN > 0 ? theme.danger : theme.success },
+          { label: `Cuota Socio (${sR > 0 ? sR + ' por pagar' : 'Listo!'})`, value: fmt(cS), color: theme.warning },
         ].map((c, i) => (
-          <div key={i} style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '18px 20px' }}>
-            <div style={{ fontSize: '0.7rem', color: theme.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>{c.label}</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: c.color }}>{c.value}</div>
+          <div key={i} style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '16px 18px' }}>
+            <div style={{ fontSize: '0.65rem', color: theme.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>{c.label}</div>
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: c.color }}>{c.value}</div>
           </div>
         ))}
       </div>
 
+      {/* Ganancias Input */}
+      <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '18px 24px', marginBottom: '20px' }}>
+        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>Ganancias del Evento</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+          <div>
+            <label style={{ fontSize: '0.7rem', color: theme.textMuted, display: 'block', marginBottom: '4px' }}>Ganancias Web (auto: boletas pagadas)</label>
+            <input type="text" value={fmt(gananciasWeb)} readOnly
+              style={{ ...inputStyle, width: '100%', marginBottom: 0, opacity: 0.8, cursor: 'default' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: '0.7rem', color: theme.textMuted, display: 'block', marginBottom: '4px' }}>Ganancias Fisico (efectivo puerta)</label>
+            <input type="number" value={gananciasFisico} onChange={e => guardarGanancias(gananciasWeb, Number(e.target.value) || 0)}
+              style={{ ...inputStyle, width: '100%', marginBottom: 0 }} placeholder="0" />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ fontSize: '0.7rem', color: theme.textMuted }}>Total Ganancias</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: theme.success }}>{fmt(totalGanancias)}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Charts */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+        {/* Bar Chart */}
+        <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '20px 24px' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '16px' }}>Resumen Visual</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {chartData.map((d, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '0.7rem', color: theme.textMuted, width: '80px', textAlign: 'right' }}>{d.label}</span>
+                <div style={{ flex: 1, height: '24px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${Math.max((d.value / maxChartVal) * 100, 2)}%`, background: d.color, borderRadius: '6px', transition: 'width 0.5s ease' }} />
+                </div>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: d.color, minWidth: '90px', textAlign: 'right' }}>{fmt(d.value)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Smart Summary */}
+        <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '20px 24px' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '16px' }}>Resumen Inteligente</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${theme.border}` }}>
+              <span style={{ fontSize: '0.8rem', color: theme.textSec }}>Ingresos totales</span>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: theme.success }}>{fmt(totalGanancias)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${theme.border}` }}>
+              <span style={{ fontSize: '0.8rem', color: theme.textSec }}>Gastos totales</span>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: theme.danger }}>{fmt(gT)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${theme.border}` }}>
+              <span style={{ fontSize: '0.8rem', color: theme.textSec }}>Entradas vendidas web</span>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: theme.info }}>{fmt(gananciasWeb)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${theme.border}` }}>
+              <span style={{ fontSize: '0.8rem', color: theme.textSec }}>Efectivo fisico</span>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: theme.info }}>{fmt(gananciasFisico)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', background: gananciaNeta >= 0 ? 'rgba(74,222,128,0.08)' : 'rgba(239,68,68,0.08)', borderRadius: '8px', paddingLeft: '10px', paddingRight: '10px', marginTop: '4px' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: theme.text }}>
+                {gananciaNeta >= 0 ? 'Ganancia neta' : 'Perdida neta'}
+              </span>
+              <span style={{ fontSize: '1rem', fontWeight: 800, color: gananciaNeta >= 0 ? theme.success : theme.danger }}>
+                {gananciaNeta >= 0 ? '+' : ''}{fmt(gananciaNeta)}
+              </span>
+            </div>
+            <div style={{ textAlign: 'center', padding: '10px', marginTop: '8px', borderRadius: '10px', background: gananciaNeta >= 0 ? 'rgba(74,222,128,0.12)' : 'rgba(239,68,68,0.12)', border: `1px solid ${gananciaNeta >= 0 ? 'rgba(74,222,128,0.3)' : 'rgba(239,68,68,0.3)'}` }}>
+              <div style={{ fontSize: '1.5rem', marginBottom: '4px' }}>{gananciaNeta >= 0 ? '+' : ''}</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: gananciaNeta >= 0 ? theme.success : theme.danger }}>
+                {gananciaNeta >= 0
+                  ? `El evento genera ${fmt(gananciaNeta)} de ganancia`
+                  : `El evento tiene una perdida de ${fmt(Math.abs(gananciaNeta))}`}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══════ ANÁLISIS FINANCIERO INTELIGENTE ═══════ */}
+      {selectedEvento && selectedEvento.precio > 0 && (() => {
+        const precioRegular = Number(selectedEvento.precio) || 0;
+        const precioPreventaVal = Number(selectedEvento.precioPreventa) || 0;
+        const cantPreventa = Number(selectedEvento.cantidadPreventa) || 0;
+        const preventaRestanteVal = Number(selectedEvento.preventaRestante) ?? 0;
+        const capacidadTotal = Number(selectedEvento.capacidad);
+        const tienePreventa = precioPreventaVal > 0 && cantPreventa > 0;
+
+        // ── Conteo real de entradas ──
+        const entradasPagadasReal = Number(entradasPagadas) || 0;
+        const entradasRegaladasReal = Number(entradasRegaladas) || 0;
+        const entradasFisico = precioRegular > 0 ? Math.round(gananciasFisico / precioRegular) : 0;
+        const totalEntradasVendidas = entradasPagadasReal + entradasRegaladasReal + entradasFisico;
+        const entradasPagasFisico = entradasFisico; // asumimos que fisico se paga a precio regular
+
+        // ── Precio promedio ponderado (preventa + regular) ──
+        // Si hay preventa, las primeras "cantPreventa" entradas se venden a precioPreventa
+        // El resto a precioRegular. Calculamos cuántas de cada una.
+        let entradasPrecioReducido = 0;
+        let entradasPrecioCompleto = 0;
+        if (tienePreventa) {
+          const preventaUsadas = Math.max(0, cantPreventa - Math.max(0, preventaRestanteVal));
+          // De las entradas pagadas, las primeras "preventaUsadas" fueron a precio reducido
+          entradasPrecioReducido = Math.min(preventaUsadas, entradasPagadasReal);
+          entradasPrecioCompleto = entradasPagadasReal - entradasPrecioReducido;
+        } else {
+          entradasPrecioCompleto = entradasPagadasReal;
+        }
+        const ingresoPreventa = entradasPrecioReducido * precioPreventaVal;
+        const ingresoRegular = entradasPrecioCompleto * precioRegular;
+        const precioPromedioPagado = entradasPagadasReal > 0
+          ? (ingresoPreventa + ingresoRegular) / entradasPagadasReal
+          : precioRegular;
+
+        // ── Punto de equilibrio con 2 escalas de precio ──
+        // Cuántas entradas (mezclando preventa + regular) se necesitan para cubrir gT
+        let puntoEquilibrio, entradasEquilibrioPreventa, entradasEquilibrioRegular;
+        if (gT <= 0) {
+          puntoEquilibrio = 0;
+          entradasEquilibrioPreventa = 0;
+          entradasEquilibrioRegular = 0;
+        } else if (tienePreventa && precioPreventaVal > 0) {
+          // Primero intentamos cubrir con preventa
+          const cubiertoConPreventa = Math.min(cantPreventa, Math.ceil(gT / precioPreventaVal));
+          const restante = gT - (cubiertoConPreventa * precioPreventaVal);
+          if (restante <= 0) {
+            entradasEquilibrioPreventa = cubiertoConPreventa;
+            entradasEquilibrioRegular = 0;
+          } else {
+            entradasEquilibrioPreventa = cantPreventa;
+            entradasEquilibrioRegular = Math.ceil(restante / precioRegular);
+          }
+          puntoEquilibrio = entradasEquilibrioPreventa + entradasEquilibrioRegular;
+        } else {
+          entradasEquilibrioPreventa = 0;
+          entradasEquilibrioRegular = Math.ceil(gT / precioRegular);
+          puntoEquilibrio = entradasEquilibrioRegular;
+        }
+
+        // Ingreso total si se alcanza el punto de equilibrio con esta mezcla
+        const ingresoEquilibrio = entradasEquilibrioPreventa * precioPreventaVal + entradasEquilibrioRegular * precioRegular;
+
+        const progresoEquilibrio = puntoEquilibrio > 0 ? Math.min((totalEntradasVendidas / puntoEquilibrio) * 100, 100) : 0;
+        const yaSuperoEquilibrio = totalEntradasVendidas >= puntoEquilibrio;
+
+        // ── ROI ──
+        const roi = gT > 0 ? ((gananciaNeta / gT) * 100) : (gananciaNeta > 0 ? Infinity : 0);
+        const mostrarRoiInfinito = gT === 0 && gananciaNeta > 0;
+        const roiDisplay = mostrarRoiInfinito ? '∞' : `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%`;
+        const roiDescripcion = mostrarRoiInfinito ? 'Sin inversión — ganancia pura' : `Por cada $1 invertido ${roi >= 0 ? 'ganas' : 'pierdes'} $${Math.abs(roi).toFixed(2)}`;
+
+        const margenPorEntrada = totalEntradasVendidas > 0 ? (gananciaNeta / totalEntradasVendidas) : 0;
+        const costoPorAsistente = totalEntradasVendidas > 0 ? (gT / totalEntradasVendidas) : 0;
+
+        // ── Capacidad ──
+        const capacidadValida = capacidadTotal > 0 && capacidadTotal !== null;
+        const capacidadEquilibrio = capacidadValida ? ((puntoEquilibrio / capacidadTotal) * 100) : null;
+        const capacidadOcupada = capacidadValida ? ((totalEntradasVendidas / capacidadTotal) * 100) : null;
+
+        // ── Proyeccion a lleno total con mezcla preventa+regular ──
+        let ingresoSilleno;
+        let roisilleno;
+        let ingresosBrutosLleno;
+        if (capacidadValida) {
+          const preventaFill = Math.min(cantPreventa, capacidadTotal);
+          const regularFill = capacidadTotal - preventaFill;
+          const ingresoBruto = (preventaFill * (tienePreventa ? precioPreventaVal : precioRegular)) + (regularFill * precioRegular);
+          ingresosBrutosLleno = ingresoBruto;
+          ingresoSilleno = ingresoBruto - gT;
+          roisilleno = gT > 0 ? ((ingresoSilleno / gT) * 100) : (ingresoSilleno > 0 ? Infinity : 0);
+        } else {
+          ingresoSilleno = null;
+          roisilleno = null;
+          ingresosBrutosLleno = null;
+        }
+
+        const roiLlenoDisplay = roisilleno === null ? '—' : roisilleno === Infinity ? '∞' : `${roisilleno >= 0 ? '+' : ''}${roisilleno.toFixed(1)}%`;
+
+        // ── Estado ──
+        const estadoFinanciero = yaSuperoEquilibrio
+          ? (roi >= 50 ? 'EXCELENTE' : roi >= 20 ? 'BUENO' : 'EN GANANCIA')
+          : progresoEquilibrio >= 75 ? 'CASI LLEGAMOS'
+          : progresoEquilibrio >= 50 ? 'A MITAD DE CAMINO'
+          : 'NECESITAMOS MÁS VENTAS';
+
+        const colorEstado = yaSuperoEquilibrio ? theme.success : progresoEquilibrio >= 50 ? theme.warning : theme.danger;
+
+        return (
+          <div style={{ marginBottom: '20px' }}>
+            {/* Header */}
+            <div style={{ background: 'linear-gradient(135deg, rgba(177,78,255,0.08), rgba(99,102,241,0.08))', border: `1px solid ${theme.border}`, borderRadius: '14px', padding: '20px 24px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Análisis Financiero Inteligente</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: theme.text }}>{selectedEvento.nombre}</div>
+                  {tienePreventa && (
+                    <div style={{ fontSize: '0.65rem', color: theme.textMuted, marginTop: '2px' }}>
+                      Preventa: {fmt(precioPreventaVal)} · Regular: {fmt(precioRegular)} · Promedio: {fmt(precioPromedioPagado)}
+                    </div>
+                  )}
+                </div>
+                <div style={{ padding: '6px 16px', borderRadius: '20px', background: `${colorEstado}20`, border: `1px solid ${colorEstado}40`, fontSize: '0.75rem', fontWeight: 800, color: colorEstado, letterSpacing: '0.5px' }}>
+                  {estadoFinanciero}
+                </div>
+              </div>
+
+              {/* Break-even Progress Bar with Markers */}
+              <div style={{ marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '14px' }}>
+                  <span style={{ fontSize: '0.7rem', color: theme.textMuted, fontWeight: 600 }}>
+                    Punto de Equilibrio
+                    {tienePreventa && <span style={{ fontSize: '0.6rem', fontWeight: 400 }}> ({entradasEquilibrioPreventa} preventa + {entradasEquilibrioRegular} regular)</span>}
+                  </span>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: colorEstado }}>
+                    {totalEntradasVendidas} / {puntoEquilibrio} entradas
+                    {entradasRegaladasReal > 0 && <span style={{ fontSize: '0.6rem', fontWeight: 400, color: theme.textMuted }}> ({entradasRegaladasReal} regaladas)</span>}
+                  </span>
+                </div>
+                <div style={{ position: 'relative', paddingTop: '28px', paddingBottom: '4px' }}>
+                  {/* Track */}
+                  <div style={{ position: 'absolute', left: '0', right: '0', top: '12px', height: '8px', background: 'rgba(255,255,255,0.04)', borderRadius: '4px' }} />
+                  {/* Fill */}
+                  <div style={{ position: 'absolute', left: '0', top: '12px', width: `${Math.min(progresoEquilibrio, 100)}%`, height: '8px', background: `linear-gradient(90deg, ${theme.danger}, ${theme.warning} 60%, ${theme.success})`, borderRadius: '4px', transition: 'width 0.6s ease' }} />
+                  {/* Markers: 25%, 50%, 75%, 100% */}
+                  {[25, 50, 75, 100].map(pct => {
+                    const ticketsNeeded = Math.ceil(puntoEquilibrio * pct / 100);
+                    const isPast = progresoEquilibrio >= pct;
+                    const isCurrentMilestone = !isPast && progresoEquilibrio >= pct - 25;
+                    return (
+                      <div key={pct} style={{ position: 'absolute', left: `${pct}%`, top: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', transform: 'translateX(-50%)' }}>
+                        <div style={{ width: '2px', height: '12px', background: isPast ? colorEstado : isCurrentMilestone ? `${theme.textMuted}80` : 'rgba(255,255,255,0.1)', borderRadius: '1px' }} />
+                        <div style={{ fontSize: '0.58rem', fontWeight: 700, color: isPast ? colorEstado : isCurrentMilestone ? theme.textMuted : 'rgba(255,255,255,0.2)', marginTop: '1px', whiteSpace: 'nowrap' }}>
+                          {pct}%
+                        </div>
+                        <div style={{ fontSize: '0.5rem', color: isPast ? `${colorEstado}99` : 'rgba(255,255,255,0.12)', marginTop: '0px', whiteSpace: 'nowrap' }}>
+                          {ticketsNeeded}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Position indicator dot */}
+                  <div style={{ position: 'absolute', left: `${Math.min(progresoEquilibrio, 100)}%`, top: '8px', width: '16px', height: '16px', borderRadius: '50%', background: colorEstado, border: `3px solid ${theme.card}`, boxShadow: `0 0 10px ${colorEstado}60`, transform: 'translateX(-50%)', transition: 'left 0.6s ease', zIndex: 2 }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                  <span style={{ fontSize: '0.65rem', color: theme.textMuted }}>{fmt(0)}</span>
+                  <span style={{ fontSize: '0.65rem', color: theme.textMuted }}>Meta: {fmt(gT)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Metrics Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+              {/* ROI */}
+              <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '16px 18px' }}>
+                <div style={{ fontSize: '0.65rem', color: theme.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>ROI (Retorno)</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: mostrarRoiInfinito ? theme.accent : (roi >= 0 ? theme.success : theme.danger) }}>
+                  {roiDisplay}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: theme.textMuted, marginTop: '4px' }}>
+                  {roiDescripcion}
+                </div>
+              </div>
+
+              {/* Margen por entrada */}
+              <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '16px 18px' }}>
+                <div style={{ fontSize: '0.65rem', color: theme.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Ganancia por Entrada</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: margenPorEntrada >= 0 ? theme.success : theme.danger }}>
+                  {fmt(margenPorEntrada)}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: theme.textMuted, marginTop: '4px' }}>
+                  Promedio neto por asistente
+                </div>
+              </div>
+
+              {/* Costo por asistente */}
+              <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '16px 18px' }}>
+                <div style={{ fontSize: '0.65rem', color: theme.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Costo por Asistente</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: theme.warning }}>
+                  {fmt(costoPorAsistente)}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: theme.textMuted, marginTop: '4px' }}>
+                  Gasto total / entradas vendidas
+                </div>
+              </div>
+
+              {/* Capacidad ocupada */}
+              <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '16px 18px' }}>
+                <div style={{ fontSize: '0.65rem', color: theme.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Capacidad Ocupada</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: theme.info }}>
+                  {capacidadValida ? `${capacidadOcupada.toFixed(1)}%` : '—'}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: theme.textMuted, marginTop: '4px' }}>
+                  {capacidadValida
+                    ? `${totalEntradasVendidas} / ${capacidadTotal} personas (${entradasRegaladasReal} regaladas)`
+                    : 'Capacidad no especificada'}
+                </div>
+              </div>
+            </div>
+
+            {/* Proyecciones */}
+            <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '18px 24px' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>Proyecciones</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+                {/* Para llegar al punto de equilibrio */}
+                <div style={{ padding: '14px 16px', borderRadius: '10px', background: yaSuperoEquilibrio ? 'rgba(74,222,128,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${yaSuperoEquilibrio ? 'rgba(74,222,128,0.2)' : 'rgba(239,68,68,0.2)'}` }}>
+                  <div style={{ fontSize: '0.7rem', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>
+                    {yaSuperoEquilibrio ? 'Ya superaste el punto de equilibrio' : 'Faltan entradas para equilibrio'}
+                  </div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: yaSuperoEquilibrio ? theme.success : theme.danger }}>
+                    {yaSuperoEquilibrio
+                      ? `+${totalEntradasVendidas - puntoEquilibrio} sobre la meta`
+                      : `${puntoEquilibrio - totalEntradasVendidas} entradas más`
+                    }
+                  </div>
+                  {!yaSuperoEquilibrio && (
+                    <div style={{ fontSize: '0.7rem', color: theme.textMuted, marginTop: '4px' }}>
+                      = {fmt((puntoEquilibrio - totalEntradasVendidas) * precioPromedioPagado)} adicionales (prom.)
+                    </div>
+                  )}
+                </div>
+
+                {/* Si se llena el evento */}
+                <div style={{ padding: '14px 16px', borderRadius: '10px', background: ingresoSilleno !== null && ingresoSilleno >= 0 ? 'rgba(74,222,128,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${ingresoSilleno !== null && ingresoSilleno >= 0 ? 'rgba(74,222,128,0.2)' : 'rgba(239,68,68,0.2)'}` }}>
+                  <div style={{ fontSize: '0.7rem', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>Si se llena el evento</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: ingresoSilleno !== null && ingresoSilleno >= 0 ? theme.success : theme.danger }}>
+                    {ingresoSilleno !== null ? `${ingresoSilleno >= 0 ? '+' : ''}${fmt(ingresoSilleno)}` : '—'}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: theme.textMuted, marginTop: '4px' }}>
+                    {ingresoSilleno !== null
+                      ? `ROI: ${roiLlenoDisplay} · ${fmt(ingresosBrutosLleno)} ingresos brutos`
+                      : 'Capacidad no especificada'}
+                  </div>
+                </div>
+
+                {/* Equilibrio en capacidad */}
+                <div style={{ padding: '14px 16px', borderRadius: '10px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                  <div style={{ fontSize: '0.7rem', color: theme.textMuted, marginBottom: '6px', fontWeight: 600 }}>Capacidad para equilibrio</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: theme.info }}>
+                    {capacidadValida ? `${capacidadEquilibrio.toFixed(1)}%` : '—'}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: theme.textMuted, marginTop: '4px' }}>
+                    {capacidadValida
+                      ? `Necesitas ${puntoEquilibrio} de ${capacidadTotal} asistentes (${fmt(gT)} en gastos)`
+                      : 'Especifica la capacidad del evento'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Video Daniela toggle */}
-      <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '18px 24px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+      <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '18px 24px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <div style={{ fontSize: '0.85rem', fontWeight: 700, color: theme.text }}>Video Daniela (condicional)</div>
           <div style={{ fontSize: '0.75rem', color: theme.textMuted }}>Solo se paga si el evento da plata — {fmt(450000)}</div>
         </div>
         <button onClick={() => setVideoDanielaActivo(!videoDanielaActivo)}
           style={{ padding: '8px 20px', borderRadius: '8px', border: `1px solid ${videoDanielaActivo ? theme.success : theme.border}`, background: videoDanielaActivo ? 'rgba(74,222,128,0.12)' : 'transparent', color: videoDanielaActivo ? theme.success : theme.textMuted, cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}>
-          {videoDanielaActivo ? '✓ Activo' : 'Inactivo'}
+          {videoDanielaActivo ? 'Activo' : 'Inactivo'}
         </button>
       </div>
 
-      {/* Caja input */}
-      <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '18px 24px', marginBottom: '24px' }}>
-        <label style={{ fontSize: '0.7rem', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>Plata disponible en caja</label>
-        <input type="number" value={cajaDisponible} onChange={e => setCajaDisponible(Number(e.target.value) || 0)}
-          style={{ ...inputStyle, width: '250px', marginBottom: 0, fontSize: '1.1rem', fontWeight: 700 }} />
+      {/* Caja + Socios */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+        <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '18px 24px' }}>
+          <label style={{ fontSize: '0.7rem', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>Plata disponible en caja</label>
+          <input type="number" value={cajaDisponible} onChange={e => setCajaDisponible(Number(e.target.value) || 0)}
+            style={{ ...inputStyle, width: '100%', marginBottom: 0, fontSize: '1.1rem', fontWeight: 700 }} />
+        </div>
+        <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '18px 24px' }}>
+          <label style={{ fontSize: '0.7rem', fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>Socios que ya pagaron su cuota</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {[0, 1, 2, 3, 4].map(n => (
+              <button key={n} onClick={() => setSociosQuePagaron(n)}
+                style={{ width: '48px', height: '48px', borderRadius: '10px', border: `2px solid ${sociosQuePagaron === n ? theme.accent : theme.border}`, background: sociosQuePagaron === n ? 'rgba(177,78,255,0.15)' : 'transparent', color: sociosQuePagaron === n ? theme.accentLight : theme.textMuted, cursor: 'pointer', fontWeight: 800, fontSize: '1.1rem', transition: 'all 0.2s' }}>
+                {n}
+              </button>
+            ))}
+            <span style={{ fontSize: '0.8rem', color: theme.textMuted, marginLeft: '4px' }}>/ 4</span>
+          </div>
+          {sR > 0 && <div style={{ fontSize: '0.75rem', color: theme.textMuted, marginTop: '8px' }}>Falta{sR !== 1 ? 'n' : ''} <span style={{ color: theme.warning, fontWeight: 700 }}>{sR}</span> socio{sR !== 1 ? 's' : ''} por pagar</div>}
+          {sR === 0 && <div style={{ fontSize: '0.75rem', color: theme.success, marginTop: '8px', fontWeight: 600 }}>Todos los socios ya pagaron</div>}
+        </div>
       </div>
 
       {/* Toolbar */}
@@ -4243,28 +4782,33 @@ export default function AdminDashboard() {
         <button onClick={handleAddGasto} style={{ ...btnPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Icon name="plus" size={14} /> Agregar
         </button>
-        <button onClick={handleGuardarGastos} style={{ padding: '10px 24px', borderRadius: '8px', border: `1px solid ${gastosGuardado ? theme.success : theme.border}`, background: gastosGuardado ? 'rgba(74,222,128,0.12)' : 'rgba(74,222,128,0.06)', color: gastosGuardado ? theme.success : theme.text, cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.3s' }}>
-          {gastosGuardado ? '✓ Guardado' : '💾 Guardar Cambios'}
-        </button>
-        <button onClick={handleResetGastos} style={{ ...btnGhost, borderColor: 'rgba(239,68,68,0.3)', color: theme.danger, display: 'flex', alignItems: 'center', gap: '6px' }}>
-          ↺ Restaurar
+        <button onClick={handleGuardarGastos}
+          style={{ ...btnPrimary, display: 'flex', alignItems: 'center', gap: '6px', background: gastosGuardado ? 'rgba(74,222,128,0.2)' : undefined, borderColor: gastosGuardado ? theme.success : undefined, color: gastosGuardado ? theme.success : undefined, transition: 'all 0.3s' }}>
+          {gastosGuardado ? (
+            <><Icon name="check" size={14} /> Guardado</>
+          ) : (
+            <><Icon name="save" size={14} /> Guardar</>
+          )}
         </button>
         <button onClick={exportGastosCSV} style={{ ...btnGhost, display: 'flex', alignItems: 'center', gap: '6px' }}>
-          📊 Excel / CSV
+          Excel / CSV
         </button>
         <button onClick={exportGastosPDF} style={{ ...btnGhost, display: 'flex', alignItems: 'center', gap: '6px' }}>
-          📄 Descargar PDF
+          Descargar PDF
         </button>
       </div>
 
       {/* Table */}
       <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '14px', overflow: 'hidden', marginBottom: '24px' }}>
         <div style={{ overflowX: 'auto' }}>
+          {gastosLoading ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: theme.textMuted }}>Cargando gastos...</div>
+          ) : (
           <table style={tableStyle}>
             <thead>
               <tr>
                 <th style={thStyle}>#</th>
-                <th style={thStyle}>Ítem</th>
+                <th style={thStyle}>Item</th>
                 <th style={{ ...thStyle, textAlign: 'right' }}>Valor Total</th>
                 <th style={{ ...thStyle, textAlign: 'right' }}>Pagado</th>
                 <th style={{ ...thStyle, textAlign: 'right' }}>Saldo</th>
@@ -4273,8 +4817,8 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {gastosFiltrados.map((g, idx) => {
-                const saldo = g.valorTotal - g.pagado;
+              {gastosFilt.map((g, idx) => {
+                const saldo = Number(g.valorTotal || 0) - Number(g.pagado || 0);
                 const isEditing = gastosEditando === g.id;
                 return (
                   <tr key={g.id} style={{ background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)' }}>
@@ -4316,16 +4860,29 @@ export default function AdminDashboard() {
                     <td style={{ ...tdStyle, textAlign: 'center' }}>
                       {isEditing ? (
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                          <button onClick={() => handleGastoSave(g.id)} style={{ ...btnPrimary, padding: '5px 12px', fontSize: '0.7rem' }}>Guardar</button>
+                          <button onClick={() => {
+                            if (eventoSeleccionadoGastos) {
+                              handleAPIUpdateGasto(g.id, { item: gastosEditForm.item, valorTotal: Number(gastosEditForm.valorTotal), pagado: Number(gastosEditForm.pagado), estado: gastosEditForm.estado });
+                            } else {
+                              handleGastoSave(g.id);
+                            }
+                            setGastosEditando(null);
+                          }} style={{ ...btnPrimary, padding: '5px 12px', fontSize: '0.7rem' }}>Guardar</button>
                           <button onClick={() => setGastosEditando(null)} style={{ ...btnGhost, padding: '5px 12px', fontSize: '0.7rem' }}>Cancelar</button>
                         </div>
                       ) : (
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                           <button onClick={() => handleGastoEdit(g)} style={{ ...btnGhost, padding: '5px 10px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Icon name="edit" size={12} /> Editar
+                            Editar
                           </button>
-                          <button onClick={() => handleGastoDelete(g.id)} style={{ ...btnGhost, padding: '5px 10px', fontSize: '0.7rem', borderColor: 'rgba(239,68,68,0.3)', color: theme.danger, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Icon name="trash" size={12} />
+                          <button onClick={() => {
+                            if (eventoSeleccionadoGastos) {
+                              handleAPIDeleteGasto(g.id);
+                            } else {
+                              handleGastoDelete(g.id);
+                            }
+                          }} style={{ ...btnGhost, padding: '5px 10px', fontSize: '0.7rem', borderColor: 'rgba(239,68,68,0.3)', color: theme.danger }}>
+                            X
                           </button>
                         </div>
                       )}
@@ -4336,66 +4893,51 @@ export default function AdminDashboard() {
             </tbody>
             <tfoot>
               <tr style={{ borderTop: `2px solid ${theme.borderLight}` }}>
-                <td style={{ ...tdStyle, fontWeight: 800, color: theme.text }}></td>
-                <td style={{ ...tdStyle, fontWeight: 800, color: theme.text, fontSize: '0.9rem' }}>TOTAL</td>
-                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 800, color: theme.accent, fontSize: '0.9rem' }}>{fmt(gastosTotales)}</td>
-                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 800, color: theme.success, fontSize: '0.9rem' }}>{fmt(gastosPagados)}</td>
-                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 800, color: theme.danger, fontSize: '0.9rem' }}>{fmt(gastosSaldo)}</td>
+                <td style={{ ...tdStyle, fontWeight: 800 }}></td>
+                <td style={{ ...tdStyle, fontWeight: 800, fontSize: '0.9rem' }}>TOTAL</td>
+                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 800, color: theme.accent, fontSize: '0.9rem' }}>{fmt(gT)}</td>
+                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 800, color: theme.success, fontSize: '0.9rem' }}>{fmt(gP)}</td>
+                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 800, color: theme.danger, fontSize: '0.9rem' }}>{fmt(gS)}</td>
                 <td style={tdStyle}></td>
                 <td style={tdStyle}></td>
               </tr>
             </tfoot>
           </table>
+          )}
         </div>
       </div>
+      </>)}
 
-      {/* Caja & Faltante */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '14px', padding: '24px' }}>
-          <h3 style={{ color: theme.text, fontSize: '0.85rem', fontWeight: 700, margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Caja y Faltante</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {[
-              { label: 'Plata disponible en caja', value: fmt(cajaDisponible), color: theme.info },
-              { label: 'Total pendiente a proveedores', value: fmt(gastosSaldo), color: theme.danger },
-              { label: 'Faltante neto por conseguir', value: fmt(faltanteNeto), color: faltanteNeto > 0 ? theme.danger : theme.success },
-              { label: 'Cuota por socio (4 socios)', value: fmt(cuotaSocio), color: theme.warning },
-            ].map((r, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < 3 ? `1px solid ${theme.border}` : 'none' }}>
-                <span style={{ fontSize: '0.8rem', color: theme.textSec }}>{r.label}</span>
-                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: r.color, fontVariantNumeric: 'tabular-nums' }}>{r.value}</span>
-              </div>
-            ))}
+      {/* Copy Dialog */}
+      {showCopyDialog && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '16px', padding: '32px', maxWidth: '440px', width: '90%' }}>
+            <h3 style={{ color: theme.text, fontSize: '1.1rem', fontWeight: 800, margin: '0 0 8px' }}>Copiar gastos de otro evento?</h3>
+            <p style={{ color: theme.textMuted, fontSize: '0.8rem', margin: '0 0 20px' }}>Puedes copiar la plantilla de gastos de un evento existente al nuevo evento que acabas de crear.</p>
+            <select value={copyFromEvento} onChange={e => setCopyFromEvento(e.target.value)}
+              style={{ ...inputStyle, width: '100%', marginBottom: '20px' }}>
+              <option value="">-- Selecciona evento origen --</option>
+              {eventos.filter(e => String(e.id) !== String(copyTargetEventoId)).map(ev => (
+                <option key={ev.id} value={ev.id}>{ev.nombre} ({ev.fecha})</option>
+              ))}
+            </select>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowCopyDialog(false)} style={{ ...btnGhost, padding: '10px 20px' }}>Ahora no</button>
+              <button onClick={handleCopyGastos} disabled={!copyFromEvento} style={{ ...btnPrimary, padding: '10px 20px', opacity: copyFromEvento ? 1 : 0.5 }}>Copiar gastos</button>
+            </div>
           </div>
         </div>
-
-        <div style={{ background: theme.card, border: `1px solid ${theme.border}`, borderRadius: '14px', padding: '24px' }}>
-          <h3 style={{ color: theme.text, fontSize: '0.85rem', fontWeight: 700, margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Resumen por Estado</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {['Pagado', 'Abono', 'Pendiente', 'N/A'].map(estado => {
-              const items = gastos.filter(g => g.estado === estado);
-              const total = items.reduce((s, g) => s + g.valorTotal, 0);
-              return (
-                <div key={estado} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: estado !== 'N/A' ? `1px solid ${theme.border}` : 'none' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={badgeStyle(estadoBadgeColor(estado))}>{estado}</span>
-                    <span style={{ fontSize: '0.75rem', color: theme.textMuted }}>{items.length} ítems</span>
-                  </div>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: theme.text, fontVariantNumeric: 'tabular-nums' }}>{fmt(total)}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Title */}
       <div style={{ textAlign: 'center', padding: '16px 0 0', borderTop: `1px solid ${theme.border}` }}>
         <span style={{ fontSize: '0.7rem', color: theme.textMuted, fontWeight: 600, letterSpacing: '2px', textTransform: 'uppercase' }}>
-          GASTOS EVENTO BORRACHOS PERO NUNCA FACHOS
+          GASTOS EVENTO
         </span>
       </div>
     </motion.div>
-  );
+    );
+  };
 
   // ── Main Layout ──
   return (

@@ -84,4 +84,16 @@ public interface CompraRepository extends JpaRepository<Compra, Long> {
 
     @Query("SELECT c FROM Compra c JOIN FETCH c.usuario WHERE c.codigoCupon IN :cupones ORDER BY c.createdAt DESC")
     List<Compra> findUsagesByCodigoCuponIn(@Param("cupones") List<String> cupones);
+
+    @Query("SELECT COALESCE(SUM(c.total), 0.0) FROM Compra c WHERE c.evento.id = :eventoId AND c.estado = 'PAGADO'")
+    Double sumTotalPagadoByEventoId(@Param("eventoId") Long eventoId);
+
+    @Query("SELECT COALESCE(SUM(c.total), 0.0) FROM Compra c WHERE c.evento.id = :eventoId AND c.estado = 'REGALADA'")
+    Double sumTotalRegaladasByEventoId(@Param("eventoId") Long eventoId);
+
+    @Query("SELECT COALESCE(SUM(c.cantidad), 0) FROM Compra c WHERE c.evento.id = :eventoId AND c.estado = 'PAGADO'")
+    Integer countEntradasPagadasByEventoId(@Param("eventoId") Long eventoId);
+
+    @Query("SELECT COALESCE(SUM(c.cantidad), 0) FROM Compra c WHERE c.evento.id = :eventoId AND c.estado = 'REGALADA'")
+    Integer countEntradasRegaladasByEventoId(@Param("eventoId") Long eventoId);
 }

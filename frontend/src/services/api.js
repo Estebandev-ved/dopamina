@@ -72,7 +72,7 @@ class ApiService {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        if (response.status === 401 && !endpoint.includes('/api/auth/') && !endpoint.startsWith('/api/public/')) {
+        if ((response.status === 401 || response.status === 403) && !endpoint.includes('/api/auth/') && !endpoint.startsWith('/api/public/')) {
           this.clearAuth();
           if (!window.location.pathname.includes('/login')) {
             sessionStorage.setItem('dopamina_redirect_after_login', window.location.pathname + window.location.search);
@@ -258,6 +258,34 @@ class ApiService {
 
   adminDeleteEvento(id) {
     return this.delete(`/api/admin/eventos/${id}`);
+  }
+
+  adminGetIngresosEvento(eventoId) {
+    return this.get(`/api/admin/eventos/${eventoId}/ingresos`);
+  }
+
+  // ── Gastos por Evento ────────────────────────────────────────────────────
+  adminGetGastosEvento(eventoId) {
+    return this.get(`/api/admin/eventos/${eventoId}/gastos`);
+  }
+
+  adminCrearGastoEvento(eventoId, data) {
+    return this.post(`/api/admin/eventos/${eventoId}/gastos`, data);
+  }
+
+  adminActualizarGastoEvento(eventoId, gastoId, data) {
+    return this.request(`/api/admin/eventos/${eventoId}/gastos/${gastoId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  adminEliminarGastoEvento(eventoId, gastoId) {
+    return this.delete(`/api/admin/eventos/${eventoId}/gastos/${gastoId}`);
+  }
+
+  adminCopiarGastosEvento(eventoId, origenId) {
+    return this.post(`/api/admin/eventos/${eventoId}/gastos/copy`, { origenId });
   }
 
   // ── Canjes (Premios) ──────────────────────────────────────────────────────

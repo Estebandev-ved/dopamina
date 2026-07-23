@@ -116,16 +116,16 @@ export default function App() {
   // Admin panel: full screen, no Navbar/Footer, skip splash
   if (location.pathname === '/admin') {
     return (
-      <Routes>
-        <Route
-          path="/admin"
-          element={
-            <AdminRoute>
-              <AdminDashboard />
-            </AdminRoute>
-          }
-        />
-      </Routes>
+      <Routes future={{ v7_relativeSplatPath: true }}>
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            }
+          />
+        </Routes>
     );
   }
 
@@ -139,7 +139,7 @@ export default function App() {
             <Navbar />
             <main className="flex-grow flex flex-col">
               <AnimatePresence mode="wait">
-                <Routes location={location} key={location.pathname}>
+                <Routes location={location} key={location.pathname} future={{ v7_relativeSplatPath: true }}>
                   <Route path="/" element={<Home />} />
                   <Route path="/about" element={<About />} />
                   <Route path="/login" element={<Login />} />

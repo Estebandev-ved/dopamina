@@ -3,6 +3,7 @@ package com.dopaminacrew.backend.controller;
 import com.dopaminacrew.backend.dto.EventoRequest;
 import com.dopaminacrew.backend.dto.EventoResponse;
 import com.dopaminacrew.backend.service.impl.EventoServiceImpl;
+import com.dopaminacrew.backend.repository.CompraRepository;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -10,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 
 /**
  * EventoController — REST endpoints for events.
@@ -24,6 +26,9 @@ public class EventoController {
 
     @Autowired
     private EventoServiceImpl eventoService;
+
+    @Autowired
+    private CompraRepository compraRepository;
 
     // ── Public endpoints ──────────────────────────────────────────────────────
 
@@ -86,6 +91,23 @@ public class EventoController {
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    /** Admin: get revenue and ticket counts for a specific event. */
+    @GetMapping("/api/admin/eventos/{id}/ingresos")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
+    public ResponseEntity<Map<String, Object>> getIngresos(@PathVariable Long id) {
+        Double pagado = compraRepository.sumTotalPagadoByEventoId(id);
+        Double regaladasValor = compraRepository.sumTotalRegaladasByEventoId(id);
+        Integer entradasPagadas = compraRepository.countEntradasPagadasByEventoId(id);
+        Integer entradasRegaladas = compraRepository.countEntradasRegaladasByEventoId(id);
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("web", pagado != null ? pagado : 0.0);
+        result.put("regaladas", regaladasValor != null ? regaladasValor : 0.0);
+        result.put("total", (pagado != null ? pagado : 0.0) + (regaladasValor != null ? regaladasValor : 0.0));
+        result.put("entradasPagadas", entradasPagadas != null ? entradasPagadas : 0);
+        result.put("entradasRegaladas", entradasRegaladas != null ? entradasRegaladas : 0);
+        return ResponseEntity.ok(result);
     }
 
     /** Admin: permanently delete an event. */

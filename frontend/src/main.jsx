@@ -9,7 +9,7 @@ const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '123456-fakeclie
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <GoogleOAuthProvider clientId={googleClientId}>
         <App />
       </GoogleOAuthProvider>

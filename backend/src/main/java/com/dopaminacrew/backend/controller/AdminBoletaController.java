@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
  */
 @RestController
 @RequestMapping("/api/admin/boletas")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN', 'SUBADMIN')")
 public class AdminBoletaController {
 
     @Autowired
