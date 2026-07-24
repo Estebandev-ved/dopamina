@@ -222,7 +222,14 @@ public class DatabaseFixer implements CommandLineRunner {
                 jdbcTemplate.update("UPDATE combos SET precio_original = 180000.0 WHERE nombre = 'Combo Ron Crew' AND (precio_original IS NULL OR precio_original = 0.0)");
                 jdbcTemplate.update("UPDATE combos SET precio_original = 100000.0 WHERE nombre = 'Combo Vape Crew' AND (precio_original IS NULL OR precio_original = 0.0)");
                 jdbcTemplate.update("UPDATE combos SET precio_original = 100000.0, precio = 75000.0 WHERE nombre = 'Combo Cumpleañero' AND (precio_original IS NULL OR precio_original = 0.0)");
-                System.out.println("✔ Precios originales de combos existentes actualizados.");
+                        System.out.println("✔ Precios originales de combos existentes actualizados.");
+            }
+
+            try {
+                jdbcTemplate.execute("ALTER TABLE combos ADD COLUMN agotado BOOLEAN NOT NULL DEFAULT FALSE;");
+                System.out.println("✔ Columna agotado agregada a combos.");
+            } catch (Exception e) {
+                System.out.println("Info: Columna agotado ya existe: " + e.getMessage());
             }
         } catch (Exception e) {
             System.err.println("Error creando o sembrando la tabla combos: " + e.getMessage());
